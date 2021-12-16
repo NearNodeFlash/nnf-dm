@@ -1,0 +1,6 @@
+apiVersion: dm.cray.hpe.com/v1alpha1
+kind: RsyncTemplate
+metadata:
+  name: rsynctemplate-sample
+spec:
+  # Add fields here

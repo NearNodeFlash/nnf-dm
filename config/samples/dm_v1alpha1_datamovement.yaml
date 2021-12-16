@@ -1,0 +1,6 @@
+apiVersion: dm.cray.hpe.com/v1alpha1
+kind: DataMovement
+metadata:
+  name: datamovement-sample
+spec:
+  # Add fields here

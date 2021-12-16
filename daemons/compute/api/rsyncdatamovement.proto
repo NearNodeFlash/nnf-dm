@@ -1,0 +1,59 @@
+// TODO: Copyright
+
+syntax = "proto3";
+
+option go_package = "nnf.cray.hpe.com/datamovement/api";
+option java_multiple_files = true;
+option java_package = "com.hpe.cray.nnf.datamovement";
+option java_outer_classname = "DataMovementProto";
+
+package datamovement;
+
+// RsyncDataMover service definition describes the API for perform data movement
+// for NNF storage. 
+service RsyncDataMover {
+    // Create sends a new data movement request identified by source and destination fields. It returns
+    // a response containing a unique identifier which can be used to query the status of the request.
+    rpc Create (RsyncDataMovementCreateRequest) returns (RsyncDataMovementCreateResponse) {}
+
+    // Status requests the status of a previously submitted data movement request. It accepts a unique
+    // identifier that identifies the request and returns a status message.
+    rpc Status (RsyncDataMovementStatusRequest) returns (RsyncDataMovementStatusResponse) {}
+}
+
+// The data movemement create request message containing the source and destination files or directories. The
+// NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
+// a new data movement request where the copy is simulated and not executed
+message RsyncDataMovementCreateRequest {
+    string source = 1;
+    string destination = 2;
+    bool dryrun = 3;
+}
+
+// The data movement create response message contains a unique identifier amont all data movement requests for
+// the lifetime of the active job. The UID can be used to query for status of the request using the
+// data movememnt status request message.
+message RsyncDataMovementCreateResponse {
+    string uid = 1;
+}
+
+// The data movement status request message permits users to query the status of a previously issued
+// data movement request by specifying the request's unique identifier.
+message RsyncDataMovementStatusRequest {
+    string uid = 1;
+}
+
+// The data movement status response message defines the current status of a data movement request. The
+// state field describes the current state of the request. The message field contains ancillary information
+// describing the data movement request. 
+message RsyncDataMovementStatusResponse {
+    enum State {
+        STARTING = 0;
+        RUNNING = 1;
+        COMPLETED = 2;
+        FAILED = 3;
+        UNKNOWN = 4;
+    }
+    State state = 1;
+    string message = 2;
+}

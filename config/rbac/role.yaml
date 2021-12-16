@@ -1,0 +1,86 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - datamovements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - datamovements/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - datamovements/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsyncnodedatamovements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsyncnodedatamovements/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsyncnodedatamovements/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsynctemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsynctemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsynctemplates/status
+  verbs:
+  - get
+  - patch
+  - update
