@@ -30,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/controllers"
@@ -52,11 +53,13 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var controller string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&controller, "controller", "node", "The controller type to run {node, system}")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -65,6 +68,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	dmCtrl := newDataMovementController(controller)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -72,33 +76,17 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "a60dd315.cray.hpe.com",
+		Namespace:              dmCtrl.GetNamespace(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.DataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DataMovement")
-		os.Exit(1)
+	if err := dmCtrl.SetupReconcilers(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", dmCtrl.GetType())
 	}
-	if err = (&controllers.RsyncTemplateReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RsyncTemplate")
-		os.Exit(1)
-	}
-	if err = (&controllers.RsyncNodeDataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RsyncNodeDataMovement")
-		os.Exit(1)
-	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -115,4 +103,69 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+type dataMovementControllerInterface interface {
+	GetType() string
+	GetNamespace() string
+	SetupReconcilers(manager.Manager) error
+}
+
+const (
+	NodeLocalController = "node"
+	SystemController    = "system"
+)
+
+func newDataMovementController(t string) dataMovementControllerInterface {
+	switch t {
+	case NodeLocalController:
+		return &nodeLocalController{}
+	case SystemController:
+		return &systemController{}
+	}
+
+	setupLog.Info("unable to create controller", "controller", "RsyncNodeDataMovement")
+	os.Exit(1)
+	return nil
+}
+
+type nodeLocalController struct{}
+
+func (*nodeLocalController) GetType() string      { return NodeLocalController }
+func (*nodeLocalController) GetNamespace() string { return os.Getenv("NODE_NAME") }
+
+func (*nodeLocalController) SetupReconcilers(mgr manager.Manager) (err error) {
+	if err = (&controllers.RsyncNodeDataMovementReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RsyncNodeDataMovement")
+		os.Exit(1)
+	}
+
+	return
+}
+
+type systemController struct{}
+
+func (*systemController) GetType() string      { return SystemController }
+func (*systemController) GetNamespace() string { return "" }
+
+func (*systemController) SetupReconcilers(mgr manager.Manager) (err error) {
+	if err = (&controllers.DataMovementReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DataMovement")
+		os.Exit(1)
+	}
+	if err = (&controllers.RsyncTemplateReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RsyncTemplate")
+		os.Exit(1)
+	}
+
+	return
 }

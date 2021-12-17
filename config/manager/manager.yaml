@@ -29,6 +29,7 @@ spec:
         - /manager
         args:
         - --leader-elect
+        - --controller=system
         image: controller:latest
         name: manager
         securityContext:
