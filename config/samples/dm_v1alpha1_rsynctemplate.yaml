@@ -3,4 +3,20 @@ kind: RsyncTemplate
 metadata:
   name: rsynctemplate-sample
 spec:
-  # Add fields here
+  selectors:
+    matchLabels:
+      cray.nnf.node: "true"
+  template:
+    spec:
+    - containers:
+      name: rsync-controller
+      image: arti.dev.cray.com/rabsw-docker-stable-local/nnf-dm:latest
+      command: /manager
+      args:
+      - --controller=node
+      env:
+      - name: NNF_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+

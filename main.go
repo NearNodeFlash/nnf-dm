@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/controllers"
 	//+kubebuilder:scaffold:imports
@@ -44,6 +45,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(lusv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

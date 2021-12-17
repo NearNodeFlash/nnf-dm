@@ -1,0 +1,3 @@
+[submodule ".lustre-fs-operator"]
+	path = .lustre-fs-operator
+	url = git@github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator.git

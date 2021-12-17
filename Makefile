@@ -28,15 +28,16 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# cray.hpe.com/nnf-dm3-bundle:$VERSION and cray.hpe.com/nnf-dm3-catalog:$VERSION.
-IMAGE_TAG_BASE ?= cray.hpe.com/nnf-dm3
+# cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
+IMAGE_TAG_BASE ?= arti.dev.cray.com/rabsw-docker-stable-local/nnf-dm
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= ${IMAGE_TAG_BASE}:${VERSION}
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.22
 
@@ -101,6 +102,9 @@ docker-build: test ## Build docker image with the manager.
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+
+kind-push:
+	kind load docker-image ${IMG}
 
 ##@ Deployment
 

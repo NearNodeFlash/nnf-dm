@@ -19,12 +19,30 @@ package controllers
 import (
 	"context"
 
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile" // Required for Watching
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+)
+
+const (
+	DaemonSetSuffix             = "-ds"
+	PersistentVolumeSuffix      = "-pv"
+	PersistentVolumeClaimSuffix = "-pvc"
 )
 
 // RsyncTemplateReconciler reconciles a RsyncTemplate object
@@ -36,6 +54,8 @@ type RsyncTemplateReconciler struct {
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsynctemplates,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsynctemplates/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsynctemplates/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -47,16 +67,123 @@ type RsyncTemplateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx).WithValues("RsyncTemplate", req.NamespacedName.String())
 
-	// your logic here
+	log.Info("Starting reconcile")
+	defer log.Info("Finished reconcile")
+
+	rsyncTemplate := &dmv1alpha1.RsyncTemplate{}
+	if err := r.Get(ctx, req.NamespacedName, rsyncTemplate); err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	ds := &apps.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rsyncTemplate.Name + DaemonSetSuffix,
+			Namespace: rsyncTemplate.Namespace,
+		},
+	}
+
+	mutateFn := func() error {
+
+		if err := ctrl.SetControllerReference(rsyncTemplate, ds, r.Scheme); err != nil {
+			return err
+		}
+
+		filesystems := &lusv1alpha1.LustreFileSystemList{}
+		if err := r.List(ctx, filesystems); err != nil {
+			return err
+		}
+
+		t := &rsyncTemplate.Spec.Template
+
+		// Always match the nodes with the selector labels
+		t.ObjectMeta.Labels = rsyncTemplate.Spec.Selector.MatchLabels
+		t.Spec.NodeSelector = rsyncTemplate.Spec.Selector.MatchLabels
+
+		// Add the volumes and volume mounts to the specification
+		t.Spec.Volumes = append(t.Spec.Volumes, volumes(filesystems.Items)...)
+
+		for cidx := range t.Spec.Containers {
+			container := &t.Spec.Containers[cidx]
+			container.VolumeMounts = append(container.VolumeMounts, volumeMounts(filesystems.Items)...)
+		}
+
+		ds.Spec = apps.DaemonSetSpec{
+			Selector: &rsyncTemplate.Spec.Selector,
+			Template: *t,
+		}
+
+		return nil
+	}
+
+	_, err := ctrl.CreateOrUpdate(ctx, r.Client, ds, mutateFn)
+	if err != nil {
+		return ctrl.Result{}, nil
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func volumes(filesystems []lusv1alpha1.LustreFileSystem) []core.Volume {
+	vols := make([]core.Volume, len(filesystems))
+	for idx, fs := range filesystems {
+		vols[idx] = core.Volume{
+			Name: fs.Name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: fs.Name + PersistentVolumeClaimSuffix,
+				},
+			},
+		}
+	}
+	return vols
+}
+
+func volumeMounts(filesystems []lusv1alpha1.LustreFileSystem) []core.VolumeMount {
+	mounts := make([]core.VolumeMount, len(filesystems))
+	for idx, fs := range filesystems {
+		mounts[idx] = core.VolumeMount{
+			Name:      fs.Name,
+			MountPath: fs.Spec.MountRoot,
+		}
+	}
+	return mounts
+}
+
+// Enqueue requests for all Rsync Templates
+func (r *RsyncTemplateReconciler) updateRsyncTemplates(client.Object) []reconcile.Request {
+
+	templates := &dmv1alpha1.RsyncTemplateList{}
+	if err := r.List(context.TODO(), templates); err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, len(templates.Items))
+	for idx, item := range templates.Items {
+		requests[idx] = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.GetName(),
+				Namespace: item.GetNamespace(),
+			},
+		}
+	}
+
+	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RsyncTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dmv1alpha1.RsyncTemplate{}).
+		Owns(&apps.DaemonSet{}).
+		Watches(
+			&source.Kind{Type: &lusv1alpha1.LustreFileSystem{}},
+			handler.EnqueueRequestsFromMapFunc(r.updateRsyncTemplates),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
 }
