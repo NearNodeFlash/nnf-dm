@@ -29,6 +29,8 @@ type RsyncTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	Selector metav1.LabelSelector `json:"selector,omitempty"`
+
 	// Template defines the pod template that is used for the basis of the Rsync Daemon set that
 	// manages the Rsync Node Data Movement requests.
 	Template v1.PodTemplateSpec `json:"template,omitempty"`

@@ -1,19 +1,28 @@
+# NNF Data Movement
 
-# Custom Resource Definitions
+## Setup
 
-## Data Movement CRD
+This project uses submodule `lustre-fs-operator` so that the LustreFileSystem CRDs can be installed during testing. To clone this project, use the additional `--recurse-submodules` option.
+
+```bash
+git clone --recurse-submodules ssh://git@github.hpe.com/hpe/hpc-rabsw-nnf-dm
+```
+
+## Custom Resource Definitions
+
+### Data Movement CRD
 
 Describes the data movement request at the very top level. References the Servers and Computes that are part of the request.
 
-## Rsync Template CRD
+### Rsync Template CRD
 
 The template for the Rsync Daemon Set that describes what is deployed to Rsync Nodes. Watches LustreFileSystems to ensure the proper PV/PVCs exist for each node.
 
-## Rsync Node Data Movement CRD
+### Rsync Node Data Movement CRD
 
 Describes a Rsync Data Movement request on an Rsync Node.
 
-# Bootstrapping
+## Bootstrapping
 
 This repository was bootstrapped using the operator-sdk
 ```
