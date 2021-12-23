@@ -34,4 +34,13 @@ resources:
   kind: RsyncNodeDataMovement
   path: github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cray.hpe.com
+  group: dm
+  kind: RsyncDataMovement
+  path: github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1
+  version: v1alpha1
 version: "3"

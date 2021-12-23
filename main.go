@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
+
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/controllers"
 	//+kubebuilder:scaffold:imports
@@ -89,6 +90,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", dmCtrl.GetType())
 	}
 
+	if err = (&controllers.RsyncDataMovementReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RsyncDataMovement")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

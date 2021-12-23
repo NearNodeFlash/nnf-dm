@@ -59,6 +59,32 @@ rules:
 - apiGroups:
   - dm.cray.hpe.com
   resources:
+  - rsyncdatamovements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsyncdatamovements/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
+  - rsyncdatamovements/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dm.cray.hpe.com
+  resources:
   - rsyncnodedatamovements
   verbs:
   - create
