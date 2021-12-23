@@ -3,4 +3,5 @@ resources:
 - dm_v1alpha1_datamovement.yaml
 - dm_v1alpha1_rsynctemplate.yaml
 - dm_v1alpha1_rsyncnodedatamovement.yaml
+- dm_v1alpha1_rsyncdatamovement.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

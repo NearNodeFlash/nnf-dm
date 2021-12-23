@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,15 +29,37 @@ type DataMovementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of DataMovement. Edit datamovement_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Source DataMovementSpecSourceDestination `json:"source,omitempty"`
+
+	Destination DataMovementSpecSourceDestination `json:"destination,omitempty"`
+
+	Servers corev1.ObjectReference `json:"storageInstance,omitempty"`
+
+	NodeAccess corev1.ObjectReference `json:"nodeAccess,omitempty"`
+}
+
+// DataMovementSpecSourceDestination defines the desired source or destination of data movement
+type DataMovementSpecSourceDestination struct {
+	Path string `json:"path,omitempty"`
+
+	StorageInstance *corev1.ObjectReference `json:"storageInstance,omitempty"`
 }
 
 // DataMovementStatus defines the observed state of DataMovement
 type DataMovementStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	Job corev1.ObjectReference `json:"job,omitempty"`
+
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
+
+const (
+	DataMovementConditionCreating = "Creating"
+	DataMovementConditionRunning  = "Running"
+	DataMovementConditionFinished = "Finished"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

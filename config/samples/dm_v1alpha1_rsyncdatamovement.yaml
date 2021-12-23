@@ -1,0 +1,6 @@
+apiVersion: dm.cray.hpe.com/v1alpha1
+kind: RsyncDataMovement
+metadata:
+  name: rsyncdatamovement-sample
+spec:
+  # Add fields here
