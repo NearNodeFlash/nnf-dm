@@ -5,7 +5,7 @@
 This project uses submodule `lustre-fs-operator` so that the LustreFileSystem CRDs can be installed during testing. To clone this project, use the additional `--recurse-submodules` option.
 
 ```bash
-git clone --recurse-submodules ssh://git@github.hpe.com/hpe/hpc-rabsw-nnf-dm
+git clone --recurse-submodules ssh://git@github.hpe.com:hpe/hpc-rabsw-nnf-dm.git
 ```
 
 ## Custom Resource Definitions
@@ -29,5 +29,6 @@ This repository was bootstrapped using the operator-sdk
 operator-sdk init --domain cray.hpe.com --repo github.hpe.com/hpe/hpc-rabsw-nnf-dm
 operator-sdk create api --group dm --version v1alpha1 --kind DataMovement --resource --controller
 operator-sdk create api --group dm --version v1alpha1 --kind RsyncTemplate --resource --controller
+operator-sdk create api --group dm --version v1alpha1 --kind RsyncDataMovement --resource --controller
 operator-sdk create api --group dm --version v1alpha1 --kind RsyncNodeDataMovement --resource --controller
 ```
