@@ -167,7 +167,6 @@ func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1
 	return "lustre", nil
 }
 
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).

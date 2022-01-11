@@ -129,9 +129,10 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20211216155555-d22b6b0ccef4 => ./.lustre-fs-operator
+# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220111162522-1d08349ccfda
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1
+github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases
 # github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20211213185652-ece897e5fe46
 github.hpe.com/hpe/hpc-rabsw-nnf-ec/pkg/rfsf/pkg/models
 # github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20211223141145-a7cad4f4e7e8
@@ -610,4 +611,3 @@ sigs.k8s.io/structured-merge-diff/v4/typed
 sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 sigs.k8s.io/yaml
-# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator => ./.lustre-fs-operator
