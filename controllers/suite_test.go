@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
+	_ "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -63,7 +64,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", ".lustre-fs-operator", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.hpe.com", "hpe", "hpc-rabsw-lustre-fs-operator", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}

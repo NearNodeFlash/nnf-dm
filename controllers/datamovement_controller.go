@@ -23,13 +23,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
-	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
 
 // DataMovementReconciler reconciles a DataMovement object
@@ -144,9 +142,9 @@ func (r *DataMovementReconciler) isLustre2Lustre(dm *dmv1alpha1.DataMovement) (i
 	//      Source is JobStorageInstance.fsType == lustre or
 	//      Source is PersistentStorageInstance.fsType == lustre
 	fsType := ""
-	if dm.Spec.Source.StorageInstance.Kind == "LustreFileSystem" {
+	if dm.Spec.Source.StorageInstance != nil && dm.Spec.Source.StorageInstance.Kind == "LustreFileSystem" {
 		fsType, err = r.getStorageInstanceFileSystemType(dm.Spec.Destination.StorageInstance)
-	} else if dm.Spec.Destination.StorageInstance.Kind == "LustreFileSystem" {
+	} else if dm.Spec.Destination.StorageInstance != nil && dm.Spec.Destination.StorageInstance.Kind == "LustreFileSystem" {
 		fsType, err = r.getStorageInstanceFileSystemType(dm.Spec.Source.StorageInstance)
 	}
 
@@ -156,17 +154,18 @@ func (r *DataMovementReconciler) isLustre2Lustre(dm *dmv1alpha1.DataMovement) (i
 func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1.ObjectReference) (string, error) {
 	switch object.Kind {
 	case "JobStorageInstance":
-		jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
-		if err := r.Get(context.TODO(), types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
-			return "", err
-		}
+		/*
+			jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
+			if err := r.Get(context.TODO(), types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
+				return "", err
+			}
 
-		return jobStorageInstance.Spec.FsType, nil
+			return jobStorageInstance.Spec.FsType, nil
+		*/
 	case "PersistentStorageInstance":
 	}
 	return "lustre", nil
 }
-
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
