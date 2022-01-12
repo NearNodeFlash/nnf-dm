@@ -21,13 +21,19 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+)
+
+const (
+	finalizer = "dm.cray.hpe.com"
 )
 
 // DataMovementReconciler reconciles a DataMovement object
@@ -51,7 +57,7 @@ type DataMovementReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx).WithValues("DataMovement", req.NamespacedName.String())
+	log := log.FromContext(ctx)
 
 	log.Info("Starting reconcile")
 	defer log.Info("Finished reconcile")
@@ -61,53 +67,150 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if len(dm.Status.Conditions) == 0 {
+	// Check if the object is being deleted. Deletion is coordinated around the sub-resources
+	// created or modified as part of data movement. This includes:
+	// TODO
+	if !dm.GetDeletionTimestamp().IsZero() {
+		log.V(4).Info("Starting delete operation")
 
-		if err := r.validateSpec(dm); err != nil {
-			dm.Status.Conditions = []metav1.Condition{{
-				Type:               dmv1alpha1.DataMovementConditionFinished,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Message:            fmt.Sprintf("input validation failed: %v", err),
-			}}
-		} else {
-			dm.Status.Conditions = []metav1.Condition{{
-				Type:               dmv1alpha1.DataMovementConditionCreating,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Message:            "data movement resource creating",
-			}}
+		if !controllerutil.ContainsFinalizer(dm, finalizer) {
+			return ctrl.Result{}, nil
 		}
 
-		if err := r.Status().Update(ctx, dm); err != nil {
+		// Unlabel any nodes that contain the current label
+		result, err := r.unlabelStorageNodes(ctx, dm)
+		log.V(4).Info("Unlabel Storage Nodes", "Result", result, "Error", err)
+		if err != nil {
+			return ctrl.Result{}, err
+		} else if !result.IsZero() {
+			return *result, nil
+		}
+
+		controllerutil.RemoveFinalizer(dm, finalizer)
+		if err := r.Update(ctx, dm); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	// TODO: Add a finalizer to ensure all created resources and actions are resolved upon deletion
+	if !controllerutil.ContainsFinalizer(dm, finalizer) {
+
+		// Do first level validation
+		if len(dm.Status.Conditions) == 0 {
+
+			if err := r.validateSpec(dm); err != nil {
+				dm.Status.Conditions = []metav1.Condition{{
+					Type:               dmv1alpha1.DataMovementConditionFinished,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Message:            fmt.Sprintf("Input validation failed: %v", err),
+					Reason:             "InputValidationFailed",
+				}}
+			} else {
+				dm.Status.Conditions = []metav1.Condition{{
+					Type:               dmv1alpha1.DataMovementConditionStarting,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: metav1.Now(),
+					Message:            "Data movement resource starting",
+					Reason:             "ResourceStarting",
+				}}
+			}
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				log.Error(err, "Failed to initialize status")
+				if errors.IsConflict(err) {
+					return ctrl.Result{Requeue: true}, nil
+				}
+
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{Requeue: true}, nil
+		}
+
+		controllerutil.AddFinalizer(dm, finalizer)
+		if err := r.Update(ctx, dm); err != nil {
+			log.Error(err, "Failed to initialize finalizer")
 			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	lastConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
-	switch lastConditionType {
+	isLustre2Lustre, err := r.isLustre2Lustre(dm)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	case dmv1alpha1.DataMovementConditionFinished:
-		// Already finished, do nothing further.
-		return ctrl.Result{}, nil
+	currentConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
+	log.Info("Executing", "IsLustre", isLustre2Lustre, "Condition", currentConditionType)
+	switch currentConditionType {
 
-	case dmv1alpha1.DataMovementConditionCreating:
-		// TODO: Transition to running
+	case dmv1alpha1.DataMovementConditionStarting:
 
-		// LUSTRE 2 LUSTRE
-		// We need to label all the nodes in the Servers object with a unique label that describes this
-		// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
-		// targets all the nodes
+		startFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+			false: r.initializeRsyncJob,
+			true:  r.initializeLustreJob,
+		}[isLustre2Lustre]
 
-		// XFS / GFS2
-		// We need to forward the NnfNodeAccess, Servers, and Source and Destination paths to the Rsync Job
-		// This should be a "CreateOrUpdate" call.
+		result, err := startFn(ctx, dm)
+		if err != nil {
+			log.Error(err, "Failed to start")
+			return ctrl.Result{}, err
+		} else if !result.IsZero() {
+			return *result, nil
+		}
+
+		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
+			Type:               dmv1alpha1.DataMovementConditionRunning,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Message:            "Data movement resource running",
+			Reason:             "ResourceRunning",
+		})
+
+		if err := r.Status().Update(ctx, dm); err != nil {
+			log.Error(err, "Failed to transition to running state")
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Data Movement Running")
+		return ctrl.Result{Requeue: true}, nil
 
 	case dmv1alpha1.DataMovementConditionRunning:
-		// TODO: Monitor the underlying MPIJob or RsyncJob for progress; if either of them transition to
-		// a Finished state, update the status here and transition myself to Finished.
+		monitorFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+			false: r.monitorRsyncJob,
+			true:  r.monitorLustreJob,
+		}[isLustre2Lustre]
+
+		result, err := monitorFn(ctx, dm) // TODO: This should return an additional error status if the job failed
+		if err != nil {
+			log.Error(err, "Failed to monitor")
+			return ctrl.Result{}, err
+		} else if !result.IsZero() {
+			return *result, nil
+		}
+
+		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
+			Type:               dmv1alpha1.DataMovementConditionFinished,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Message:            "Data movement resource finished",
+			Reason:             "ResourceFinished",
+		})
+
+		if err := r.Status().Update(ctx, dm); err != nil {
+			log.Error(err, "Failed to transition to running state")
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Data Movement Finished")
+		return ctrl.Result{}, nil
+
+	case dmv1alpha1.DataMovementConditionFinished:
+		return ctrl.Result{}, nil // Already finished, do nothing further.
 	}
 
 	return ctrl.Result{}, nil
@@ -133,12 +236,12 @@ func (r *DataMovementReconciler) validateSpec(dm *dmv1alpha1.DataMovement) error
 }
 
 func (r *DataMovementReconciler) isLustre2Lustre(dm *dmv1alpha1.DataMovement) (isLustre bool, err error) {
-	// TODO: Data Movement is a Lustre2Lustre copy if
-	//   COPYIN and Source is LustreFileSystem and
+	// Data Movement is a Lustre2Lustre copy if...
+	//   COPY_IN and Source is LustreFileSystem and
 	//      Destination is JobStorageInstance.fsType == lustre or
 	//      Destination is PersistentStorageInstance.fsType == lustre
 	//   or
-	//   COPYOUT and Destination is LustreFileSystem and
+	//   COPY_OUT and Destination is LustreFileSystem and
 	//      Source is JobStorageInstance.fsType == lustre or
 	//      Source is PersistentStorageInstance.fsType == lustre
 	fsType := ""
@@ -165,6 +268,14 @@ func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1
 	case "PersistentStorageInstance":
 	}
 	return "lustre", nil
+}
+
+func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+	return nil, nil
+}
+
+func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+	return nil, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

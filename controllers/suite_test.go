@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -35,6 +36,11 @@ import (
 	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	_ "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases"
 
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
+	_ "github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases"
+
+	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
+
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -51,6 +57,8 @@ var cancel context.CancelFunc
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
+	os.Setenv("ACK_GINKGO_DEPRECATIONS", "1.16.5")
+
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
 		[]Reporter{printer.NewlineReporter{}})
@@ -65,7 +73,9 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "vendor", "github.hpe.com", "hpe", "hpc-rabsw-lustre-fs-operator", "config", "crd", "bases"),
-			filepath.Join("..", "config", "crd", "bases")},
+			filepath.Join("..", "vendor", "github.hpe.com", "hpe", "hpc-rabsw-nnf-sos", "config", "crd", "bases"),
+			filepath.Join("..", "config", "crd", "bases"),
+			filepath.Join("..", "config", "mpi")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -76,7 +86,10 @@ var _ = BeforeSuite(func() {
 	err = lusv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = dmv1alpha1.AddToScheme(scheme.Scheme)
+	err = nnfv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = mpiv2beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dmv1alpha1.AddToScheme(scheme.Scheme)
@@ -98,6 +111,12 @@ var _ = BeforeSuite(func() {
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
 	})
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&DataMovementReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&RsyncTemplateReconciler{

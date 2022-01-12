@@ -20,11 +20,13 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
 
 // RsyncDataMovementReconciler reconciles a RsyncDataMovement object
@@ -47,9 +49,40 @@ type RsyncDataMovementReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncDataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx).WithValues("Rsync", req.NamespacedName.String())
 
-	// your logic here
+	rsync := &dmv1alpha1.RsyncDataMovement{}
+	if err := r.Get(ctx, req.NamespacedName, rsync); err != nil {
+		log.Error(err, "Failed to get RsyncDataMovememnt")
+		return ctrl.Result{}, err
+	}
+
+	// Retrieve the NnfStorage object that is associated with this Rsync job. This provides the list of Rabbits that will receive
+	// RsyncNodeDataMovement resources. TODO: Add rbac policy to perfrom GET
+	storage := &nnfv1alpha1.NnfStorage{}
+	if err := r.Get(ctx, types.NamespacedName{Name: rsync.Spec.Storage.Name, Namespace: rsync.Spec.Storage.Namespace}, storage); err != nil {
+		log.Error(err, "Failed to get NnfStorage")
+		return ctrl.Result{}, err
+	}
+
+	// TODO: Retrieve the NnfNodeLocalAccess object that is associated with this Rsync job. Should then retrieve the list of computes
+	//       associated with the node local access, which is used to start the data movement
+
+	// The NnfStorage specification is a list of Allocation Sets; with each set containing a number of Nodes <Name, Count> pair that
+	// describes the Rabbit and the number of allocations to perform on that node. Since this is an Rsync job, the expected number
+	// of Allocation Sets is one, and it should be of xfs/gfs2 type.
+	for _, allocationSet := range storage.Spec.AllocationSets {
+		if allocationSet.FileSystemType == "xfs" || allocationSet.FileSystemType == "gfs2" {
+			// TODO: Iterate over the list of Nodes in this allocation set, create an RsyncNodeDataMovement object that
+			// 1. Name is the rsync job name + compute ID
+			// 2. Namespace is the Rabbit name
+			// 3. Spec.Source is the Rsync Source
+			// 4. Spec.Destination is the NodeLocalAccess path + compute ID + Rsync Destination
+
+			// TODO: Compute ID is found by filtering the list of Computes for the target Rabbit; this algorithm must use a solid naming
+			//       convention (x-names or something similiar) so we can get the computes associated with the target Rabbit.
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -58,5 +91,6 @@ func (r *RsyncDataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *RsyncDataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dmv1alpha1.RsyncDataMovement{}).
+		Owns(&dmv1alpha1.RsyncNodeDataMovement{}).
 		Complete(r)
 }
