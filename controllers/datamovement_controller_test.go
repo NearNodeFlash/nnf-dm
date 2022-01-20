@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -14,9 +15,9 @@ import (
 
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
-	//lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 )
 
 var _ = Describe("Data Movement Controller", func() {
@@ -87,10 +88,24 @@ var _ = Describe("Data Movement Controller", func() {
 	// outside the BeforeEach() declartion so each test can modify the NNF Storage
 	// resource as needed.
 	JustBeforeEach(func() {
+		mgsNode := storage.Status.MgsNode
 		Expect(k8sClient.Create(context.TODO(), storage)).To(Succeed())
 		Eventually(func() error {
-			return k8sClient.Get(context.TODO(), storageKey, storage)
+			expected := &nnfv1alpha1.NnfStorage{}
+			return k8sClient.Get(context.TODO(), storageKey, expected)
 		}).Should(Succeed(), "create the nnf storage resource")
+
+		if len(mgsNode) > 0 {
+			storage.Status.MgsNode = mgsNode
+			Expect(k8sClient.Status().Update(context.TODO(), storage)).To(Succeed())
+			Eventually(func() string {
+				expected := &nnfv1alpha1.NnfStorage{}
+				Expect(k8sClient.Get(context.TODO(), storageKey, expected)).To(Succeed())
+				return expected.Status.MgsNode
+			}).Should(Equal(mgsNode), "update the nnf storage resource status")
+		}
+
+		Expect(k8sClient.Get(context.TODO(), storageKey, storage)).To(Succeed())
 	})
 
 	// Before each test, create a skeletal template for the Data Movement resource.
@@ -125,153 +140,264 @@ var _ = Describe("Data Movement Controller", func() {
 		}).Should(Succeed(), "create the data movement resource")
 	})
 
-	Describe("Lustre File System", func() {
+	Describe("Perform various Lustre to Lustre tests", func() {
 
-		BeforeEach(func() {
-			storage.Spec.AllocationSets[0].FileSystemType = "lustre"
-
-			dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
-				Path: "/lus/maui/example.file",
-				StorageInstance: &corev1.ObjectReference{
-					Kind:      "LustreFileSystem",
-					Name:      "lustre-maui",
-					Namespace: corev1.NamespaceDefault,
-				},
-			}
-
-			dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
-				Path: "/mnt/lus/maui",
-				StorageInstance: &corev1.ObjectReference{
-					Kind:      "JobStorageInstance",
-					Name:      "job-storage-instance-test",
-					Namespace: corev1.NamespaceDefault,
-				},
-			}
-		})
-
-		JustBeforeEach(func() {
-			Eventually(func() []metav1.Condition {
-				expected := &dmv1alpha1.DataMovement{}
-				Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
-				return expected.Status.Conditions
-			}).Should(ContainElements(
-				HaveField("Type", dmv1alpha1.DataMovementConditionStarting),
-				HaveField("Type", dmv1alpha1.DataMovementConditionRunning),
-			), "transition to running")
-		})
-
-		Describe("Check Lifecycle", func() {
-
-			// After each life-cycle test specification, delete the Data Movement resource
-			AfterEach(func() {
-				expected := &dmv1alpha1.DataMovement{}
-				Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
-				Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
-			})
-
-			PIt("Labels the node", func() {
-				Eventually(func() map[string]string {
-					node := &corev1.Node{}
-					Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-					return node.Labels
-				}).Should(HaveKeyWithValue(dmKey.Name, "true"))
-			})
-
-			PIt("Creates the MPI Job", func() {
-				Eventually(func() error {
-					mpi := &mpiv2beta1.MPIJob{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      dmKey.Name + mpiJobSuffix,
-							Namespace: dmKey.Namespace,
-						},
-					}
-					return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
-				}).Should(Succeed())
-			})
-		})
-
-		Describe("Check delete operation", func() {
-
-			PIt("Unlabels the node on delete", func() {
-				Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
-
-				Eventually(func() map[string]string {
-					node := &corev1.Node{}
-					Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-					return node.Labels
-				}).ShouldNot(HaveKey(dmKey.Name))
-			})
-		})
-
-		Context("Source is Global Lustre", func() {
+		Context("When source is Lustre File System type", func() {
+			var (
+				lustre *lusv1alpha1.LustreFileSystem
+			)
 
 			BeforeEach(func() {
-				dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
-					Path: "/lus/maui/myfile.tar.gz",
-					StorageInstance: &corev1.ObjectReference{
-						Kind:      "LustreFileSystem",
-						Name:      "lustre-maui",
+				lustre = &lusv1alpha1.LustreFileSystem{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "lustre-test",
 						Namespace: corev1.NamespaceDefault,
 					},
+					Spec: lusv1alpha1.LustreFileSystemSpec{
+						Name:      "lustre-test",
+						MgsNid:    "172.0.0.1@tcp",
+						MountRoot: "/lus/test",
+					},
 				}
+				Expect(k8sClient.Create(context.TODO(), lustre)).To(Succeed())
 			})
 
-			Describe("Destination is Job Storage Instance", func() {
+			AfterEach(func() {
+				Expect(k8sClient.Delete(context.TODO(), lustre)).To(Succeed())
+			})
+
+			Context("When destination is Job Storage Instance type", func() {
+				var (
+					jsi *nnfv1alpha1.NnfJobStorageInstance
+				)
 
 				BeforeEach(func() {
-					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
-						Path: "/mnt/lus/maui",
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "JobStorageInstance",
+					jsi = &nnfv1alpha1.NnfJobStorageInstance{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      "job-storage-instance-test",
 							Namespace: corev1.NamespaceDefault,
+						},
+						Spec: nnfv1alpha1.NnfJobStorageInstanceSpec{
+							Name:   "job-storage-instance-test",
+							FsType: "lustre",
+						},
+					}
+
+					Expect(k8sClient.Create(context.TODO(), jsi)).To(Succeed())
+					Eventually(func() error {
+						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(jsi), jsi)
+					}).Should(Succeed())
+
+				})
+
+				AfterEach(func() {
+					Expect(k8sClient.Delete(context.TODO(), jsi)).To(Succeed())
+				})
+
+				BeforeEach(func() {
+					// TODO: We need to find the correct allocation set amongst the three that are
+					// created
+					storage.Spec.AllocationSets[0].FileSystemType = "lustre"
+					storage.Status.MgsNode = "172.0.0.1@tcp"
+
+					dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
+						Path: "example.file",
+						StorageInstance: &corev1.ObjectReference{
+							Kind:      "LustreFileSystem",
+							Name:      lustre.Name,
+							Namespace: lustre.Namespace,
+						},
+					}
+
+					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
+						Path: "/",
+						StorageInstance: &corev1.ObjectReference{
+							Kind:      "NnfJobStorageInstance",
+							Name:      jsi.Name,
+							Namespace: jsi.Namespace,
 						},
 					}
 				})
 
-				PIt("Creates PV/PVC", func() {
-					Eventually(func() error {
+				JustBeforeEach(func() {
+
+					Eventually(func() []metav1.Condition {
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						return expected.Status.Conditions
+					}).Should(ContainElements(
+						HaveField("Type", dmv1alpha1.DataMovementConditionStarting),
+						HaveField("Type", dmv1alpha1.DataMovementConditionRunning),
+					), "transition to running")
+				})
+
+				Describe("Create Data Movement resource", func() {
+					// After each life-cycle test specification, delete the Data Movement resource
+					AfterEach(func() {
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
+					})
+
+					PIt("Labels the node", func() {
+						Eventually(func() map[string]string {
+							node := &corev1.Node{}
+							Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+							return node.Labels
+						}).Should(HaveKeyWithValue(dmKey.Name, "true"))
+					})
+
+					PIt("Creates PV/PVC", func() {
 						pv := &corev1.PersistentVolume{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeSuffix,
 								Namespace: dmKey.Namespace,
 							},
 						}
-						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
-					}).Should(Succeed())
 
-					Eventually(func() error {
+						Eventually(func() error {
+							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
+						}).Should(Succeed())
+
+						Expect(pv.Spec.CSI).To(MatchAllFields(Fields{
+							"Driver":       Equal("lustre-csi.nnf.cray.hpe.com"),
+							"FSType":       Equal("lustre"),
+							"VolumeHandle": Equal(storage.Status.MgsNode),
+						}))
+
 						pvc := &corev1.PersistentVolumeClaim{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeClaimSuffix,
 								Namespace: dmKey.Namespace,
 							},
 						}
-						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
-					}).Should(Succeed())
+
+						Eventually(func() error {
+							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
+						}).Should(Succeed())
+
+						// TODO: Do some checking of the PVC attributes
+					})
+
+					PIt("Creates MPIJob", func() {
+
+						mpi := &mpiv2beta1.MPIJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      dmKey.Name + mpiJobSuffix,
+								Namespace: dmKey.Namespace,
+							},
+						}
+
+						Eventually(func() error {
+							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
+						}).Should(Succeed(), "retrieve the mpi job")
+
+						By("Checking the worker specification")
+						workerSpec := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker].Template.Spec
+
+						source := corev1.PersistentVolumeClaimVolumeSource{ClaimName: lustre.Name + "-pvc"}
+						destination := corev1.PersistentVolumeClaimVolumeSource{ClaimName: dm.Name + "-pvc"}
+
+						Expect(workerSpec.Volumes).To(ContainElements(
+							HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(source))),
+							HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(destination))),
+							//HaveField("VolumeSource.PersistentVolumeClaim.ClaimName", Equal(lustre.Name + "-pvc")), // NJR: Not sure why this isn't working, seems it can't dereference a pointer type
+						), "have correct pvcs")
+					})
+				}) // Describe("Create Data Movement resource")
+
+				Describe("Create Data Movement resource with configuration map", func() {
+
+					AfterEach(func() {
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
+					})
+
+					// Create the ConfigMap this block will refer to
+					var (
+						config *corev1.ConfigMap
+					)
+
+					BeforeEach(func() {
+						config = &corev1.ConfigMap{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "data-movement" + configSuffix,
+								Namespace: corev1.NamespaceDefault,
+							},
+							Data: map[string]string{
+								configImage:             "testImage",
+								configCommand:           "testCommand",
+								configSourceVolume:      `{ "hostPath": { "path": "/tmp", "type": "Directory" } }`,
+								configDestinationVolume: `{ "hostPath": { "path": "/tmp", "type": "Directory" } }`,
+							},
+						}
+
+						Expect(k8sClient.Create(context.TODO(), config)).To(Succeed())
+					})
+
+					AfterEach(func() {
+						Expect(k8sClient.Delete(context.TODO(), config)).To(Succeed())
+					})
+
+					It("Contains correct overrides", func() {
+
+						mpi := &mpiv2beta1.MPIJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      dmKey.Name + mpiJobSuffix,
+								Namespace: dmKey.Namespace,
+							},
+						}
+
+						Eventually(func() error {
+							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
+						}).Should(Succeed())
+
+						By("Checking the launcher specification")
+						launcherSpec := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeLauncher].Template.Spec
+						Expect(launcherSpec.Containers).To(HaveLen(1))
+
+						By("Checking the worker specification")
+						workerSpec := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker].Template.Spec
+						Expect(workerSpec.Containers).To(HaveLen(1))
+						Expect(workerSpec.Containers[0].Image == config.Data[configImage])
+
+						hostPathType := corev1.HostPathDirectory
+						source := corev1.HostPathVolumeSource{Path: "/tmp", Type: &hostPathType}
+						destination := corev1.HostPathVolumeSource{Path: "/tmp", Type: &hostPathType}
+
+						Expect(workerSpec.Volumes).To(ContainElements(
+							HaveField("VolumeSource.HostPath", PointTo(Equal(source))),
+							HaveField("VolumeSource.HostPath", PointTo(Equal(destination))),
+						))
+
+					})
 				})
-			})
 
-			Describe("Destination is Persistent Storage Instance", func() {
+				Describe("Delete Data Movement resource", func() {
 
-				BeforeEach(func() {
-					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
-						Path: "/mnt/lus/maui",
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "PersistentStorageInstance",
-							Name:      "persistent-storage-instance-test",
-							Namespace: corev1.NamespaceDefault,
-						},
-					}
+					JustBeforeEach(func() {
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
+					})
+
+					PIt("Unlabels the nodes", func() {
+						Eventually(func() map[string]string {
+							node := &corev1.Node{}
+							Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+							return node.Labels
+						}).ShouldNot(HaveKey(dmKey.Name))
+					})
 				})
-			})
+			}) // Context("When destination is Job Storage Instance type"
 
-		})
+			Context("When destination is Persistent File System of lustre type", func() {})
 
-		Context("Source is Persistent Lustre", func() {
+		}) // Context("When source is Lustre File System type")
 
-		})
+		Context("When source is Persistent File System of lustre type", func() {})
 
-	})
+	}) // Describe("Perform various Lustre to Lustre tests"
 
 })

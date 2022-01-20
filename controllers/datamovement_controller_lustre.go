@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -17,18 +19,28 @@ import (
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
+
+	lustrecsi "github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service"
+	lustrectrl "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers"
 )
 
 const (
 	persistentVolumeSuffix      = "-pv"
 	persistentVolumeClaimSuffix = "-pvc"
 	mpiJobSuffix                = "-mpi"
+	configSuffix                = "-mpi-config"
+)
+
+const (
+	configImage             = "image"   // Image specifies the image used in the MPI launcher & worker containers
+	configCommand           = "command" // Command specifies the command attributes to use, excluding the distributed copy (dcpy) SOURCE DESTINATION parameters
+	configSourceVolume      = "sourceVolume"
+	configDestinationVolume = "destinationVolume"
 )
 
 func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx, "DataMovement", "Lustre")
 
-	// LUSTRE 2 LUSTRE
 	// We need to label all the nodes in the Servers object with a unique label that describes this
 	// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
 	// targets all the nodes
@@ -42,8 +54,6 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 
 	// TODO: The PV/PVC should only be needed for JobStorageInstance, otherwise the PV/PVC will already
 	//       be created, and we only need to reference them in the MPIJob.
-	//
-	// When Destination is
 
 	if err := r.createPersistentVolume(ctx, dm); err != nil {
 		log.Error(err, "Failed to create persistent volume")
@@ -65,6 +75,8 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 }
 
 func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+	log := log.FromContext(ctx).WithName("labeler")
+
 	storageRef := dm.Spec.Storage
 	storage := &nnfv1alpha1.NnfStorage{}
 	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
@@ -78,6 +90,8 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 
 	label := dm.Name
 
+	// TODO: We need to find the correct allocation set
+
 	for _, storageNode := range storage.Spec.AllocationSets[0].Nodes {
 		for _, node := range nodes.Items {
 
@@ -86,6 +100,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 
 					node.Labels[label] = "true"
 
+					log.Info("Applying label to node", "node", node.Name)
 					if err := r.Update(ctx, &node); err != nil {
 						if errors.IsConflict(err) {
 							return &ctrl.Result{Requeue: true}, nil
@@ -123,6 +138,15 @@ func (r *DataMovementReconciler) unlabelStorageNodes(ctx context.Context, dm *dm
 
 func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
 
+	if dm.Spec.Storage.Kind != "NnfStorage" {
+		panic("Create Persistent Volume requires NNF Storage type")
+	}
+
+	storage := &nnfv1alpha1.NnfStorage{}
+	if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Storage.Name, Namespace: dm.Spec.Storage.Namespace}, storage); err != nil {
+		return err
+	}
+
 	volumeMode := corev1.PersistentVolumeFilesystem
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -138,9 +162,9 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 			},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				CSI: &corev1.CSIPersistentVolumeSource{
-					Driver:       "TODO",
+					Driver:       lustrecsi.Name,
 					FSType:       "lustre",
-					VolumeHandle: "TODO",
+					VolumeHandle: storage.Status.MgsNode,
 				},
 			},
 			VolumeMode: &volumeMode,
@@ -149,7 +173,13 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 
 	ctrl.SetControllerReference(pv, dm, r.Scheme)
 
-	return r.Create(ctx, pv)
+	if err := r.Create(ctx, pv); err != nil {
+		if !errors.IsAlreadyExists(err) { // Ignore existing which may occur while trying to create the resource subtree fails at a later step
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
@@ -174,19 +204,34 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 
 	ctrl.SetControllerReference(pvc, dm, r.Scheme)
 
-	return r.Create(ctx, pvc)
+	if err := r.Create(ctx, pvc); err != nil {
+		if !errors.IsAlreadyExists(err) { // Ignore existing which may occur while trying to create the resource subtree fails at a later step
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+
+	config, err := r.getDataMovementConfigMap(ctx)
+	if err != nil {
+		return err
+	}
 
 	launcher := &kubeflowv1.ReplicaSpec{
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
-						Image:   "", // This should be from some config file somewhere
-						Name:    dm.Name,
-						Command: []string{},
+						Image: config.Data[configImage],
+						Name:  dm.Name,
+						Command: append(strings.Split(config.Data[configCommand], " "),
+							"dcp",
+							"/mnt/src"+dm.Spec.Source.Path,
+							"/mnt/dest"+dm.Spec.Destination.Path,
+						),
 					},
 				},
 			},
@@ -215,6 +260,9 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 					},
 				},
 				Affinity: &corev1.Affinity{
+					// Prevent multiple mpi-workers from being scheduled on the same node. That is to say...
+					// The pod should _not_ be scheduled (through anti-affinity) onto a node if that node
+					// is in the same zone (dm.Name) as a pod having label dm.Name="true".
 					PodAntiAffinity: &corev1.PodAntiAffinity{
 						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 							{
@@ -225,6 +273,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 											dm.Name: "true",
 										},
 									},
+									TopologyKey: dm.Name,
 								},
 							},
 						},
@@ -232,40 +281,28 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 				},
 				Containers: []corev1.Container{
 					{
-						Image: "", // This should be from some config file somewhere,
+						Image: config.Data[configImage],
 						Name:  dm.Name,
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "source",
-								MountPath: dm.Spec.Source.Path,
+								MountPath: "/mnt/src",
 							},
 							{
 								Name:      "destination",
-								MountPath: dm.Spec.Destination.Path,
+								MountPath: "/mnt/dest",
 							},
 						},
 					},
 				},
 				Volumes: []corev1.Volume{
 					{
-						Name: "source",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								// TODO: If SOURCE is global lustre, we should Get() the claim name from the lustre-fs-operator
-								//       If SOURCE is persistent lustre, we get the name from the PersistentVolumeSource
-								ClaimName: "",
-							},
-						},
+						Name:         "source",
+						VolumeSource: r.getVolumeSource(ctx, dm, config, configSourceVolume, r.getLustreSourcePersistentVolumeClaimName),
 					},
 					{
-						Name: "destination",
-						VolumeSource: corev1.VolumeSource{
-							PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-								// TODO: If DESTINATION is persistent lustre, we get the name from the PersistentVolumeSource
-								//       If DESTINATION is job lustre, we know the name is for our self created PVC
-								ClaimName: "",
-							},
-						},
+						Name:         "destination",
+						VolumeSource: r.getVolumeSource(ctx, dm, config, configDestinationVolume, r.getLustreDestinationPersistentVolumeClaimName),
 					},
 				},
 			},
@@ -288,6 +325,69 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 	ctrl.SetControllerReference(job, dm, r.Scheme)
 
 	return r.Create(ctx, job)
+}
+
+func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
+	config := &corev1.ConfigMap{}
+
+	// TODO: This should move to the Data Movement Namespace
+	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: corev1.NamespaceDefault}, config); err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, err
+		}
+
+		config.Data = map[string]string{
+			configImage:   "TODO",
+			configCommand: "mpirun --allow-run-as-root",
+		}
+	}
+
+	return config, nil
+}
+
+func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *dmv1alpha1.DataMovement, config *corev1.ConfigMap, override string, claimFn func(context.Context, *dmv1alpha1.DataMovement) string) corev1.VolumeSource {
+	if data, found := config.Data[override]; found {
+		source := corev1.VolumeSource{}
+		if err := json.Unmarshal([]byte(data), &source); err == nil {
+			return source
+		} else {
+			log.FromContext(ctx).Info("Failed to unmarshal override config " + override)
+		}
+	}
+
+	return corev1.VolumeSource{
+		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: claimFn(ctx, dm),
+		},
+	}
+}
+
+func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx context.Context, dm *dmv1alpha1.DataMovement) string {
+	ref := dm.Spec.Source.StorageInstance
+
+	if ref.Kind == "LustreFileSystem" {
+		return ref.Name + lustrectrl.PersistentVolumeClaimSuffix
+	} else if ref.Kind == "NnfPersistentStorageInstance" {
+		return ref.Name + "TODO" // TODO: Should look this up via nnf-sos when creating persistent lustre volume
+	} else if ref.Kind == "NnfJobStorageInstance" {
+		return dm.Name + persistentVolumeClaimSuffix
+	}
+
+	panic("Unsupported Lustre Source PVC: " + ref.Kind)
+}
+
+func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(ctx context.Context, dm *dmv1alpha1.DataMovement) string {
+	ref := dm.Spec.Destination.StorageInstance
+
+	if ref.Kind == "LustreFileSystem" {
+		return ref.Name + lustrectrl.PersistentVolumeClaimSuffix
+	} else if ref.Kind == "NnfPersistentStorageInstance" {
+		return ref.Name + "TODO" // TODO: Should look this up via nnf-sos when creating persistent lustre volume
+	} else if ref.Kind == "NnfJobStorageInstance" {
+		return dm.Name + persistentVolumeClaimSuffix
+	}
+
+	panic("Unsupported Lustre Destination PVC: " + ref.Kind)
 }
 
 func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {

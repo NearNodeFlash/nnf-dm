@@ -32,7 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/controllers"
@@ -48,7 +50,10 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(lusv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(mpiv2beta1.AddToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -62,7 +67,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&controller, "controller", "node", "The controller type to run {node, system}")
+	flag.StringVar(&controller, "controller", "node", "The controller type to run {node, system}.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -88,15 +93,9 @@ func main() {
 
 	if err := dmCtrl.SetupReconcilers(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", dmCtrl.GetType())
-	}
-
-	if err = (&controllers.RsyncDataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RsyncDataMovement")
 		os.Exit(1)
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -169,6 +168,15 @@ func (*systemController) SetupReconcilers(mgr manager.Manager) (err error) {
 		setupLog.Error(err, "unable to create controller", "controller", "DataMovement")
 		os.Exit(1)
 	}
+
+	if err = (&controllers.RsyncDataMovementReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RsyncDataMovement")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.RsyncTemplateReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),

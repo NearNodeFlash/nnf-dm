@@ -1,0 +1,35 @@
+apiVersion: nnf.cray.hpe.com/v1alpha1
+kind: NnfStorage
+metadata:
+  name: nnfstorage-sample-lustre
+spec:
+  allocationSets:
+  - name: mgt
+    capacity: 1048576
+    fileSystemType: lustre
+    fileSystemName: sample
+    targetType: MGT
+    backFs: zfs
+    nodes:
+    - name: kind-worker
+      count: 1
+  - name: mdt
+    capacity: 1048576
+    fileSystemType: lustre
+    fileSystemName: sample
+    targetType: MDT
+    backFs: zfs
+    nodes:
+    - name: kind-worker2
+      count: 1
+  - name: ost
+    capacity: 1048576
+    fileSystemType: lustre
+    fileSystemName: sample
+    targetType: OST
+    backFs: zfs
+    nodes:
+    - name: kind-worker2
+      count: 1
+status:
+  mgsNode: "127.0.0.1@tcp"

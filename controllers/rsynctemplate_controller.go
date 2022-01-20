@@ -67,7 +67,7 @@ type RsyncTemplateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx).WithValues("RsyncTemplate", req.NamespacedName.String())
+	log := log.FromContext(ctx)
 
 	log.Info("Starting reconcile")
 	defer log.Info("Finished reconcile")

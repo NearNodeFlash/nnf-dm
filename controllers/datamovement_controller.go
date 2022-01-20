@@ -24,12 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
 
 const (
@@ -45,7 +48,14 @@ type DataMovementReconciler struct {
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/finalizers,verbs=update
-//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfjobstorageinstances,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
+//+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;pathc;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -68,8 +78,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Check if the object is being deleted. Deletion is coordinated around the sub-resources
-	// created or modified as part of data movement. This includes:
-	// TODO
+	// created or modified as part of data movement.
 	if !dm.GetDeletionTimestamp().IsZero() {
 		log.V(4).Info("Starting delete operation")
 
@@ -94,7 +103,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// TODO: Add a finalizer to ensure all created resources and actions are resolved upon deletion
 	if !controllerutil.ContainsFinalizer(dm, finalizer) {
 
 		// Do first level validation
@@ -202,7 +210,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		})
 
 		if err := r.Status().Update(ctx, dm); err != nil {
-			log.Error(err, "Failed to transition to running state")
+			log.Error(err, "Failed to transition to finished state")
 			return ctrl.Result{}, err
 		}
 
@@ -256,17 +264,18 @@ func (r *DataMovementReconciler) isLustre2Lustre(dm *dmv1alpha1.DataMovement) (i
 
 func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1.ObjectReference) (string, error) {
 	switch object.Kind {
-	case "JobStorageInstance":
-		/*
-			jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
-			if err := r.Get(context.TODO(), types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
-				return "", err
-			}
+	case "NnfJobStorageInstance":
 
-			return jobStorageInstance.Spec.FsType, nil
-		*/
-	case "PersistentStorageInstance":
+		jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
+			return "", err
+		}
+
+		return jobStorageInstance.Spec.FsType, nil
+
+	case "NnfPersistentStorageInstance":
 	}
+
 	return "lustre", nil
 }
 
@@ -282,5 +291,8 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1al
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dmv1alpha1.DataMovement{}).
+		Owns(&mpiv2beta1.MPIJob{}).
+		Owns(&corev1.PersistentVolume{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }
