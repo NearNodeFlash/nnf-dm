@@ -172,7 +172,7 @@ github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers
 # github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220107171404-8b3a8cdbd9de
 github.hpe.com/hpe/hpc-rabsw-nnf-ec/pkg/rfsf/pkg/models
-# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220112202643-dbcf84f7e871
+# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220114194648-224a04755b2f
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases

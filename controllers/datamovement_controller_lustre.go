@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,10 +33,10 @@ const (
 )
 
 const (
-	configImage             = "image"   // Image specifies the image used in the MPI launcher & worker containers
-	configCommand           = "command" // Command specifies the command attributes to use, excluding the distributed copy (dcpy) SOURCE DESTINATION parameters
-	configSourceVolume      = "sourceVolume"
-	configDestinationVolume = "destinationVolume"
+	configImage             = "image"             // Image specifies the image used in the MPI launcher & worker containers
+	configCommand           = "command"           // Command specifies the command to run. Defaults to "mpirun"
+	configSourceVolume      = "sourceVolume"      // SourceVolume is the corev1.VolumeSource used as the source volume mount. Defaults to a CSI volume interpreted from the Spec.Source
+	configDestinationVolume = "destinationVolume" // DestinationVolume is the corev1.VolumeSource used as the destination volume mount. Defaults to a CSI volume interpreted from the Spec.Destination
 )
 
 func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
@@ -77,12 +78,38 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("labeler")
 
-	storageRef := dm.Spec.Storage
-	storage := &nnfv1alpha1.NnfStorage{}
-	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
-		return nil, err
+	// List of target node names that are to perform lustre data movement
+	targetNodeNames := make([]string, 0)
+
+	// DEVELOPMENT: Support the NnfStorage as an allocation mechanism; this should be replaced by DWS Servers definition,
+	// but for development the NnfStorage is easier to use for both listing the nodes and getting the msgNode.
+	switch dm.Spec.Storage.Kind {
+	case "NnfStorage":
+		storageRef := dm.Spec.Storage
+		storage := &nnfv1alpha1.NnfStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+			return nil, err
+		}
+
+		targetAllocationSetIndex := -1
+		for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
+			if allocationSet.TargetType == "OST" {
+				targetAllocationSetIndex = allocationSetIndex
+			}
+		}
+
+		if targetAllocationSetIndex == -1 {
+			return nil, fmt.Errorf("OST allocation set not found")
+		}
+
+		for _, storageNode := range storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes {
+			targetNodeNames = append(targetNodeNames, storageNode.Name)
+		}
+		break
 	}
 
+	// Retrieve all the NNF Nodes in the cluster - these nodes will be matched against the requested
+	// node list and labeled such that the mpijob can target the desired nodes
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes, client.HasLabels{"cray.nnf.node"}); err != nil {
 		return nil, err
@@ -90,12 +117,11 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 
 	label := dm.Name
 
-	// TODO: We need to find the correct allocation set
+	for _, nodeName := range targetNodeNames {
 
-	for _, storageNode := range storage.Spec.AllocationSets[0].Nodes {
+		nodeFound := false
 		for _, node := range nodes.Items {
-
-			if node.Name == storageNode.Name {
+			if node.Name == nodeName {
 				if _, found := node.Labels[label]; !found {
 
 					node.Labels[label] = "true"
@@ -110,8 +136,13 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 					}
 				}
 
+				nodeFound = true
 				break
 			}
+		}
+
+		if !nodeFound {
+			log.Info("Node %s not found. Check the spelling or status of the node")
 		}
 	}
 
@@ -220,18 +251,29 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 		return err
 	}
 
+	image := "arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1"
+	if img, found := config.Data[configImage]; found {
+		image = img
+	}
+
+	command := []string{"mpirun", "--allow-run-as-root", "dcp", "/mnt/src" + dm.Spec.Source.Path, "/mnt/dest" + dm.Spec.Destination.Path}
+	if cmd, found := config.Data[configCommand]; found {
+		if strings.HasPrefix(cmd, "/bin/bash -c") {
+			command = []string{"/bin/bash", "-c", strings.TrimPrefix(cmd, "/bin/bash -c")}
+		} else {
+			command = strings.Split(cmd, " ")
+		}
+
+	}
+
 	launcher := &kubeflowv1.ReplicaSpec{
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
-						Image: config.Data[configImage],
-						Name:  dm.Name,
-						Command: append(strings.Split(config.Data[configCommand], " "),
-							"dcp",
-							"/mnt/src"+dm.Spec.Source.Path,
-							"/mnt/dest"+dm.Spec.Destination.Path,
-						),
+						Image:   image,
+						Name:    dm.Name,
+						Command: command,
 					},
 				},
 			},
@@ -334,11 +376,6 @@ func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (
 	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: corev1.NamespaceDefault}, config); err != nil {
 		if !errors.IsNotFound(err) {
 			return nil, err
-		}
-
-		config.Data = map[string]string{
-			configImage:   "TODO",
-			configCommand: "mpirun --allow-run-as-root",
 		}
 	}
 

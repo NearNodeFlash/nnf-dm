@@ -20,30 +20,38 @@ import (
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
 
+const (
+	testNumberOfNodes = 2
+)
+
 var _ = Describe("Data Movement Controller", func() {
 
 	var (
-		nodeKey, storageKey, dmKey types.NamespacedName
-		storage                    *nnfv1alpha1.NnfStorage
-		dm                         *dmv1alpha1.DataMovement
+		nodeKeys          []types.NamespacedName
+		storageKey, dmKey types.NamespacedName
+		storage           *nnfv1alpha1.NnfStorage
+		dm                *dmv1alpha1.DataMovement
 	)
 
 	// Before each test ensure there is a Node with the proper label (cray.nnf.node=true), and
 	// there is NNF Storage that contains that node as its one and only allocation.
 	BeforeEach(func() {
-		nodeKey = types.NamespacedName{
-			Name: "test-node",
+		nodeKeys = []types.NamespacedName{
+			{Name: "test-node-0"},
+			{Name: "test-node-1"},
 		}
 
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeKey.Name,
-				Labels: map[string]string{
-					"cray.nnf.node": "true",
+		for _, nodeKey := range nodeKeys {
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeKey.Name,
+					Labels: map[string]string{
+						"cray.nnf.node": "true",
+					},
 				},
-			},
+			}
+			Expect(k8sClient.Create(context.TODO(), node)).To(Succeed())
 		}
-		Expect(k8sClient.Create(context.TODO(), node)).To(Succeed())
 
 		storageKey = types.NamespacedName{
 			Name:      "test-storage",
@@ -55,21 +63,6 @@ var _ = Describe("Data Movement Controller", func() {
 				Name:      storageKey.Name,
 				Namespace: storageKey.Namespace,
 			},
-			Spec: nnfv1alpha1.NnfStorageSpec{
-				AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
-					{
-						Name:           "test-nnf-storage",
-						Capacity:       0,
-						FileSystemType: "lustre",
-						Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{
-							{
-								Name:  node.Name,
-								Count: 1,
-							},
-						},
-					},
-				},
-			},
 		}
 	})
 
@@ -79,9 +72,11 @@ var _ = Describe("Data Movement Controller", func() {
 		Expect(k8sClient.Get(context.TODO(), storageKey, storage)).To(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), storage)).To(Succeed())
 
-		node := &corev1.Node{}
-		Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), node)).To(Succeed())
+		for _, nodeKey := range nodeKeys {
+			node := &corev1.Node{}
+			Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), node)).To(Succeed())
+		}
 	})
 
 	// Just before each test, ensure the NNF Storage resource is created. This is
@@ -148,6 +143,40 @@ var _ = Describe("Data Movement Controller", func() {
 			)
 
 			BeforeEach(func() {
+				// These are the nodes that should be targeted for the
+				nodes := make([]nnfv1alpha1.NnfStorageAllocationNodes, len(nodeKeys))
+				for nodeKeyIdx, nodeKey := range nodeKeys {
+					nodes[nodeKeyIdx] = nnfv1alpha1.NnfStorageAllocationNodes{
+						Name:  nodeKey.Name,
+						Count: 1,
+					}
+				}
+
+				storage.Spec = nnfv1alpha1.NnfStorageSpec{
+					AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
+						// Non OST definitions should be ignored
+						{
+							Name:           "test-nnf-storage-mdt",
+							FileSystemType: "lustre",
+							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+								TargetType: "MDT",
+							},
+							Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
+						},
+						{
+							Name:           "test-nnf-storage",
+							Capacity:       0,
+							FileSystemType: "lustre",
+							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+								TargetType: "OST",
+							},
+							Nodes: nodes,
+						},
+					},
+				}
+			})
+
+			BeforeEach(func() {
 				lustre = &lusv1alpha1.LustreFileSystem{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "lustre-test",
@@ -195,9 +224,7 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				BeforeEach(func() {
-					// TODO: We need to find the correct allocation set amongst the three that are
-					// created
-					storage.Spec.AllocationSets[0].FileSystemType = "lustre"
+
 					storage.Status.MgsNode = "172.0.0.1@tcp"
 
 					dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
@@ -220,7 +247,6 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				JustBeforeEach(func() {
-
 					Eventually(func() []metav1.Condition {
 						expected := &dmv1alpha1.DataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
@@ -239,12 +265,14 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
 					})
 
-					PIt("Labels the node", func() {
-						Eventually(func() map[string]string {
-							node := &corev1.Node{}
-							Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-							return node.Labels
-						}).Should(HaveKeyWithValue(dmKey.Name, "true"))
+					It("Labels the node", func() {
+						for _, nodeKey := range nodeKeys {
+							Eventually(func() map[string]string {
+								node := &corev1.Node{}
+								Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+								return node.Labels
+							}).Should(HaveKeyWithValue(dmKey.Name, "true"))
+						}
 					})
 
 					PIt("Creates PV/PVC", func() {
@@ -340,7 +368,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), config)).To(Succeed())
 					})
 
-					It("Contains correct overrides", func() {
+					PIt("Contains correct overrides", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
@@ -383,14 +411,16 @@ var _ = Describe("Data Movement Controller", func() {
 					})
 
 					PIt("Unlabels the nodes", func() {
-						Eventually(func() map[string]string {
-							node := &corev1.Node{}
-							Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-							return node.Labels
-						}).ShouldNot(HaveKey(dmKey.Name))
+						for _, nodeKey := range nodeKeys {
+							Eventually(func() map[string]string {
+								node := &corev1.Node{}
+								Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+								return node.Labels
+							}).ShouldNot(HaveKey(dmKey.Name))
+						}
 					})
 				})
-			}) // Context("When destination is Job Storage Instance type"
+			}) // Context("When destination is Job Storage Instance type")
 
 			Context("When destination is Persistent File System of lustre type", func() {})
 
@@ -398,6 +428,6 @@ var _ = Describe("Data Movement Controller", func() {
 
 		Context("When source is Persistent File System of lustre type", func() {})
 
-	}) // Describe("Perform various Lustre to Lustre tests"
+	}) // Describe("Perform various Lustre to Lustre tests")
 
 })

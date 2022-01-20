@@ -13,7 +13,7 @@ require (
 	github.com/onsi/gomega v1.17.0
 	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20211216142843-0b84f0d84e3f
 	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220111162522-1d08349ccfda
-	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220112202643-dbcf84f7e871
+	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220114194648-224a04755b2f
 	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
