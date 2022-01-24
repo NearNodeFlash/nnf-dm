@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
@@ -45,7 +46,7 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 	// We need to label all the nodes in the Servers object with a unique label that describes this
 	// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
 	// targets all the nodes
-	result, err := r.labelStorageNodes(ctx, dm)
+	result, workerCount, err := r.labelStorageNodes(ctx, dm)
 	if err != nil {
 		log.Error(err, "Failed to label storage nodes")
 		return nil, err
@@ -66,29 +67,27 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 		return nil, err
 	}
 
-	if err := r.createMpiJob(ctx, dm); err != nil {
+	if err := r.createMpiJob(ctx, dm, workerCount); err != nil {
 		log.Error(err, "Failed to create MPI Job")
 		return nil, err
 	}
 
-	log.Info("Data Movement Started")
+	log.Info("Lustre data movement initialized")
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
-	log := log.FromContext(ctx).WithName("labeler")
+func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, int32, error) {
+	log := log.FromContext(ctx).WithName("label")
 
 	// List of target node names that are to perform lustre data movement
 	targetNodeNames := make([]string, 0)
 
-	// DEVELOPMENT: Support the NnfStorage as an allocation mechanism; this should be replaced by DWS Servers definition,
-	// but for development the NnfStorage is easier to use for both listing the nodes and getting the msgNode.
 	switch dm.Spec.Storage.Kind {
 	case "NnfStorage":
 		storageRef := dm.Spec.Storage
 		storage := &nnfv1alpha1.NnfStorage{}
 		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
-			return nil, err
+			return nil, -1, err
 		}
 
 		targetAllocationSetIndex := -1
@@ -99,40 +98,45 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 		}
 
 		if targetAllocationSetIndex == -1 {
-			return nil, fmt.Errorf("OST allocation set not found")
+			return nil, -1, fmt.Errorf("OST allocation set not found")
 		}
 
 		for _, storageNode := range storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes {
 			targetNodeNames = append(targetNodeNames, storageNode.Name)
 		}
+
 		break
+	default:
+		panic(fmt.Sprintf("Unsupported storage type: %s", dm.Spec.Storage.Kind))
 	}
 
 	// Retrieve all the NNF Nodes in the cluster - these nodes will be matched against the requested
 	// node list and labeled such that the mpijob can target the desired nodes
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes, client.HasLabels{"cray.nnf.node"}); err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	label := dm.Name
+	log.V(2).Info("Labeling nodes", "label", label, "count", len(targetNodeNames))
 
 	for _, nodeName := range targetNodeNames {
 
 		nodeFound := false
 		for _, node := range nodes.Items {
+
 			if node.Name == nodeName {
 				if _, found := node.Labels[label]; !found {
 
 					node.Labels[label] = "true"
 
-					log.Info("Applying label to node", "node", node.Name)
+					log.V(1).Info("Applying label to node", "node", nodeName)
 					if err := r.Update(ctx, &node); err != nil {
 						if errors.IsConflict(err) {
-							return &ctrl.Result{Requeue: true}, nil
+							return &ctrl.Result{Requeue: true}, -1, nil
 						}
 
-						return nil, err
+						return nil, -1, err
 					}
 				}
 
@@ -142,14 +146,15 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 		}
 
 		if !nodeFound {
-			log.Info("Node %s not found. Check the spelling or status of the node")
+			log.V(3).Info("Node not found. Check the spelling or status of the node.", "node", nodeName)
 		}
 	}
 
-	return nil, nil
+	return nil, int32(len(targetNodeNames)), nil
 }
 
 func (r *DataMovementReconciler) unlabelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+	log := log.FromContext(ctx).WithName("unlabel")
 
 	label := dm.Name
 	nodes := &corev1.NodeList{}
@@ -157,6 +162,7 @@ func (r *DataMovementReconciler) unlabelStorageNodes(ctx context.Context, dm *dm
 		return nil, err
 	}
 
+	log.V(2).Info("Unlabelling nodes", "count", len(nodes.Items))
 	for _, node := range nodes.Items {
 		delete(node.Labels, label)
 		if err := r.Update(ctx, &node); err != nil {
@@ -168,6 +174,7 @@ func (r *DataMovementReconciler) unlabelStorageNodes(ctx context.Context, dm *dm
 }
 
 func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+	log := log.FromContext(ctx).WithName("pv")
 
 	if dm.Spec.Storage.Kind != "NnfStorage" {
 		panic("Create Persistent Volume requires NNF Storage type")
@@ -178,13 +185,17 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 		return err
 	}
 
-	volumeMode := corev1.PersistentVolumeFilesystem
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + persistentVolumeSuffix,
 			Namespace: dm.Namespace,
 		},
-		Spec: corev1.PersistentVolumeSpec{
+	}
+
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, pv, func() error {
+
+		volumeMode := corev1.PersistentVolumeFilesystem
+		pv.Spec = corev1.PersistentVolumeSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteMany,
 			},
@@ -199,28 +210,33 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 				},
 			},
 			VolumeMode: &volumeMode,
-		},
-	}
-
-	ctrl.SetControllerReference(pv, dm, r.Scheme)
-
-	if err := r.Create(ctx, pv); err != nil {
-		if !errors.IsAlreadyExists(err) { // Ignore existing which may occur while trying to create the resource subtree fails at a later step
-			return err
 		}
+
+		return ctrl.SetControllerReference(dm, pv, r.Scheme)
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create persistent volume")
+		return err
+	} else if result == controllerutil.OperationResultCreated {
+		log.V(2).Info("Created persistent volume", "object", client.ObjectKeyFromObject(pv).String())
 	}
 
 	return nil
 }
 
 func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+	log := log.FromContext(ctx).WithName("pvc")
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + persistentVolumeClaimSuffix,
 			Namespace: dm.Namespace,
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
+	}
+
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, pvc, func() error {
+		pvc.Spec = corev1.PersistentVolumeClaimSpec{
 			VolumeName: dm.Name + persistentVolumeSuffix,
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteMany,
@@ -230,24 +246,27 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 					corev1.ResourceStorage: resource.MustParse("1"),
 				},
 			},
-		},
-	}
-
-	ctrl.SetControllerReference(pvc, dm, r.Scheme)
-
-	if err := r.Create(ctx, pvc); err != nil {
-		if !errors.IsAlreadyExists(err) { // Ignore existing which may occur while trying to create the resource subtree fails at a later step
-			return err
 		}
+
+		return ctrl.SetControllerReference(dm, pvc, r.Scheme)
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to create persistent volume claim")
+		return err
+	} else if result == controllerutil.OperationResultCreated {
+		log.V(2).Info("Created persistent volume claim", "object", client.ObjectKeyFromObject(pvc).String())
 	}
 
 	return nil
 }
 
-func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha1.DataMovement, workerCount int32) error {
+	log := log.FromContext(ctx)
 
 	config, err := r.getDataMovementConfigMap(ctx)
 	if err != nil {
+		log.Error(err, "Failed to read mpi configuration")
 		return err
 	}
 
@@ -263,7 +282,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 		} else {
 			command = strings.Split(cmd, " ")
 		}
-
+		log.V(1).Info("Command override", "command", command)
 	}
 
 	launcher := &kubeflowv1.ReplicaSpec{
@@ -280,7 +299,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 		},
 	}
 
-	replicas := int32(1) // TODO: This should be number of nodes
+	replicas := workerCount
 	worker := &kubeflowv1.ReplicaSpec{
 		Replicas: &replicas,
 		Template: corev1.PodTemplateSpec{
@@ -364,8 +383,9 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 		},
 	}
 
-	ctrl.SetControllerReference(job, dm, r.Scheme)
+	ctrl.SetControllerReference(dm, job, r.Scheme)
 
+	log.V(2).Info("Creating mpi job", "name", client.ObjectKeyFromObject(job).String())
 	return r.Create(ctx, job)
 }
 
@@ -427,7 +447,7 @@ func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(c
 	panic("Unsupported Lustre Destination PVC: " + ref.Kind)
 }
 
-func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error) {
 
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -437,19 +457,18 @@ func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1a
 	}
 
 	if err := r.Get(ctx, client.ObjectKeyFromObject(job), job); err != nil {
-		return nil, err
+		return nil, dmv1alpha1.DataMovementConditionReasonFailed, "", err
 	}
 
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == kubeflowv1.JobFailed {
-			return nil, nil // TODO: Propagate error up to caller
+			return nil, dmv1alpha1.DataMovementConditionReasonFailed, condition.Message, nil
 		} else if condition.Type == kubeflowv1.JobSucceeded {
-			return nil, nil
+			return nil, dmv1alpha1.DataMovementConditionReasonSuccess, condition.Message, nil
 		}
-
 	}
 
 	// TODO: Consider the job still running, we'll pick up the next event through the watch
 
-	return &ctrl.Result{}, nil
+	return &ctrl.Result{}, dmv1alpha1.DataMovementConditionTypeRunning, "Running", nil
 }

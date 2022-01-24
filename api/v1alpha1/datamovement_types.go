@@ -69,10 +69,19 @@ type DataMovementStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// Types describing the various data movement status conditions.
 const (
-	DataMovementConditionStarting = "Starting"
-	DataMovementConditionRunning  = "Running"
-	DataMovementConditionFinished = "Finished"
+	DataMovementConditionTypeStarting = "Starting"
+	DataMovementConditionTypeRunning  = "Running"
+	DataMovementConditionTypeFinished = "Finished"
+)
+
+// Reasons describing the various data movement status conditions. Must be
+// in CamelCase format (see metav1.Condition)
+const (
+	DataMovementConditionReasonSuccess     = "Success"
+	DataMovementConditionReasonFailed      = "Failed"
+	DataMovementConditionReasonInvalid     = "Invalid"
 )
 
 //+kubebuilder:object:root=true

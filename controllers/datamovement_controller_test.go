@@ -31,6 +31,7 @@ var _ = Describe("Data Movement Controller", func() {
 		storageKey, dmKey types.NamespacedName
 		storage           *nnfv1alpha1.NnfStorage
 		dm                *dmv1alpha1.DataMovement
+		dmOwnerRef        metav1.OwnerReference
 	)
 
 	// Before each test ensure there is a Node with the proper label (cray.nnf.node=true), and
@@ -133,6 +134,17 @@ var _ = Describe("Data Movement Controller", func() {
 		Eventually(func() error {
 			return k8sClient.Get(context.TODO(), dmKey, dm)
 		}).Should(Succeed(), "create the data movement resource")
+
+		controller := true
+		blockOwnerDeletion := true
+		dmOwnerRef = metav1.OwnerReference{
+			Kind:               "DataMovement",
+			APIVersion:         dmv1alpha1.GroupVersion.String(),
+			UID:                dm.GetUID(),
+			Name:               dm.Name,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		}
 	})
 
 	Describe("Perform various Lustre to Lustre tests", func() {
@@ -252,8 +264,8 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}).Should(ContainElements(
-						HaveField("Type", dmv1alpha1.DataMovementConditionStarting),
-						HaveField("Type", dmv1alpha1.DataMovementConditionRunning),
+						HaveField("Type", dmv1alpha1.DataMovementConditionTypeStarting),
+						HaveField("Type", dmv1alpha1.DataMovementConditionTypeRunning),
 					), "transition to running")
 				})
 
@@ -265,7 +277,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
 					})
 
-					It("Labels the node", func() {
+					PIt("Labels the node", func() {
 						for _, nodeKey := range nodeKeys {
 							Eventually(func() map[string]string {
 								node := &corev1.Node{}
@@ -275,7 +287,7 @@ var _ = Describe("Data Movement Controller", func() {
 						}
 					})
 
-					PIt("Creates PV/PVC", func() {
+					It("Creates PV/PVC", func() {
 						pv := &corev1.PersistentVolume{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeSuffix,
@@ -287,7 +299,9 @@ var _ = Describe("Data Movement Controller", func() {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
 						}).Should(Succeed())
 
-						Expect(pv.Spec.CSI).To(MatchAllFields(Fields{
+						Expect(pv.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
+
+						Expect(*pv.Spec.CSI).To(MatchFields(IgnoreExtras, Fields{
 							"Driver":       Equal("lustre-csi.nnf.cray.hpe.com"),
 							"FSType":       Equal("lustre"),
 							"VolumeHandle": Equal(storage.Status.MgsNode),
@@ -304,7 +318,9 @@ var _ = Describe("Data Movement Controller", func() {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
 						}).Should(Succeed())
 
-						// TODO: Do some checking of the PVC attributes
+						Expect(pvc.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
+
+						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
 					})
 
 					PIt("Creates MPIJob", func() {
@@ -320,9 +336,13 @@ var _ = Describe("Data Movement Controller", func() {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
 						}).Should(Succeed(), "retrieve the mpi job")
 
-						By("Checking the worker specification")
-						workerSpec := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker].Template.Spec
+						Expect(mpi.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
 
+						By("Checking the worker specification")
+						worker := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker]
+						Expect(*(worker.Replicas)).To(Equal(int32(testNumberOfNodes)))
+
+						workerSpec := worker.Template.Spec
 						source := corev1.PersistentVolumeClaimVolumeSource{ClaimName: lustre.Name + "-pvc"}
 						destination := corev1.PersistentVolumeClaimVolumeSource{ClaimName: dm.Name + "-pvc"}
 

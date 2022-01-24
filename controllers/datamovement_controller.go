@@ -69,18 +69,18 @@ type DataMovementReconciler struct {
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("Starting reconcile")
-	defer log.Info("Finished reconcile")
+	log.V(1).Info("Starting reconcile")
+	defer log.V(1).Info("Finished reconcile")
 
 	dm := &dmv1alpha1.DataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Check if the object is being deleted. Deletion is coordinated around the sub-resources
 	// created or modified as part of data movement.
 	if !dm.GetDeletionTimestamp().IsZero() {
-		log.V(4).Info("Starting delete operation")
+		log.V(2).Info("Starting delete operation")
 
 		if !controllerutil.ContainsFinalizer(dm, finalizer) {
 			return ctrl.Result{}, nil
@@ -88,7 +88,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		// Unlabel any nodes that contain the current label
 		result, err := r.unlabelStorageNodes(ctx, dm)
-		log.V(4).Info("Unlabel Storage Nodes", "Result", result, "Error", err)
+		log.V(2).Info("Unlabel Storage Nodes", "Result", result, "Error", err)
 		if err != nil {
 			return ctrl.Result{}, err
 		} else if !result.IsZero() {
@@ -110,19 +110,19 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 			if err := r.validateSpec(dm); err != nil {
 				dm.Status.Conditions = []metav1.Condition{{
-					Type:               dmv1alpha1.DataMovementConditionFinished,
+					Type:               dmv1alpha1.DataMovementConditionTypeFinished,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
+					Reason:             dmv1alpha1.DataMovementConditionReasonInvalid,
 					Message:            fmt.Sprintf("Input validation failed: %v", err),
-					Reason:             "InputValidationFailed",
 				}}
 			} else {
 				dm.Status.Conditions = []metav1.Condition{{
-					Type:               dmv1alpha1.DataMovementConditionStarting,
+					Type:               dmv1alpha1.DataMovementConditionTypeStarting,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
+					Reason:             dmv1alpha1.DataMovementConditionReasonSuccess,
 					Message:            "Data movement resource starting",
-					Reason:             "ResourceStarting",
 				}}
 			}
 
@@ -153,10 +153,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	currentConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
-	log.Info("Executing", "IsLustre", isLustre2Lustre, "Condition", currentConditionType)
+	log.V(1).Info("Executing", "IsLustre", isLustre2Lustre, "Condition", currentConditionType)
 	switch currentConditionType {
 
-	case dmv1alpha1.DataMovementConditionStarting:
+	case dmv1alpha1.DataMovementConditionTypeStarting:
 
 		startFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
 			false: r.initializeRsyncJob,
@@ -172,7 +172,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-			Type:               dmv1alpha1.DataMovementConditionRunning,
+			Type:               dmv1alpha1.DataMovementConditionTypeRunning,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            "Data movement resource running",
@@ -187,13 +187,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Data Movement Running")
 		return ctrl.Result{Requeue: true}, nil
 
-	case dmv1alpha1.DataMovementConditionRunning:
-		monitorFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+	case dmv1alpha1.DataMovementConditionTypeRunning:
+		monitorFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error){
 			false: r.monitorRsyncJob,
 			true:  r.monitorLustreJob,
 		}[isLustre2Lustre]
 
-		result, err := monitorFn(ctx, dm) // TODO: This should return an additional error status if the job failed
+		result, status, message, err := monitorFn(ctx, dm)
 		if err != nil {
 			log.Error(err, "Failed to monitor")
 			return ctrl.Result{}, err
@@ -201,23 +201,32 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return *result, nil
 		}
 
-		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-			Type:               dmv1alpha1.DataMovementConditionFinished,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Message:            "Data movement resource finished",
-			Reason:             "ResourceFinished",
-		})
+		switch status {
+		case dmv1alpha1.DataMovementConditionTypeRunning:
+			// Still running, nothing to do here
+			break
+		case dmv1alpha1.DataMovementConditionReasonFailed, dmv1alpha1.DataMovementConditionReasonSuccess:
+
+			dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
+
+			// Note: In this case status == reason, so we can use it directly in the condition below
+			dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
+				Type:               dmv1alpha1.DataMovementConditionTypeFinished,
+				Status:             metav1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Message:            message,
+				Reason:             status,
+			})
+		}
 
 		if err := r.Status().Update(ctx, dm); err != nil {
 			log.Error(err, "Failed to transition to finished state")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Data Movement Finished")
 		return ctrl.Result{}, nil
 
-	case dmv1alpha1.DataMovementConditionFinished:
+	case dmv1alpha1.DataMovementConditionTypeFinished:
 		return ctrl.Result{}, nil // Already finished, do nothing further.
 	}
 
@@ -283,8 +292,8 @@ func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *dmv
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
-	return nil, nil
+func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error) {
+	return nil, dmv1alpha1.DataMovementConditionReasonSuccess, "Rsync Job Complete", nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,7 +66,11 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(
+		zap.New(zap.WriteTo(GinkgoWriter),
+			zap.UseDevMode(true),
+			zap.Level(zapcore.Level(-3))), // The inversion here is because zap is garbage and doesn't conform to any reasonable existing logging techniques
+	)
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
