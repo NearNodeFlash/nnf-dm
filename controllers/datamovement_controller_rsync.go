@@ -24,7 +24,7 @@ const (
 	ownerLabelRsyncNodeDataMovement = "dm.cray.hpe.com/owner"
 )
 
-func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 
 	nodes, err := r.getStorageNodes(ctx, dm)
 	if err != nil {
@@ -34,7 +34,7 @@ func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *dmv
 	return r.startNodeDataMovers(ctx, dm, nodes)
 }
 
-func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) ([]nnfv1alpha1.NnfStorageAllocationNodes, error) {
+func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]nnfv1alpha1.NnfStorageAllocationNodes, error) {
 
 	// Retrieve the NnfStorage object that is associated with this Rsync job. This provides the list of Rabbits that will receive
 	// RsyncNodeDataMovement resources.
@@ -55,7 +55,7 @@ func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *dmv1al
 	return nil, fmt.Errorf("Invalid NnfStorage: Must have xfs/gfs2 allocation set")
 }
 
-func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *dmv1alpha1.DataMovement, nodes []nnfv1alpha1.NnfStorageAllocationNodes) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, nodes []nnfv1alpha1.NnfStorageAllocationNodes) (*ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	config, err := r.getDataMovementConfigMap(ctx)
@@ -74,7 +74,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *dm
 	for _, node := range nodes {
 		log.V(1).Info("Creating Rsync Node Data Movement", "node", node.Name, "count", node.Count)
 
-		dm.Status.NodeStatus = append(dm.Status.NodeStatus, dmv1alpha1.DataMovementNodeStatus{
+		dm.Status.NodeStatus = append(dm.Status.NodeStatus, nnfv1alpha1.NnfDataMovementNodeStatus{
 			Node:     node.Name,
 			Count:    uint32(node.Count),
 			Running:  0,
@@ -110,7 +110,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *dm
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) getRsyncPath(spec dmv1alpha1.DataMovementSpecSourceDestination, config *corev1.ConfigMap, prefixPath string, index int, override string) string {
+func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSpecSourceDestination, config *corev1.ConfigMap, prefixPath string, index int, override string) string {
 	if path, found := config.Data[override]; found {
 		return path
 	}
@@ -128,7 +128,7 @@ func (r *DataMovementReconciler) getRsyncPath(spec dmv1alpha1.DataMovementSpecSo
 	panic(fmt.Sprintf("Unsupported Storage Instance %s", spec.StorageInstance.Kind))
 }
 
-func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error) {
+func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {
 	log := log.FromContext(ctx)
 
 	nodes := &dmv1alpha1.RsyncNodeDataMovementList{}
@@ -136,7 +136,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1al
 		return nil, "", "", err
 	}
 
-	statusMap := map[string]*dmv1alpha1.DataMovementNodeStatus{}
+	statusMap := map[string]*nnfv1alpha1.NnfDataMovementNodeStatus{}
 	for statusIdx, status := range dm.Status.NodeStatus {
 		statusMap[status.Node] = &dm.Status.NodeStatus[statusIdx]
 	}
@@ -149,9 +149,9 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1al
 		}
 
 		switch node.Status.State {
-		case dmv1alpha1.DataMovementConditionTypeRunning:
+		case nnfv1alpha1.DataMovementConditionTypeRunning:
 			status.Running++
-		case dmv1alpha1.DataMovementConditionTypeFinished:
+		case nnfv1alpha1.DataMovementConditionTypeFinished:
 			status.Complete++
 		}
 
@@ -160,14 +160,14 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1al
 		}
 	}
 
-	currentStatus := dmv1alpha1.DataMovementConditionReasonSuccess
+	currentStatus := nnfv1alpha1.DataMovementConditionReasonSuccess
 	currentMessage := ""
 	for _, status := range dm.Status.NodeStatus {
 		if status.Complete < status.Count {
-			currentStatus = dmv1alpha1.DataMovementConditionTypeRunning
+			currentStatus = nnfv1alpha1.DataMovementConditionTypeRunning
 		}
 		if len(status.Messages) != 0 {
-			currentStatus = dmv1alpha1.DataMovementConditionReasonFailed
+			currentStatus = nnfv1alpha1.DataMovementConditionReasonFailed
 			currentMessage = "Failure detected on nodes TODO" // TODO: Talk with Dean on how we want to report rsync errors
 		}
 	}
@@ -176,7 +176,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1al
 
 }
 
-func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	// There is a bug in kubernetes that prevents DeleteAllOf from working, See TODO

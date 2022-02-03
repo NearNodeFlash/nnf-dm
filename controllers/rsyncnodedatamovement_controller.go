@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
 
 // RsyncNodeDataMovementReconciler reconciles a RsyncNodeDataMovement object
@@ -62,7 +63,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	if rsyncNode.Status.StartTime.IsZero() {
 
 		rsyncNode.Status.StartTime = metav1.Now()
-		rsyncNode.Status.State = dmv1alpha1.DataMovementConditionTypeRunning
+		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 		if err := r.Status().Update(ctx, rsyncNode); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -90,13 +91,13 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		}
 
 		rsyncNode.Status.EndTime = metav1.Now()
-		rsyncNode.Status.State = dmv1alpha1.DataMovementConditionTypeFinished
+		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 
 		if err != nil {
-			rsyncNode.Status.Status = dmv1alpha1.DataMovementConditionReasonFailed
+			rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
 			rsyncNode.Status.Message = err.Error()
 		} else {
-			rsyncNode.Status.Status = dmv1alpha1.DataMovementConditionReasonSuccess
+			rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
 		}
 
 		if err := r.Status().Update(ctx, rsyncNode); err != nil {

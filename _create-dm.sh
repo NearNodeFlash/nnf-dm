@@ -27,10 +27,10 @@ EOF
 
   echo "$(tput bold)Creating lustre data movement $(tput sgr 0)"
   cat <<-EOF | kubectl apply -f -
-  apiVersion: dm.cray.hpe.com/v1alpha1
-  kind: DataMovement
+  apiVersion: nnf.cray.hpe.com/v1alpha1
+  kind: NnfDataMovement
   metadata:
-    name: datamovement-sample-lustre-3
+    name: datamovement-sample-lustre-4
     namespace: nnf-dm-system
   spec:
     source:
@@ -70,8 +70,8 @@ EOF
 
   echo "$(tput bold)Creating rsync data movement $(tput sgr 0)"
   cat <<-EOF | kubectl apply -f -
-  apiVersion: dm.cray.hpe.com/v1alpha1
-  kind: DataMovement
+  apiVersion: nnf.cray.hpe.com/v1alpha1
+  kind: NnfDataMovement
   metadata:
     name: datamovement-sample-xfs
     namespace: nnf-dm-system

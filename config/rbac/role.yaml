@@ -78,32 +78,6 @@ rules:
 - apiGroups:
   - dm.cray.hpe.com
   resources:
-  - datamovements
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - datamovements/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - datamovements/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
   - rsyncnodedatamovements
   verbs:
   - create
@@ -166,6 +140,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - nnf.cray.hpe.com
   resources:

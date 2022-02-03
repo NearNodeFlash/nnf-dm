@@ -21,6 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
+
 	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
 
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/server/auth"
@@ -155,9 +157,9 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	}
 
 	stateMap := map[string]pb.RsyncDataMovementStatusResponse_State{
-		dmv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
-		dmv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
-		dmv1alpha1.DataMovementConditionTypeFinished: pb.RsyncDataMovementStatusResponse_COMPLETED,
+		nnfv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
+		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
+		nnfv1alpha1.DataMovementConditionTypeFinished: pb.RsyncDataMovementStatusResponse_COMPLETED,
 	}
 
 	state, ok := stateMap[rsync.Status.State]

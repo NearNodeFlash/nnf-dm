@@ -47,9 +47,9 @@ type DataMovementReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfjobstorageinstances,verbs=get;list;watch
@@ -72,7 +72,7 @@ type DataMovementReconciler struct {
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	dm := &dmv1alpha1.DataMovement{}
+	dm := &nnfv1alpha1.NnfDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -87,7 +87,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		isLustre2Lustre, _ := r.isLustre2Lustre(dm)
-		teardownFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+		teardownFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
 			false: r.teardownRsyncJob,
 			true:  r.teardownLustreJob,
 		}
@@ -115,18 +115,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 			if err := r.validateSpec(dm); err != nil {
 				dm.Status.Conditions = []metav1.Condition{{
-					Type:               dmv1alpha1.DataMovementConditionTypeFinished,
+					Type:               nnfv1alpha1.DataMovementConditionTypeFinished,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
-					Reason:             dmv1alpha1.DataMovementConditionReasonInvalid,
+					Reason:             nnfv1alpha1.DataMovementConditionReasonInvalid,
 					Message:            fmt.Sprintf("Input validation failed: %v", err),
 				}}
 			} else {
 				dm.Status.Conditions = []metav1.Condition{{
-					Type:               dmv1alpha1.DataMovementConditionTypeStarting,
+					Type:               nnfv1alpha1.DataMovementConditionTypeStarting,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.Now(),
-					Reason:             dmv1alpha1.DataMovementConditionReasonSuccess,
+					Reason:             nnfv1alpha1.DataMovementConditionReasonSuccess,
 					Message:            "Data movement resource starting",
 				}}
 			}
@@ -161,9 +161,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.V(1).Info("Executing", "IsLustre", isLustre2Lustre, "Condition", currentConditionType)
 	switch currentConditionType {
 
-	case dmv1alpha1.DataMovementConditionTypeStarting:
+	case nnfv1alpha1.DataMovementConditionTypeStarting:
 
-		startFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+		startFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
 			false: r.initializeRsyncJob,
 			true:  r.initializeLustreJob,
 		}[isLustre2Lustre]
@@ -177,7 +177,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-			Type:               dmv1alpha1.DataMovementConditionTypeRunning,
+			Type:               nnfv1alpha1.DataMovementConditionTypeRunning,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            "Data movement resource running",
@@ -192,8 +192,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Data Movement Running")
 		return ctrl.Result{Requeue: true}, nil
 
-	case dmv1alpha1.DataMovementConditionTypeRunning:
-		monitorFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error){
+	case nnfv1alpha1.DataMovementConditionTypeRunning:
+		monitorFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error){
 			false: r.monitorRsyncJob,
 			true:  r.monitorLustreJob,
 		}[isLustre2Lustre]
@@ -207,16 +207,16 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 
 		switch status {
-		case dmv1alpha1.DataMovementConditionTypeRunning:
+		case nnfv1alpha1.DataMovementConditionTypeRunning:
 			// Still running, nothing to do here
 			break
-		case dmv1alpha1.DataMovementConditionReasonFailed, dmv1alpha1.DataMovementConditionReasonSuccess:
+		case nnfv1alpha1.DataMovementConditionReasonFailed, nnfv1alpha1.DataMovementConditionReasonSuccess:
 
 			dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
 
 			// Note: In this case status == reason, so we can use it directly in the condition below
 			dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-				Type:               dmv1alpha1.DataMovementConditionTypeFinished,
+				Type:               nnfv1alpha1.DataMovementConditionTypeFinished,
 				Status:             metav1.ConditionTrue,
 				LastTransitionTime: metav1.Now(),
 				Message:            message,
@@ -231,14 +231,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		return ctrl.Result{}, nil
 
-	case dmv1alpha1.DataMovementConditionTypeFinished:
+	case nnfv1alpha1.DataMovementConditionTypeFinished:
 		return ctrl.Result{}, nil // Already finished, do nothing further.
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *DataMovementReconciler) validateSpec(dm *dmv1alpha1.DataMovement) error {
+func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) error {
 	// Validation
 
 	// If source is just "path" this must be a lustre file system
@@ -257,7 +257,7 @@ func (r *DataMovementReconciler) validateSpec(dm *dmv1alpha1.DataMovement) error
 	return nil
 }
 
-func (r *DataMovementReconciler) isLustre2Lustre(dm *dmv1alpha1.DataMovement) (isLustre bool, err error) {
+func (r *DataMovementReconciler) isLustre2Lustre(dm *nnfv1alpha1.NnfDataMovement) (isLustre bool, err error) {
 	// Data Movement is a Lustre2Lustre copy if...
 	//   COPY_IN and Source is LustreFileSystem and
 	//      Destination is JobStorageInstance.fsType == lustre or
@@ -309,7 +309,7 @@ func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dmv1alpha1.DataMovement{}).
+		For(&nnfv1alpha1.NnfDataMovement{}).
 		Owns(&mpiv2beta1.MPIJob{}).
 		Owns(&corev1.PersistentVolume{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

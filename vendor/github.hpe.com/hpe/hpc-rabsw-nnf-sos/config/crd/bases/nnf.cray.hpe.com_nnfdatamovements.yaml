@@ -4,22 +4,22 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: datamovements.dm.cray.hpe.com
+  name: nnfdatamovements.nnf.cray.hpe.com
 spec:
-  group: dm.cray.hpe.com
+  group: nnf.cray.hpe.com
   names:
-    kind: DataMovement
-    listKind: DataMovementList
-    plural: datamovements
-    singular: datamovement
+    kind: NnfDataMovement
+    listKind: NnfDataMovementList
+    plural: nnfdatamovements
+    singular: nnfdatamovement
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DataMovement is the Schema for the datamovements API
+        description: NnfDataMovement is the Schema for the datamovements API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,7 +34,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: DataMovementSpec defines the desired state of DataMovement
+            description: NnfDataMovementSpec defines the desired state of DataMovement
             properties:
               access:
                 description: Access references the access elements that are needed
@@ -323,25 +323,37 @@ spec:
                 description: Node Status reflects the status of individual NNF Node
                   Data Movement operations
                 items:
-                  description: DataMovementNodeStatus defines the observed state of
-                    a DataMovementNode
+                  description: NnfDataMovementNodeStatus defines the observed state
+                    of a DataMovementNode
                   properties:
                     complete:
+                      description: Complete is the number of resource completed by
+                        this node
                       format: int32
                       type: integer
                     count:
+                      description: Count is the total number of resources managed
+                        by this node
                       format: int32
                       type: integer
                     messages:
+                      description: Messages is an array of error messages reported
+                        by resources in this node
                       items:
                         type: string
                       type: array
                     node:
+                      description: Node is the node who's status this status element
+                        describes
                       type: string
                     running:
+                      description: Running is the number of resources running under
+                        this node
                       format: int32
                       type: integer
                     status:
+                      description: Status is an array of status strings reported by
+                        resources in this node
                       items:
                         type: string
                       type: array

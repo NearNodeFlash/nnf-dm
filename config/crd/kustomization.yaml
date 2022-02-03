@@ -2,7 +2,6 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/dm.cray.hpe.com_datamovements.yaml
 - bases/dm.cray.hpe.com_rsynctemplates.yaml
 - bases/dm.cray.hpe.com_rsyncnodedatamovements.yaml
 #+kubebuilder:scaffold:crdkustomizeresource

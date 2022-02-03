@@ -5,9 +5,9 @@ shopt -s expand_aliases
 # Common command aliases for data movement. Source this file to load alias into your bash terminal
 # i.e. source ./_aliases.sh
 
-alias dmget="kubectl get datamovements --no-headers -n nnf-dm-system | head -n1 | awk '{print \$1}'"
-alias dmyaml="kubectl get datamovement/`dmget` -n nnf-dm-system -o yaml"
-alias dmdel="kubectl delete datamovement/`dmget` -n nnf-dm-system"
+alias dmget="kubectl get nnfdatamovements --no-headers -n nnf-dm-system | head -n1 | awk '{print \$1}'"
+alias dmyaml="kubectl get nnfdatamovement/`dmget` -n nnf-dm-system -o yaml"
+alias dmdel="kubectl delete nnfdatamovement/`dmget` -n nnf-dm-system"
 alias dmpod="kubectl get pods -n nnf-dm-system --no-headers | grep nnf-dm-controller-manager | awk '{print \$1}'"
 alias dmlog="kubectl logs `dmpod` -n nnf-dm-system  -c manager"
 alias dmsh="kubectl exec --stdin --tty `dmpod` -n nnf-dm-system -c manager -- /bin/bash"

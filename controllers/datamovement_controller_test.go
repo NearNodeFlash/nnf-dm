@@ -31,7 +31,7 @@ var _ = Describe("Data Movement Controller", func() {
 		nodeKeys          []types.NamespacedName
 		storageKey, dmKey types.NamespacedName
 		storage           *nnfv1alpha1.NnfStorage
-		dm                *dmv1alpha1.DataMovement
+		dm                *nnfv1alpha1.NnfDataMovement
 		dmOwnerRef        metav1.OwnerReference
 	)
 
@@ -112,12 +112,12 @@ var _ = Describe("Data Movement Controller", func() {
 			Namespace: corev1.NamespaceDefault,
 		}
 
-		dm = &dmv1alpha1.DataMovement{
+		dm = &nnfv1alpha1.NnfDataMovement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      dmKey.Name,
 				Namespace: dmKey.Namespace,
 			},
-			Spec: dmv1alpha1.DataMovementSpec{
+			Spec: nnfv1alpha1.NnfDataMovementSpec{
 				Storage: corev1.ObjectReference{
 					Kind:      "NnfStorage",
 					Name:      storage.Name,
@@ -240,7 +240,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 					storage.Status.MgsNode = "172.0.0.1@tcp"
 
-					dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
+					dm.Spec.Source = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 						Path: "example.file",
 						StorageInstance: &corev1.ObjectReference{
 							Kind:      "LustreFileSystem",
@@ -249,7 +249,7 @@ var _ = Describe("Data Movement Controller", func() {
 						},
 					}
 
-					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
+					dm.Spec.Destination = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 						Path: "/",
 						StorageInstance: &corev1.ObjectReference{
 							Kind:      "NnfJobStorageInstance",
@@ -261,19 +261,19 @@ var _ = Describe("Data Movement Controller", func() {
 
 				JustBeforeEach(func() {
 					Eventually(func() []metav1.Condition {
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}).Should(ContainElements(
-						HaveField("Type", dmv1alpha1.DataMovementConditionTypeStarting),
-						HaveField("Type", dmv1alpha1.DataMovementConditionTypeRunning),
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeRunning),
 					), "transition to running")
 				})
 
 				Describe("Create Data Movement resource", func() {
 					// After each life-cycle test specification, delete the Data Movement resource
 					AfterEach(func() {
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
 					})
@@ -358,7 +358,7 @@ var _ = Describe("Data Movement Controller", func() {
 				Describe("Create Data Movement resource with configuration map", func() {
 
 					AfterEach(func() {
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
 					})
@@ -426,7 +426,7 @@ var _ = Describe("Data Movement Controller", func() {
 				Describe("Delete Data Movement resource", func() {
 
 					JustBeforeEach(func() {
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
 					})
@@ -567,7 +567,7 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				BeforeEach(func() {
-					dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
+					dm.Spec.Source = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 						Path: "/", // Doesn't matter, using overrides
 						StorageInstance: &corev1.ObjectReference{
 							Kind:      "LustreFileSystem",
@@ -576,7 +576,7 @@ var _ = Describe("Data Movement Controller", func() {
 						},
 					}
 
-					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
+					dm.Spec.Destination = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 						Path: "/", // Doesn't matter, using overrides
 						StorageInstance: &corev1.ObjectReference{
 							Kind:      "NnfJobStorageInstance",
@@ -588,12 +588,12 @@ var _ = Describe("Data Movement Controller", func() {
 
 				JustBeforeEach(func() {
 					Eventually(func() []metav1.Condition {
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}).Should(ContainElements(
-						HaveField("Type", dmv1alpha1.DataMovementConditionTypeStarting),
-						HaveField("Type", dmv1alpha1.DataMovementConditionTypeRunning),
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeRunning),
 					), "transition to running")
 				})
 
@@ -624,8 +624,8 @@ var _ = Describe("Data Movement Controller", func() {
 								Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, expected)).To(Succeed())
 								return expected.Status
 							}).Should(MatchFields(IgnoreExtras, Fields{
-								"State":  Equal(dmv1alpha1.DataMovementConditionTypeFinished),
-								"Status": Equal(dmv1alpha1.DataMovementConditionReasonSuccess),
+								"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+								"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
 							}))
 						}
 
@@ -634,13 +634,13 @@ var _ = Describe("Data Movement Controller", func() {
 							Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 							return dm.Status.Conditions
 						}).Should(ContainElements(MatchFields(IgnoreExtras, Fields{
-							"Type":   Equal(dmv1alpha1.DataMovementConditionTypeFinished),
-							"Reason": Equal(dmv1alpha1.DataMovementConditionReasonSuccess),
+							"Type":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+							"Reason": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
 							"Status": Equal(metav1.ConditionTrue),
 						})))
 
 						// Delete the data movement resource
-						expected := &dmv1alpha1.DataMovement{}
+						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
 

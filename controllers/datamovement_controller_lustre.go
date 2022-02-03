@@ -19,7 +19,6 @@ import (
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
-	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 
 	lustrecsi "github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service"
@@ -42,7 +41,7 @@ const (
 	configDestinationVolume = "destinationVolume" // DestinationVolume is the corev1.VolumeSource used as the destination volume mount. Defaults to a CSI volume interpreted from the Spec.Destination
 )
 
-func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx, "DataMovement", "Lustre")
 
 	// We need to label all the nodes in the Servers object with a unique label that describes this
@@ -78,7 +77,7 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *dm
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, int32, error) {
+func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, int32, error) {
 	log := log.FromContext(ctx).WithName("label")
 
 	// List of target node names that are to perform lustre data movement
@@ -155,7 +154,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 	return nil, int32(len(targetNodeNames)), nil
 }
 
-func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("unlabel")
 
 	label := dm.Name
@@ -175,7 +174,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *dmv1
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
 	log := log.FromContext(ctx).WithName("pv")
 
 	if dm.Spec.Storage.Kind != "NnfStorage" {
@@ -227,7 +226,7 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 	return nil
 }
 
-func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context, dm *dmv1alpha1.DataMovement) error {
+func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
 	log := log.FromContext(ctx).WithName("pvc")
 
 	pvc := &corev1.PersistentVolumeClaim{
@@ -263,7 +262,7 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 	return nil
 }
 
-func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha1.DataMovement, workerCount int32) error {
+func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, workerCount int32) error {
 	log := log.FromContext(ctx)
 
 	config, err := r.getDataMovementConfigMap(ctx)
@@ -391,7 +390,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 	return r.Create(ctx, job)
 }
 
-func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *dmv1alpha1.DataMovement, config *corev1.ConfigMap, override string, claimFn func(context.Context, *dmv1alpha1.DataMovement) string) corev1.VolumeSource {
+func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, config *corev1.ConfigMap, override string, claimFn func(context.Context, *nnfv1alpha1.NnfDataMovement) string) corev1.VolumeSource {
 	if data, found := config.Data[override]; found {
 		source := corev1.VolumeSource{}
 		if err := json.Unmarshal([]byte(data), &source); err == nil {
@@ -408,7 +407,7 @@ func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *dmv1al
 	}
 }
 
-func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx context.Context, dm *dmv1alpha1.DataMovement) string {
+func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) string {
 	ref := dm.Spec.Source.StorageInstance
 
 	if ref.Kind == "LustreFileSystem" {
@@ -422,7 +421,7 @@ func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx co
 	panic("Unsupported Lustre Source PVC: " + ref.Kind)
 }
 
-func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(ctx context.Context, dm *dmv1alpha1.DataMovement) string {
+func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) string {
 	ref := dm.Spec.Destination.StorageInstance
 
 	if ref.Kind == "LustreFileSystem" {
@@ -436,7 +435,7 @@ func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(c
 	panic("Unsupported Lustre Destination PVC: " + ref.Kind)
 }
 
-func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error) {
+func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {
 
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -446,17 +445,17 @@ func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1a
 	}
 
 	if err := r.Get(ctx, client.ObjectKeyFromObject(job), job); err != nil {
-		return nil, dmv1alpha1.DataMovementConditionReasonFailed, "ObjectNotFound", err
+		return nil, nnfv1alpha1.DataMovementConditionReasonFailed, "ObjectNotFound", err
 	}
 
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == kubeflowv1.JobFailed {
-			return nil, dmv1alpha1.DataMovementConditionReasonFailed, condition.Message, nil
+			return nil, nnfv1alpha1.DataMovementConditionReasonFailed, condition.Message, nil
 		} else if condition.Type == kubeflowv1.JobSucceeded {
-			return nil, dmv1alpha1.DataMovementConditionReasonSuccess, condition.Message, nil
+			return nil, nnfv1alpha1.DataMovementConditionReasonSuccess, condition.Message, nil
 		}
 	}
 
 	// Consider the job still running
-	return &ctrl.Result{}, dmv1alpha1.DataMovementConditionTypeRunning, "Running", nil
+	return &ctrl.Result{}, nnfv1alpha1.DataMovementConditionTypeRunning, "Running", nil
 }
