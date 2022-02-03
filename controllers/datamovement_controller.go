@@ -28,7 +28,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
@@ -48,6 +50,7 @@ type DataMovementReconciler struct {
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovements/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfjobstorageinstances,verbs=get;list;watch
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
@@ -69,9 +72,6 @@ type DataMovementReconciler struct {
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	log.V(1).Info("Starting reconcile")
-	defer log.V(1).Info("Finished reconcile")
-
 	dm := &dmv1alpha1.DataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -86,9 +86,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		// Unlabel any nodes that contain the current label
-		result, err := r.unlabelStorageNodes(ctx, dm)
-		log.V(2).Info("Unlabel Storage Nodes", "Result", result, "Error", err)
+		isLustre2Lustre, _ := r.isLustre2Lustre(dm)
+		teardownFn := map[bool]func(context.Context, *dmv1alpha1.DataMovement) (*ctrl.Result, error){
+			false: r.teardownRsyncJob,
+			true:  r.teardownLustreJob,
+		}
+
+		result, err := teardownFn[isLustre2Lustre](ctx, dm)
+		log.V(2).Info("Teardown", "Result", result, "Error", err)
 		if err != nil {
 			return ctrl.Result{}, err
 		} else if !result.IsZero() {
@@ -288,12 +293,17 @@ func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1
 	return "lustre", nil
 }
 
-func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
-	return nil, nil
-}
+func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
+	config := &corev1.ConfigMap{}
 
-func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, string, string, error) {
-	return nil, dmv1alpha1.DataMovementConditionReasonSuccess, "Rsync Job Complete", nil
+	// TODO: This should move to the Data Movement Namespace
+	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: corev1.NamespaceDefault}, config); err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, err
+		}
+	}
+
+	return config, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -303,5 +313,9 @@ func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&mpiv2beta1.MPIJob{}).
 		Owns(&corev1.PersistentVolume{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(
+			&source.Kind{Type: &dmv1alpha1.RsyncNodeDataMovement{}},
+			handler.EnqueueRequestsFromMapFunc(rsyncNodeDataMovementEnqueueRequestMapFunc),
+		).
 		Complete(r)
 }

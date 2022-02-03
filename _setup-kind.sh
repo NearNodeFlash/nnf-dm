@@ -6,7 +6,7 @@ if [[ "$CMD" == "kind-reset" ]]; then
 fi
 
 echo "$(tput bold)Creating temporary source file for data movement $(tput sgr 0)"
-mkdir -p /tmp/nnf && dd if=/dev/zero of=/tmp/nnf/file.in bs=4096 count=0 seek=$[1024 * 1024]
+mkdir -p /tmp/nnf && dd if=/dev/zero of=/tmp/nnf/file.in bs=128 count=0 seek=$[1024 * 1024]
 
 echo "$(tput bold)Creating kind cluster with two worker nodes and /nnf mount $(tput sgr 0)"
 kind create cluster --wait 60s --image=kindest/node:v1.20.0 --config kind-config.yaml
@@ -25,4 +25,4 @@ kubectl taint nodes $(kubectl get nodes --no-headers -o custom-columns=:metadata
 
 echo "$(tput bold)DONE!$(tput sgr 0)"
 echo "You should now ensure any necessary images are loaded in kind"
-echo "and then run _setup-cluster.sh to get setup data-movement."
+echo "and then run _setup-cluster.sh [lustre, xfs] to setup data-movement."

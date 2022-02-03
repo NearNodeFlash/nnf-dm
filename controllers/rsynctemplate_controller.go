@@ -26,11 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile" // Required for Watching
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -40,9 +38,10 @@ import (
 )
 
 const (
-	DaemonSetSuffix             = "-ds"
 	PersistentVolumeSuffix      = "-pv"
 	PersistentVolumeClaimSuffix = "-pvc"
+
+	defaultNnfVolumeName = "mnt-nnf"
 )
 
 // RsyncTemplateReconciler reconciles a RsyncTemplate object
@@ -67,10 +66,7 @@ type RsyncTemplateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("Starting reconcile")
-	defer log.Info("Finished reconcile")
+	_ = log.FromContext(ctx)
 
 	rsyncTemplate := &dmv1alpha1.RsyncTemplate{}
 	if err := r.Get(ctx, req.NamespacedName, rsyncTemplate); err != nil {
@@ -80,9 +76,11 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	enableLustreFileSystems := rsyncTemplate.Spec.DisableLustreFileSystems == nil || *(rsyncTemplate.Spec.DisableLustreFileSystems) == false
+
 	ds := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rsyncTemplate.Name + DaemonSetSuffix,
+			Name:      "nnf-dm-rsyncnode",
 			Namespace: rsyncTemplate.Namespace,
 		},
 	}
@@ -94,8 +92,11 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		filesystems := &lusv1alpha1.LustreFileSystemList{}
-		if err := r.List(ctx, filesystems); err != nil {
-			return err
+
+		if enableLustreFileSystems {
+			if err := r.List(ctx, filesystems); err != nil {
+				return err
+			}
 		}
 
 		t := &rsyncTemplate.Spec.Template
@@ -105,11 +106,11 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		t.Spec.NodeSelector = rsyncTemplate.Spec.Selector.MatchLabels
 
 		// Add the volumes and volume mounts to the specification
-		t.Spec.Volumes = append(t.Spec.Volumes, volumes(filesystems.Items)...)
+		t.Spec.Volumes = append(t.Spec.Volumes, volumes(rsyncTemplate, filesystems.Items)...)
 
 		for cidx := range t.Spec.Containers {
 			container := &t.Spec.Containers[cidx]
-			container.VolumeMounts = append(container.VolumeMounts, volumeMounts(filesystems.Items)...)
+			container.VolumeMounts = append(container.VolumeMounts, volumeMounts(rsyncTemplate, filesystems.Items)...)
 		}
 
 		ds.Spec = apps.DaemonSetSpec{
@@ -128,7 +129,7 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func volumes(filesystems []lusv1alpha1.LustreFileSystem) []core.Volume {
+func volumes(rsync *dmv1alpha1.RsyncTemplate, filesystems []lusv1alpha1.LustreFileSystem) []core.Volume {
 	vols := make([]core.Volume, len(filesystems))
 	for idx, fs := range filesystems {
 		vols[idx] = core.Volume{
@@ -140,10 +141,22 @@ func volumes(filesystems []lusv1alpha1.LustreFileSystem) []core.Volume {
 			},
 		}
 	}
+
+	hostPathType := core.HostPathDirectoryOrCreate
+	vols = append(vols, core.Volume{
+		Name: defaultNnfVolumeName,
+		VolumeSource: core.VolumeSource{
+			HostPath: &core.HostPathVolumeSource{
+				Path: rsync.Spec.HostPath,
+				Type: &hostPathType,
+			},
+		},
+	})
+
 	return vols
 }
 
-func volumeMounts(filesystems []lusv1alpha1.LustreFileSystem) []core.VolumeMount {
+func volumeMounts(rsync *dmv1alpha1.RsyncTemplate, filesystems []lusv1alpha1.LustreFileSystem) []core.VolumeMount {
 	mounts := make([]core.VolumeMount, len(filesystems))
 	for idx, fs := range filesystems {
 		mounts[idx] = core.VolumeMount{
@@ -151,6 +164,14 @@ func volumeMounts(filesystems []lusv1alpha1.LustreFileSystem) []core.VolumeMount
 			MountPath: fs.Spec.MountRoot,
 		}
 	}
+
+	mountPropagation := core.MountPropagationHostToContainer
+	mounts = append(mounts, core.VolumeMount{
+		Name:             defaultNnfVolumeName,
+		MountPath:        rsync.Spec.MountPath,
+		MountPropagation: &mountPropagation,
+	})
+
 	return mounts
 }
 
@@ -183,7 +204,6 @@ func (r *RsyncTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &lusv1alpha1.LustreFileSystem{}},
 			handler.EnqueueRequestsFromMapFunc(r.updateRsyncTemplates),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
 }

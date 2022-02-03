@@ -51,9 +51,14 @@ message RsyncDataMovementStatusResponse {
         STARTING = 0;
         RUNNING = 1;
         COMPLETED = 2;
-        FAILED = 3;
-        UNKNOWN = 4;
+        UNKNOWN = 3;
     }
     State state = 1;
-    string message = 2;
+
+    enum Status {
+        FAILED = 0;
+        SUCCESS = 1;
+    }
+    Status status = 2;
+    string message = 3;
 }

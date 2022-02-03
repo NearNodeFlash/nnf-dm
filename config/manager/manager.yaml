@@ -55,3 +55,35 @@ spec:
             memory: 20Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+---
+apiVersion: dm.cray.hpe.com/v1alpha1
+kind: RsyncTemplate
+metadata:
+  name: rsynctemplate
+  namespace: system
+spec:
+  selector:
+    matchLabels:
+      cray.nnf.node: "true"
+  hostPath: "/nnf"
+  mountPath: "/mnt/nnf"
+  template:
+    spec:
+      tolerations:
+      - key: "cray.nnf.node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      containers:
+        - name: rsync-controller
+          image: controller:latest
+          command: 
+            - /manager
+          args:
+            - --controller=node
+          env:
+            - name: NNF_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+      serviceAccountName: controller-manager

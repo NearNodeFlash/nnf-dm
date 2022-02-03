@@ -36,11 +36,24 @@ spec:
           spec:
             description: RsyncTemplateSpec defines the desired state of RsyncTemplate
             properties:
+              disableLustreFileSystems:
+                description: Disable Lustre File Systems will disable the lustre file
+                  systems from within the generated Rsync Daemon Set. The result is
+                  an Rsync Daemon Set without any volume mounts. This is strictly
+                  used for testing and should be omitted during normal operation.
+                type: boolean
+              hostPath:
+                description: Host Path defines the directory location of shared mounts
+                  on an individual rsync node.
+                type: string
+              mountPath:
+                description: Mount Path defines the location within the container
+                  at which the Host Path volume should be mounted.
+                type: string
               selector:
-                description: A label selector is a label query over a set of resources.
-                  The result of matchLabels and matchExpressions are ANDed. An empty
-                  label selector matches all objects. A null label selector matches
-                  no objects.
+                description: Selector defines the pod selector used in scheduling
+                  the rsync nodes. This value is duplicated to the template.spec.metadata.labels
+                  to satisfy the requirements of the Rsync Daemon Set.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -7124,6 +7137,11 @@ spec:
                     - containers
                     type: object
                 type: object
+            required:
+            - hostPath
+            - mountPath
+            - selector
+            - template
             type: object
           status:
             description: RsyncTemplateStatus defines the observed state of RsyncTemplate

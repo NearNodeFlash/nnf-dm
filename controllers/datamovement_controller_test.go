@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -287,7 +288,7 @@ var _ = Describe("Data Movement Controller", func() {
 						}
 					})
 
-					It("Creates PV/PVC", func() {
+					PIt("Creates PV/PVC", func() {
 						pv := &corev1.PersistentVolume{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeSuffix,
@@ -450,4 +451,208 @@ var _ = Describe("Data Movement Controller", func() {
 
 	}) // Describe("Perform various Lustre to Lustre tests")
 
+	Describe("Perform various Lustre to XFS/GFS2 tests", func() {
+		var (
+			ns *corev1.Namespace
+		)
+
+		BeforeEach(func() {
+			storage.Spec = nnfv1alpha1.NnfStorageSpec{
+				AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
+					{
+						Name:           "test-nnf-storage-xfs",
+						FileSystemType: "xfs",
+						Capacity:       0,
+						Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{
+							{
+								Name:  nodeKeys[0].Name,
+								Count: 1,
+							},
+						},
+					},
+				},
+			}
+		})
+
+		// Create a namespace for receiving the Rsync Node's data movement resource
+		BeforeEach(func() {
+			ns = &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeKeys[0].Name,
+				},
+			}
+
+			Expect(k8sClient.Create(context.TODO(), ns)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(context.TODO(), ns)).To(Succeed())
+		})
+
+		// Create the ConfigMap this block will refer to
+		var (
+			config *corev1.ConfigMap
+		)
+
+		BeforeEach(func() {
+			os.Create("test.in")
+			config = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "data-movement" + configSuffix,
+					Namespace: corev1.NamespaceDefault,
+				},
+				Data: map[string]string{
+					configSourcePath:      "test.in",
+					configDestinationPath: "test.out",
+				},
+			}
+
+			Expect(k8sClient.Create(context.TODO(), config)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(context.TODO(), config)).To(Succeed())
+		})
+
+		Context("When source is Lustre File System type", func() {
+			var (
+				lustre *lusv1alpha1.LustreFileSystem
+			)
+
+			BeforeEach(func() {
+				lustre = &lusv1alpha1.LustreFileSystem{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "lustre-test",
+						Namespace: corev1.NamespaceDefault,
+					},
+					Spec: lusv1alpha1.LustreFileSystemSpec{
+						Name:      "lustre-test",
+						MgsNid:    "172.0.0.1@tcp",
+						MountRoot: "/lus/test",
+					},
+				}
+				Expect(k8sClient.Create(context.TODO(), lustre)).To(Succeed())
+			})
+
+			AfterEach(func() {
+				Expect(k8sClient.Delete(context.TODO(), lustre)).To(Succeed())
+			})
+
+			Context("When destination is Job Storage Instance type", func() {
+				var (
+					jsi *nnfv1alpha1.NnfJobStorageInstance
+				)
+
+				BeforeEach(func() {
+					jsi = &nnfv1alpha1.NnfJobStorageInstance{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "job-storage-instance-test",
+							Namespace: corev1.NamespaceDefault,
+						},
+						Spec: nnfv1alpha1.NnfJobStorageInstanceSpec{
+							Name:   "job-storage-instance-test",
+							FsType: "xfs",
+						},
+					}
+
+					Expect(k8sClient.Create(context.TODO(), jsi)).To(Succeed())
+					Eventually(func() error {
+						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(jsi), jsi)
+					}).Should(Succeed())
+
+				})
+
+				AfterEach(func() {
+					Expect(k8sClient.Delete(context.TODO(), jsi)).To(Succeed())
+				})
+
+				BeforeEach(func() {
+					dm.Spec.Source = dmv1alpha1.DataMovementSpecSourceDestination{
+						Path: "/", // Doesn't matter, using overrides
+						StorageInstance: &corev1.ObjectReference{
+							Kind:      "LustreFileSystem",
+							Name:      lustre.Name,
+							Namespace: lustre.Namespace,
+						},
+					}
+
+					dm.Spec.Destination = dmv1alpha1.DataMovementSpecSourceDestination{
+						Path: "/", // Doesn't matter, using overrides
+						StorageInstance: &corev1.ObjectReference{
+							Kind:      "NnfJobStorageInstance",
+							Name:      jsi.Name,
+							Namespace: jsi.Namespace,
+						},
+					}
+				})
+
+				JustBeforeEach(func() {
+					Eventually(func() []metav1.Condition {
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						return expected.Status.Conditions
+					}).Should(ContainElements(
+						HaveField("Type", dmv1alpha1.DataMovementConditionTypeStarting),
+						HaveField("Type", dmv1alpha1.DataMovementConditionTypeRunning),
+					), "transition to running")
+				})
+
+				Describe("Rsync Data Movement", func() {
+
+					It("Validates full rsync data movement lifecycle", func() {
+						Expect(storage.Spec.AllocationSets).To(HaveLen(1), "Expected allocation set count incorrect - did you forget to change the test logic?")
+						Expect(storage.Spec.AllocationSets[0].Nodes).To(HaveLen(1), "Expected node count incorrect - did you forget to change the test logic?")
+						expectedRsyncNodeCount := storage.Spec.AllocationSets[0].Nodes[0].Count
+
+						rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
+
+						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{ownerLabelRsyncNodeDataMovement})).To(Succeed())
+							return rsyncNodes.Items
+						}).Should(HaveLen(expectedRsyncNodeCount), "expected number of rsync nodes")
+
+						for _, item := range rsyncNodes.Items {
+							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(ownerLabelRsyncNodeDataMovement, dm.Name))
+
+							// TODO: Expect the correct Source and Destination paths. Source should be the lustre volume
+						}
+
+						// Validate Rsync Nodes finish with success
+						for _, item := range rsyncNodes.Items {
+							Eventually(func() dmv1alpha1.RsyncNodeDataMovementStatus {
+								expected := &dmv1alpha1.RsyncNodeDataMovement{}
+								Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, expected)).To(Succeed())
+								return expected.Status
+							}).Should(MatchFields(IgnoreExtras, Fields{
+								"State":  Equal(dmv1alpha1.DataMovementConditionTypeFinished),
+								"Status": Equal(dmv1alpha1.DataMovementConditionReasonSuccess),
+							}))
+						}
+
+						// Validate the Data Movement finishes wtih success
+						Eventually(func() []metav1.Condition {
+							Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+							return dm.Status.Conditions
+						}).Should(ContainElements(MatchFields(IgnoreExtras, Fields{
+							"Type":   Equal(dmv1alpha1.DataMovementConditionTypeFinished),
+							"Reason": Equal(dmv1alpha1.DataMovementConditionReasonSuccess),
+							"Status": Equal(metav1.ConditionTrue),
+						})))
+
+						// Delete the data movement resource
+						expected := &dmv1alpha1.DataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
+
+						// Validate the Rsync Nodes delete
+						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{ownerLabelRsyncNodeDataMovement})).To(Succeed())
+							return rsyncNodes.Items
+						}).Should(BeEmpty(), "expected zero rsync nodes on delete")
+					})
+				})
+			})
+		})
+
+	})
 })

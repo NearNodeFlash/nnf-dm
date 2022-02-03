@@ -47,9 +47,9 @@ func main() {
 	log.Printf("Data movement request created: %s", uid)
 
 	for {
-		state, err := getStatus(ctx, c, uid)
-		if state == pb.RsyncDataMovementStatusResponse_FAILED {
-			log.Fatalf("Data movemenet failed: %v", err)
+		state, status, err := getStatus(ctx, c, uid)
+		if status == pb.RsyncDataMovementStatusResponse_FAILED {
+			log.Fatalf("Data movement failed: %v", err)
 		}
 
 		log.Printf("Data movement %s", state.String())
@@ -78,14 +78,14 @@ func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, source s
 	return rsp.GetUid(), nil
 }
 
-func getStatus(ctx context.Context, client pb.RsyncDataMoverClient, uid string) (pb.RsyncDataMovementStatusResponse_State, error) {
+func getStatus(ctx context.Context, client pb.RsyncDataMoverClient, uid string) (pb.RsyncDataMovementStatusResponse_State, pb.RsyncDataMovementStatusResponse_Status, error) {
 	rsp, err := client.Status(ctx, &pb.RsyncDataMovementStatusRequest{
 		Uid: uid,
 	})
 
 	if err != nil {
-		return pb.RsyncDataMovementStatusResponse_FAILED, err
+		return pb.RsyncDataMovementStatusResponse_UNKNOWN, pb.RsyncDataMovementStatusResponse_FAILED, err
 	}
 
-	return rsp.GetState(), nil
+	return rsp.GetState(), rsp.GetStatus(), nil
 }

@@ -18,7 +18,9 @@ package controllers
 
 import (
 	"context"
+	"os/exec"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,9 +49,66 @@ type RsyncNodeDataMovementReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// your logic here
+	//log.V(1).Info("Starting reconcile")
+	//defer log.V(1).Info("Finished reconcile")
+
+	rsyncNode := &dmv1alpha1.RsyncNodeDataMovement{}
+	if err := r.Get(ctx, req.NamespacedName, rsyncNode); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if rsyncNode.Status.StartTime.IsZero() {
+
+		rsyncNode.Status.StartTime = metav1.Now()
+		rsyncNode.Status.State = dmv1alpha1.DataMovementConditionTypeRunning
+		if err := r.Status().Update(ctx, rsyncNode); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		arguments := []string{}
+		if rsyncNode.Spec.DryRun {
+			arguments = append(arguments, "--dry-run")
+		}
+
+		// Start the rsync operation
+		source := rsyncNode.Spec.Source
+		destination := rsyncNode.Spec.Destination
+		log.V(1).Info("Executing rsync command", "source", source, "destination", destination)
+
+		arguments = append(arguments, source)
+		arguments = append(arguments, destination)
+		out, err := exec.CommandContext(ctx, "rsync", arguments...).Output()
+
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
+			}
+		} else {
+			log.V(1).Info("rsync completed", "output", string(out))
+		}
+
+		rsyncNode.Status.EndTime = metav1.Now()
+		rsyncNode.Status.State = dmv1alpha1.DataMovementConditionTypeFinished
+
+		if err != nil {
+			rsyncNode.Status.Status = dmv1alpha1.DataMovementConditionReasonFailed
+			rsyncNode.Status.Message = err.Error()
+		} else {
+			rsyncNode.Status.Status = dmv1alpha1.DataMovementConditionReasonSuccess
+		}
+
+		if err := r.Status().Update(ctx, rsyncNode); err != nil {
+			log.Error(err, "failed to update rsync status with completion")
+			return ctrl.Result{}, err
+		}
+	} else if rsyncNode.Status.EndTime.IsZero() {
+		log.V(1).Info("Rsync may be running...")
+
+		// Problem here is the rsync could still be running _or_ it could have completed
+		// but the EndTime was never recorded. I'm not sure how to solve for this condition.
+	}
 
 	return ctrl.Result{}, nil
 }

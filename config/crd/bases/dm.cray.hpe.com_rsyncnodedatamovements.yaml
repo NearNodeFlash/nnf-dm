@@ -45,8 +45,6 @@ spec:
                 format: int32
                 type: integer
               id:
-                description: Foo is an example field of RsyncNodeDataMovement. Edit
-                  rsyncnodedatamovement_types.go to remove/update
                 type: string
               source:
                 type: string
@@ -58,12 +56,24 @@ spec:
             description: RsyncNodeDataMovementStatus defines the observed state of
               RsyncNodeDataMovement
             properties:
+              endTime:
+                description: End Time of the data movement operation
+                format: date-time
+                type: string
+              message:
+                description: Message provides details on the data movement operation;
+                  can be used to diagnose problems pertaining to a failed status.
+                type: string
+              startTime:
+                description: Start Time of the data movement operation
+                format: date-time
+                type: string
               state:
-                description: Current State of the data movement request
+                description: Current state of the data movement operation
                 type: string
               status:
-                description: Status describes the helper message that accompanies
-                  the state
+                description: Current status of the data movement operation; valid
+                  only when the state is finished.
                 type: string
             type: object
         type: object

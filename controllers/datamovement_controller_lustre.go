@@ -30,12 +30,14 @@ const (
 	persistentVolumeSuffix      = "-pv"
 	persistentVolumeClaimSuffix = "-pvc"
 	mpiJobSuffix                = "-mpi"
-	configSuffix                = "-mpi-config"
+	configSuffix                = "-config"
 )
 
 const (
 	configImage             = "image"             // Image specifies the image used in the MPI launcher & worker containers
 	configCommand           = "command"           // Command specifies the command to run. Defaults to "mpirun"
+	configSourcePath        = "sourcePath"        // SourcePath is the path of the source file or directory
+	configDestinationPath   = "destinationPath"   // DestinationPath is the path of the destination file or directory
 	configSourceVolume      = "sourceVolume"      // SourceVolume is the corev1.VolumeSource used as the source volume mount. Defaults to a CSI volume interpreted from the Spec.Source
 	configDestinationVolume = "destinationVolume" // DestinationVolume is the corev1.VolumeSource used as the destination volume mount. Defaults to a CSI volume interpreted from the Spec.Destination
 )
@@ -153,7 +155,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *dmv1
 	return nil, int32(len(targetNodeNames)), nil
 }
 
-func (r *DataMovementReconciler) unlabelStorageNodes(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
+func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *dmv1alpha1.DataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("unlabel")
 
 	label := dm.Name
@@ -389,19 +391,6 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *dmv1alpha
 	return r.Create(ctx, job)
 }
 
-func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	config := &corev1.ConfigMap{}
-
-	// TODO: This should move to the Data Movement Namespace
-	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: corev1.NamespaceDefault}, config); err != nil {
-		if !errors.IsNotFound(err) {
-			return nil, err
-		}
-	}
-
-	return config, nil
-}
-
 func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *dmv1alpha1.DataMovement, config *corev1.ConfigMap, override string, claimFn func(context.Context, *dmv1alpha1.DataMovement) string) corev1.VolumeSource {
 	if data, found := config.Data[override]; found {
 		source := corev1.VolumeSource{}
@@ -457,7 +446,7 @@ func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1a
 	}
 
 	if err := r.Get(ctx, client.ObjectKeyFromObject(job), job); err != nil {
-		return nil, dmv1alpha1.DataMovementConditionReasonFailed, "", err
+		return nil, dmv1alpha1.DataMovementConditionReasonFailed, "ObjectNotFound", err
 	}
 
 	for _, condition := range job.Status.Conditions {
@@ -468,7 +457,6 @@ func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *dmv1a
 		}
 	}
 
-	// TODO: Consider the job still running, we'll pick up the next event through the watch
-
+	// Consider the job still running
 	return &ctrl.Result{}, dmv1alpha1.DataMovementConditionTypeRunning, "Running", nil
 }

@@ -1,6 +1,5 @@
 resources:
 - manager.yaml
-- rsynctemplate.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
@@ -15,3 +14,6 @@ images:
 - name: controller
   newName: arti.dev.cray.com/rabsw-docker-stable-local/nnf-dm
   newTag: 0.0.1
+
+configurations:
+- rsync_template_config.yaml

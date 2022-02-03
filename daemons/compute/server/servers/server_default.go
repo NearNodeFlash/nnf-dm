@@ -20,7 +20,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
 
 	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/server/auth"
@@ -33,7 +33,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -122,12 +122,12 @@ Retry:
 	// chances of a random UUID colliding on a single NNF Node is close to zero.
 	name := uuid.New()
 
-	dm := &nnfv1alpha1.RsyncNodeDataMovement{
+	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
 			Namespace: s.namespace,
 		},
-		Spec: nnfv1alpha1.RsyncNodeDataMovementSpec{
+		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 			Source:      req.GetSource(),
 			Destination: req.GetDestination(),
 			UserId:      userId,
@@ -149,25 +149,24 @@ Retry:
 
 func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementStatusRequest) (*pb.RsyncDataMovementStatusResponse, error) {
 
-	dm := &nnfv1alpha1.RsyncNodeDataMovement{}
-	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, dm); err != nil {
+	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
+	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
 		return nil, err
 	}
 
-	stateMap := map[nnfv1alpha1.RsyncDataMovementState]pb.RsyncDataMovementStatusResponse_State{
-		nnfv1alpha1.RsyncDataMovementStatusState_Starting:  pb.RsyncDataMovementStatusResponse_STARTING,
-		nnfv1alpha1.RsyncDataMovementStatusState_Running:   pb.RsyncDataMovementStatusResponse_RUNNING,
-		nnfv1alpha1.RsyncDataMovementStatusState_Completed: pb.RsyncDataMovementStatusResponse_COMPLETED,
-		nnfv1alpha1.RsyncDataMovementStatusState_Failed:    pb.RsyncDataMovementStatusResponse_FAILED,
+	stateMap := map[string]pb.RsyncDataMovementStatusResponse_State{
+		dmv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
+		dmv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
+		dmv1alpha1.DataMovementConditionTypeFinished: pb.RsyncDataMovementStatusResponse_COMPLETED,
 	}
 
-	state, ok := stateMap[dm.Status.State]
+	state, ok := stateMap[rsync.Status.State]
 	if !ok {
 		return &pb.RsyncDataMovementStatusResponse{
 				State:   pb.RsyncDataMovementStatusResponse_UNKNOWN,
-				Message: fmt.Sprintf("State %s unknown", dm.Status.State)},
+				Message: fmt.Sprintf("State %s unknown", rsync.Status.State)},
 			fmt.Errorf("failed to decode returned status")
 	}
 
-	return &pb.RsyncDataMovementStatusResponse{State: state, Message: dm.Status.Status}, nil
+	return &pb.RsyncDataMovementStatusResponse{State: state, Message: rsync.Status.Status}, nil
 }

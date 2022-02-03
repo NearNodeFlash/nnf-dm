@@ -141,7 +141,7 @@ func newDataMovementController(t string) dataMovementControllerInterface {
 type nodeLocalController struct{}
 
 func (*nodeLocalController) GetType() string      { return NodeLocalController }
-func (*nodeLocalController) GetNamespace() string { return os.Getenv("NODE_NAME") }
+func (*nodeLocalController) GetNamespace() string { return os.Getenv("NNF_NODE_NAME") }
 
 func (*nodeLocalController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.RsyncNodeDataMovementReconciler{
@@ -166,14 +166,6 @@ func (*systemController) SetupReconcilers(mgr manager.Manager) (err error) {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DataMovement")
-		os.Exit(1)
-	}
-
-	if err = (&controllers.RsyncDataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RsyncDataMovement")
 		os.Exit(1)
 	}
 

@@ -59,6 +59,7 @@ func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	os.Setenv("ACK_GINKGO_DEPRECATIONS", "1.16.5")
+	os.Setenv("X_DATA_MOVEMENT_TEST_ENV", "")
 
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
@@ -119,6 +120,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&DataMovementReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&RsyncNodeDataMovementReconciler{
 		Client: k8sManager.GetClient(),
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)
