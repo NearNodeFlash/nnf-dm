@@ -5,6 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}",
+            "args" :[
+                "-socket=/tmp/nnf.sock",
+            ]
+        },
+        {
             "name": "Test Current File (Nate)",
             "type": "go",
             "request": "launch",

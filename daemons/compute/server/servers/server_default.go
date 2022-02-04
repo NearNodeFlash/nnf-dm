@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"os"
 
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -51,53 +50,44 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 	var config *rest.Config
 	var err error
 
-	switch opts.config {
-
-	// The uncommon case is when the kube configuration is provided by an incluster
-	// or user supplied kubeconfig; we typically won't support this case since the
-	// access to the kube api server is over a service account.
-	case KubeServerConfig:
+	if len(opts.host) == 0 && len(opts.port) == 0 {
 		log.Printf("Using kubeconfig rest configuration")
 		config, err = ctrl.GetConfig()
 		if err != nil {
 			return nil, err
 		}
-
-	default:
+	} else {
 		log.Printf("Using default rest configuration")
 
-		host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
-		if len(host) == 0 || len(port) == 0 {
+		if len(opts.host) == 0 || len(opts.port) == 0 {
 			return nil, fmt.Errorf("kubernetes service host/port not defined")
 		}
 
-		tokenFile := os.Getenv("NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE")
-		if len(tokenFile) == 0 {
+		if len(opts.tokenFile) == 0 {
 			return nil, fmt.Errorf("nnf data movement service token not defined")
 		}
 
-		token, err := ioutil.ReadFile(tokenFile)
+		token, err := ioutil.ReadFile(opts.tokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("nnf data movement service token failed to read")
 		}
 
-		certFile := os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CERT_FILE")
-		if len(certFile) == 0 {
+		if len(opts.certFile) == 0 {
 			return nil, fmt.Errorf("nnf data movement service certificate file not defined")
 		}
 
-		if _, err := certutil.NewPool(certFile); err != nil {
+		if _, err := certutil.NewPool(opts.certFile); err != nil {
 			return nil, fmt.Errorf("nnf data movement service certificate invalid")
 		}
 
 		tlsClientConfig := rest.TLSClientConfig{}
-		tlsClientConfig.CAFile = certFile
+		tlsClientConfig.CAFile = opts.certFile
 
 		config = &rest.Config{
-			Host:            "https://" + net.JoinHostPort(host, port),
+			Host:            "https://" + net.JoinHostPort(opts.host, opts.port),
 			TLSClientConfig: tlsClientConfig,
 			BearerToken:     string(token),
-			BearerTokenFile: tokenFile,
+			BearerTokenFile: opts.tokenFile,
 		}
 	}
 
@@ -107,9 +97,8 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 	}
 
 	// TODO: We need to create the NNFDataMovement CR on the associated rabbit namespace
-	namespace := opts.nodename
 
-	return &defaultServer{client: client, namespace: namespace}, nil
+	return &defaultServer{client: client, namespace: opts.nodeName}, nil
 }
 
 func (s *defaultServer) Create(ctx context.Context, req *pb.RsyncDataMovementCreateRequest) (*pb.RsyncDataMovementCreateResponse, error) {

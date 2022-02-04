@@ -11,6 +11,7 @@ require (
 	github.com/kubeflow/mpi-operator/v2 v2.0.0-20211209024655-d7fc50603a4d
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
+	github.com/takama/daemon v1.0.0
 	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20211216142843-0b84f0d84e3f
 	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220111162522-1d08349ccfda
 	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220203191719-8eb782ced38a

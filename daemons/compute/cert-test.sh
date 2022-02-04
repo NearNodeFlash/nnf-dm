@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-SERVICE_ACCOUNT=nnf-dm-data-movement
+SERVICE_ACCOUNT=nnf-dm-controller-manager
 NAMESPACE=nnf-dm-system
 
 echo "Obtaining token and secret for service account ${SERVICE_ACCOUNT}..."

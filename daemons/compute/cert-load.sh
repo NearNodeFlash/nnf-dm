@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SERVICE_ACCOUNT=nnf-dm-data-movement
+SERVICE_ACCOUNT=nnf-dm-controller-manager
 NAMESPACE=nnf-dm-system
 
 SECRET=$(kubectl get serviceaccount ${SERVICE_ACCOUNT} -n ${NAMESPACE} -o json | jq -Mr '.secrets[].name | select(contains("token"))')
