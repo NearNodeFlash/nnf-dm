@@ -89,6 +89,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
+container-unit-test: ## Run tests inside a container image
+	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
+	docker run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
+	
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.

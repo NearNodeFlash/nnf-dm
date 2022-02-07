@@ -139,8 +139,8 @@ var _ = Describe("Data Movement Controller", func() {
 		controller := true
 		blockOwnerDeletion := true
 		dmOwnerRef = metav1.OwnerReference{
-			Kind:               "DataMovement",
-			APIVersion:         dmv1alpha1.GroupVersion.String(),
+			Kind:               "NnfDataMovement",
+			APIVersion:         nnfv1alpha1.GroupVersion.String(),
 			UID:                dm.GetUID(),
 			Name:               dm.Name,
 			Controller:         &controller,
@@ -324,7 +324,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
 					})
 
-					PIt("Creates MPIJob", func() {
+					It("Creates MPIJob", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
@@ -495,7 +495,9 @@ var _ = Describe("Data Movement Controller", func() {
 		)
 
 		BeforeEach(func() {
-			os.Create("test.in")
+			_, err := os.Create("test.in")
+			Expect(err).NotTo(HaveOccurred())
+
 			config = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "data-movement" + configSuffix,
@@ -599,7 +601,8 @@ var _ = Describe("Data Movement Controller", func() {
 
 				Describe("Rsync Data Movement", func() {
 
-					It("Validates full rsync data movement lifecycle", func() {
+					// Test disabled until rsync can be added to the docker build image
+					PIt("Validates full rsync data movement lifecycle", func() {
 						Expect(storage.Spec.AllocationSets).To(HaveLen(1), "Expected allocation set count incorrect - did you forget to change the test logic?")
 						Expect(storage.Spec.AllocationSets[0].Nodes).To(HaveLen(1), "Expected node count incorrect - did you forget to change the test logic?")
 						expectedRsyncNodeCount := storage.Spec.AllocationSets[0].Nodes[0].Count
@@ -624,8 +627,9 @@ var _ = Describe("Data Movement Controller", func() {
 								Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, expected)).To(Succeed())
 								return expected.Status
 							}).Should(MatchFields(IgnoreExtras, Fields{
-								"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
-								"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+								"State":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+								"Status":  Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+								"Message": BeEmpty(),
 							}))
 						}
 

@@ -18,6 +18,23 @@ COPY controllers/ controllers/
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 
+###############################################################################
+FROM builder as testing
+
+WORKDIR /workspace
+
+# These two steps follow the Kubebuilder envtest playbook https://book.kubebuilder.io/reference/envtest.html
+ARG K8S_VERSION=1.21.2
+RUN curl -sSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/${K8S_VERSION}/$(go env GOOS)/$(go env GOARCH)" \
+    && mkdir /usr/local/kubebuilder \
+    && tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
+
+COPY config/ config/
+COPY runContainerTest.sh .
+
+ENTRYPOINT [ "sh", "runContainerTest.sh" ]
+
+###############################################################################
 FROM arti.dev.cray.com/baseos-docker-master-local/centos8:centos8
 
 RUN dnf install -y rsync

@@ -34,7 +34,7 @@ const (
 
 const (
 	configImage             = "image"             // Image specifies the image used in the MPI launcher & worker containers
-	configCommand           = "command"           // Command specifies the command to run. Defaults to "mpirun"
+	configCommand           = "command"           // Command specifies the command to run. Defaults to "mpirun" or "rsync"
 	configSourcePath        = "sourcePath"        // SourcePath is the path of the source file or directory
 	configDestinationPath   = "destinationPath"   // DestinationPath is the path of the destination file or directory
 	configSourceVolume      = "sourceVolume"      // SourceVolume is the corev1.VolumeSource used as the source volume mount. Defaults to a CSI volume interpreted from the Spec.Source
