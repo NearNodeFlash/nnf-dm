@@ -12,15 +12,12 @@ import (
 	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
 )
 
-const (
-	socketAddr = "unix:////tmp/nnf.sock"
-)
-
 func main() {
 
 	source := flag.String("source", "", "source file or directory")
 	destination := flag.String("destination", "", "destination file or directory")
 	dryrun := flag.Bool("dryrun", false, "perfrom dry run of operation")
+	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
 
 	flag.Parse()
 
@@ -29,13 +26,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	socketAddr := "unix:///" + *socket
+
+	log.Printf("Connecting to %s", socketAddr)
 	conn, err := grpc.Dial(socketAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	c := pb.NewRsyncDataMoverClient(conn)
@@ -84,7 +84,7 @@ func getStatus(ctx context.Context, client pb.RsyncDataMoverClient, uid string) 
 	})
 
 	if err != nil {
-		return pb.RsyncDataMovementStatusResponse_UNKNOWN, pb.RsyncDataMovementStatusResponse_FAILED, err
+		return pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE, pb.RsyncDataMovementStatusResponse_FAILED, err
 	}
 
 	return rsp.GetState(), rsp.GetStatus(), nil

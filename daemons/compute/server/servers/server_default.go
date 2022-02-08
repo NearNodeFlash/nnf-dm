@@ -145,6 +145,13 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 		return nil, err
 	}
 
+	if rsync.Status.StartTime.IsZero() {
+		return &pb.RsyncDataMovementStatusResponse{
+			State:  pb.RsyncDataMovementStatusResponse_PENDING,
+			Status: pb.RsyncDataMovementStatusResponse_SUCCESS,
+		}, nil
+	}
+
 	stateMap := map[string]pb.RsyncDataMovementStatusResponse_State{
 		nnfv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
 		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
@@ -154,10 +161,26 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	state, ok := stateMap[rsync.Status.State]
 	if !ok {
 		return &pb.RsyncDataMovementStatusResponse{
-				State:   pb.RsyncDataMovementStatusResponse_UNKNOWN,
+				State:   pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
+				Status:  pb.RsyncDataMovementStatusResponse_FAILED,
 				Message: fmt.Sprintf("State %s unknown", rsync.Status.State)},
+			fmt.Errorf("failed to decode returned state")
+	}
+
+	statusMap := map[string]pb.RsyncDataMovementStatusResponse_Status{
+		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.RsyncDataMovementStatusResponse_FAILED,
+		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.RsyncDataMovementStatusResponse_SUCCESS,
+		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.RsyncDataMovementStatusResponse_INVALID,
+	}
+
+	status, ok := statusMap[rsync.Status.Status]
+	if !ok {
+		return &pb.RsyncDataMovementStatusResponse{
+				State:   state,
+				Status:  pb.RsyncDataMovementStatusResponse_UNKNOWN_STATUS,
+				Message: fmt.Sprintf("Status %s unknown", rsync.Status.Status)},
 			fmt.Errorf("failed to decode returned status")
 	}
 
-	return &pb.RsyncDataMovementStatusResponse{State: state, Message: rsync.Status.Status}, nil
+	return &pb.RsyncDataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
 }

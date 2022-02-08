@@ -48,16 +48,19 @@ message RsyncDataMovementStatusRequest {
 // describing the data movement request. 
 message RsyncDataMovementStatusResponse {
     enum State {
-        STARTING = 0;
-        RUNNING = 1;
-        COMPLETED = 2;
-        UNKNOWN = 3;
+        PENDING = 0;
+        STARTING = 1;
+        RUNNING = 2;
+        COMPLETED = 3;
+        UNKNOWN_STATE = 4;
     }
     State state = 1;
 
     enum Status {
         FAILED = 0;
         SUCCESS = 1;
+        INVALID = 2;
+        UNKNOWN_STATUS = 3;
     }
     Status status = 2;
     string message = 3;
