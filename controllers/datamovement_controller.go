@@ -114,21 +114,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if len(dm.Status.Conditions) == 0 {
 
 			if err := r.validateSpec(dm); err != nil {
-				dm.Status.Conditions = []metav1.Condition{{
-					Type:               nnfv1alpha1.DataMovementConditionTypeFinished,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             nnfv1alpha1.DataMovementConditionReasonInvalid,
-					Message:            fmt.Sprintf("Input validation failed: %v", err),
-				}}
+				advanceCondition(dm,
+					nnfv1alpha1.DataMovementConditionTypeFinished,
+					nnfv1alpha1.DataMovementConditionReasonInvalid,
+					fmt.Sprintf("Input validation failed: %v", err),
+				)
 			} else {
-				dm.Status.Conditions = []metav1.Condition{{
-					Type:               nnfv1alpha1.DataMovementConditionTypeStarting,
-					Status:             metav1.ConditionTrue,
-					LastTransitionTime: metav1.Now(),
-					Reason:             nnfv1alpha1.DataMovementConditionReasonSuccess,
-					Message:            "Data movement resource starting",
-				}}
+				advanceCondition(dm,
+					nnfv1alpha1.DataMovementConditionTypeStarting,
+					nnfv1alpha1.DataMovementConditionReasonSuccess,
+					"Data movement resource starting",
+				)
 			}
 
 			if err := r.Status().Update(ctx, dm); err != nil {
@@ -176,20 +172,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return *result, nil
 		}
 
-		dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-			Type:               nnfv1alpha1.DataMovementConditionTypeRunning,
-			Status:             metav1.ConditionTrue,
-			LastTransitionTime: metav1.Now(),
-			Message:            "Data movement resource running",
-			Reason:             "ResourceRunning",
-		})
+		advanceCondition(dm,
+			nnfv1alpha1.DataMovementConditionTypeRunning,
+			nnfv1alpha1.DataMovementConditionReasonSuccess,
+			"Data movement resource running",
+		)
 
 		if err := r.Status().Update(ctx, dm); err != nil {
 			log.Error(err, "Failed to transition to running state")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Data Movement Running")
 		return ctrl.Result{Requeue: true}, nil
 
 	case nnfv1alpha1.DataMovementConditionTypeRunning:
@@ -212,16 +205,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			break
 		case nnfv1alpha1.DataMovementConditionReasonFailed, nnfv1alpha1.DataMovementConditionReasonSuccess:
 
-			dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
+			advanceCondition(dm,
+				nnfv1alpha1.DataMovementConditionTypeFinished,
+				status,
+				message,
+			)
 
-			// Note: In this case status == reason, so we can use it directly in the condition below
-			dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-				Type:               nnfv1alpha1.DataMovementConditionTypeFinished,
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Message:            message,
-				Reason:             status,
-			})
 		}
 
 		if err := r.Status().Update(ctx, dm); err != nil {
@@ -274,6 +263,20 @@ func (r *DataMovementReconciler) isLustre2Lustre(dm *nnfv1alpha1.NnfDataMovement
 	}
 
 	return fsType == "lustre", err
+}
+
+func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string, message string) {
+	if len(dm.Status.Conditions) != 0 {
+		dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
+	}
+
+	dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
+		Type:               typ,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+		Status:             metav1.ConditionTrue,
+	})
 }
 
 func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1.ObjectReference) (string, error) {

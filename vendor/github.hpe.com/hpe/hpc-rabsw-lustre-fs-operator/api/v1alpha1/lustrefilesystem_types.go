@@ -29,15 +29,21 @@ type LustreFileSystemSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Name is the name of the Lustre file system.
-	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:MaxLength:=8
+	Name string `json:"name"`
 
 	// MgsNid is the NID of the MGS to use for accessing the Lustre file system. The MGS NID is combined with the
 	// Name to establish a connection to a global Lustre file system
-	MgsNid string `json:"mgsNid,omitempty"`
+	MgsNid string `json:"mgsNid"`
 
 	// MountRoot is the mount path used to access the Lustre file system from a host. Data Movement directives can
 	// reference this field when performing data movement from or to the Lustre file system.
-	MountRoot string `json:"mountRoot,omitempty"`
+	MountRoot string `json:"mountRoot"`
+
+	// StorageClassName refers to the StorageClass to use for this
+	// file system.
+	// +kubebuilder:default="nnf-lustre-fs"
+	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
 // LustreFileSystemStatus defines the observed state of LustreFileSystem

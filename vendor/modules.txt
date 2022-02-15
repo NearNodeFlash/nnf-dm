@@ -34,7 +34,7 @@ github.com/evanphx/json-patch
 github.com/form3tech-oss/jwt-go
 # github.com/fsnotify/fsnotify v1.5.1
 github.com/fsnotify/fsnotify
-# github.com/go-logr/logr v1.2.0
+# github.com/go-logr/logr v1.2.2
 github.com/go-logr/logr
 # github.com/go-logr/zapr v1.2.0
 github.com/go-logr/zapr
@@ -130,13 +130,14 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.17.0
+# github.com/onsi/gomega v1.18.1
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/gstruct
 github.com/onsi/gomega/gstruct/errors
 github.com/onsi/gomega/internal
+github.com/onsi/gomega/internal/gutil
 github.com/onsi/gomega/matchers
 github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
 github.com/onsi/gomega/matchers/support/goraph/edge
@@ -168,14 +169,14 @@ github.com/takama/daemon
 # github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20211216142843-0b84f0d84e3f
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service
-# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220111162522-1d08349ccfda
+# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220207222326-93e1e70f148c
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers
-# github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220120175054-b056e28e2606
+# github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220201134105-36fbf15bc488
 github.hpe.com/hpe/hpc-rabsw-nnf-ec/pkg/rfsf/pkg/models
-# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220203191719-8eb782ced38a
+# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220214205208-b4e3cff0a25c
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases
@@ -359,7 +360,7 @@ gopkg.in/tomb.v1
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
-# k8s.io/api v0.23.2
+# k8s.io/api v0.23.3
 ## explicit
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -416,7 +417,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.23.2
+# k8s.io/apimachinery v0.23.3
 ## explicit
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -463,7 +464,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.23.2
+# k8s.io/client-go v0.23.3
 ## explicit
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
@@ -605,7 +606,7 @@ k8s.io/klog/v2
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/schemaconv
 k8s.io/kube-openapi/pkg/util/proto
-# k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+# k8s.io/utils v0.0.0-20211116205334-6203023598ed
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/clock/testing

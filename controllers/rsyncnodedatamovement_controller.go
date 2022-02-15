@@ -57,7 +57,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 	rsyncNode := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, rsyncNode); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if rsyncNode.Status.StartTime.IsZero() {

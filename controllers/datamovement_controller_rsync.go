@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
@@ -63,13 +65,23 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 		return nil, err
 	}
 
-	// TODO: Once we have NnfAccess, we'll need the source/destination to load the PrefixPath; this is the
-	// path that is the basis for this data movement request, and we should append "compute-%id" onto the prefix
+	// From the provided NnfAccess, we'll need the source/destination to load the PrefixPath; this is the
+	// path that is the basis for this data movement request, and we should append "/compute-%id" onto the prefix
 	// path, and then append the rsync.Spec.Source/rsync.Spec.Destination as needed.
 	//
 	// For example, if a request is for XFS Storage, with Source=file.in Destination=file.out, NnfAccess will contain
 	// a prefix path that corresponds to the XFS File System at something like /mnt/nnf/job-1234/. In this case
 	// we would create rsync jobs with Destination=/mnt/nnf/job-1234/compute-%id/file.out
+
+	access := &nnfv1alpha1.NnfAccess{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: dm.Spec.Access.Name,
+			Namespace: dm.Spec.Access.Namespace,
+		},
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(access), access); err != nil {
+		return nil, err
+	}
 
 	for _, node := range nodes {
 		log.V(1).Info("Creating Rsync Node Data Movement", "node", node.Name, "count", node.Count)
@@ -87,12 +99,22 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					Name:      fmt.Sprintf("%s-%d", dm.Name, i),
 					Namespace: node.Name,
 					Labels: map[string]string{
-						ownerLabelRsyncNodeDataMovement: dm.Name,
+						// Bare name (without namespace) is used to List() all the Rsync Nodes by label. 
+						// This requires dm.Name to be unique across Namespaces, which is always the case when
+						// data movement resource is created from a workflow.
+						// We can't append "/namespace" here because of the label regex validation rules do not
+						// permit the forward slash "/"
+						ownerLabelRsyncNodeDataMovement: dm.Name, 
+					},
+					Annotations: map[string]string{
+						// Annotation is used to watch Rsync Nodes and reconcile the Data Movement resource
+						// when they change. This is namespace scoped.
+						ownerLabelRsyncNodeDataMovement: dm.Name + "/" + dm.Namespace,
 					},
 				},
 				Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
-					Source:      r.getRsyncPath(dm.Spec.Source, config, "TODO", i, configSourcePath),
-					Destination: r.getRsyncPath(dm.Spec.Destination, config, "TODO", i, configDestinationPath),
+					Source:      r.getRsyncPath(dm.Spec.Source, config, access.Spec.MountPathPrefix, i, configSourcePath),
+					Destination: r.getRsyncPath(dm.Spec.Destination, config, access.Spec.MountPathPrefix, i, configDestinationPath),
 				},
 			}
 
@@ -119,10 +141,10 @@ func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSp
 		return spec.Path
 	}
 	switch spec.StorageInstance.Kind {
-	case "LustreFileSystem":
+	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
 		return spec.Path
-	case "NnfJobStorageInstance", "NnfPersistentStorageInstance":
-		return prefixPath + fmt.Sprintf("/compute-%d/", index) + spec.Path
+	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name(), "NnfPersistentStorageInstance":
+		return prefixPath + fmt.Sprintf("/compute-%d", index) + spec.Path
 	}
 
 	panic(fmt.Sprintf("Unsupported Storage Instance %s", spec.StorageInstance.Kind))
@@ -136,17 +158,23 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 		return nil, "", "", err
 	}
 
+	// Create a map by node name so the status' can be refreshed
 	statusMap := map[string]*nnfv1alpha1.NnfDataMovementNodeStatus{}
 	for statusIdx, status := range dm.Status.NodeStatus {
+		dm.Status.NodeStatus[statusIdx].Complete = 0
+		dm.Status.NodeStatus[statusIdx].Running = 0
 		statusMap[status.Node] = &dm.Status.NodeStatus[statusIdx]
 	}
 
 	for _, node := range nodes.Items {
+
 		status, found := statusMap[node.Namespace]
 		if !found {
-			log.V(3).Info("Node not found", "node", node.Namespace)
+			log.Info("Node not found", "node", node.Namespace)
 			continue
 		}
+
+		log.Info("Refresh Node Status", "node", node.Namespace, "state", node.Status.State, "message", node.Status.Message)
 
 		switch node.Status.State {
 		case nnfv1alpha1.DataMovementConditionTypeRunning:
@@ -179,33 +207,27 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// There is a bug in kubernetes that prevents DeleteAllOf from working, See TODO
-	err := r.DeleteAllOf(ctx, &dmv1alpha1.RsyncNodeDataMovement{}, client.MatchingLabels{ownerLabelRsyncNodeDataMovement: dm.Name})
-	if errors.IsNotFound(err) {
-		rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-		if err := r.List(ctx, rsyncNodes, client.MatchingLabels{ownerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
-			return nil, err
-		}
-
-		log.V(1).Info("Deleting all nodes manually", "count", len(rsyncNodes.Items))
-		for _, node := range rsyncNodes.Items {
-			if err := r.Delete(ctx, &node); err != nil {
-				if !errors.IsNotFound(err) {
-					log.V(1).Info("Deleting", "node", node.Namespace, "error", err.Error())
-					return nil, err
-				}
-			}
-		}
-
-		return nil, nil
+	rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
+	if err := r.List(ctx, rsyncNodes, client.MatchingLabels{ownerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+		return nil, err
 	}
 
-	return nil, err
+	log.V(1).Info("Deleting all nodes", "count", len(rsyncNodes.Items))
+	for _, node := range rsyncNodes.Items {
+		if err := r.Delete(ctx, &node); err != nil {
+			if !errors.IsNotFound(err) {
+				log.V(1).Info("Deleting", "node", node.Namespace, "error", err.Error())
+				return nil, err
+			}
+		}
+	}
+
+	return nil, nil
 }
 
 func rsyncNodeDataMovementEnqueueRequestMapFunc(o client.Object) []reconcile.Request {
 
-	if owner, found := o.GetLabels()[ownerLabelRsyncNodeDataMovement]; found {
+	if owner, found := o.GetAnnotations()[ownerLabelRsyncNodeDataMovement]; found {
 		components := strings.Split(owner, "/")
 		if len(components) == 2 {
 			return []reconcile.Request{{

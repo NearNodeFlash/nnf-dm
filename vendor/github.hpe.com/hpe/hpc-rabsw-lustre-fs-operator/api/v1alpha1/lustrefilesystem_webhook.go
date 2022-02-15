@@ -64,9 +64,6 @@ func (r *LustreFileSystem) ValidateUpdate(old runtime.Object) error {
 
 func (r *LustreFileSystem) validateLustreFileSystem() error {
 	var errList field.ErrorList
-	if err := r.validateName(); err != nil {
-		errList = append(errList, err)
-	}
 	if err := r.validateMgsNid(); err != nil {
 		errList = append(errList, err)
 	}
@@ -85,25 +82,9 @@ func (r *LustreFileSystem) validateLustreFileSystem() error {
 	return nil
 }
 
-func (r *LustreFileSystem) validateName() *field.Error {
-	f := field.NewPath("spec").Child("name")
-	name := r.Spec.Name
-	if len(name) == 0 {
-		return field.Required(f, "must be non-empty")
-	}
-	if len(name) > 8 {
-		return field.Invalid(f, name, "must be 8 characters or fewer")
-	}
-
-	return nil
-}
-
 func (r *LustreFileSystem) validateMgsNid() *field.Error {
 	f := field.NewPath("spec").Child("mgsNid")
 	nid := r.Spec.MgsNid
-	if len(nid) == 0 {
-		return field.Required(f, "must be non-empty")
-	}
 	if !strings.Contains(nid, "@") {
 		return field.Invalid(f, nid, "must be valid mgsNid format [HOST]@[INTERFACE]")
 	}
@@ -129,10 +110,6 @@ func (r *LustreFileSystem) validateMgsNid() *field.Error {
 func (r *LustreFileSystem) validateMountRoot() *field.Error {
 	f := field.NewPath("spec").Child("mountRoot")
 	mount := r.Spec.MountRoot
-	if len(mount) == 0 {
-		return field.Required(f, "must be non-empty")
-	}
-
 	if !filepath.IsAbs(mount) {
 		return field.Invalid(f, mount, "not an absolute file path")
 	}

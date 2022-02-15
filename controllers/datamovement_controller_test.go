@@ -31,6 +31,7 @@ var _ = Describe("Data Movement Controller", func() {
 		nodeKeys          []types.NamespacedName
 		storageKey, dmKey types.NamespacedName
 		storage           *nnfv1alpha1.NnfStorage
+		access            *nnfv1alpha1.NnfAccess
 		dm                *nnfv1alpha1.NnfDataMovement
 		dmOwnerRef        metav1.OwnerReference
 	)
@@ -66,13 +67,28 @@ var _ = Describe("Data Movement Controller", func() {
 				Namespace: storageKey.Namespace,
 			},
 		}
+
+		access = &nnfv1alpha1.NnfAccess{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      storageKey.Name,
+				Namespace: storageKey.Namespace,
+			},
+			Spec: nnfv1alpha1.NnfAccessSpec{
+				Target:       "all",
+				DesiredState: "mounted",
+			},
+		}
 	})
 
-	// After each test delete the NNF Storage and the Node
+	// After each test delete the NNF Storage, NNF Access and the Node
 	AfterEach(func() {
 		storage := &nnfv1alpha1.NnfStorage{}
 		Expect(k8sClient.Get(context.TODO(), storageKey, storage)).To(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), storage)).To(Succeed())
+
+		access := &nnfv1alpha1.NnfAccess{}
+		Expect(k8sClient.Get(context.TODO(), storageKey, access)).To(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), access)).To(Succeed())
 
 		for _, nodeKey := range nodeKeys {
 			node := &corev1.Node{}
@@ -83,7 +99,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 	// Just before each test, ensure the NNF Storage resource is created. This is
 	// outside the BeforeEach() declartion so each test can modify the NNF Storage
-	// resource as needed.
+	// resource as needed. Same for NNF Access
 	JustBeforeEach(func() {
 		mgsNode := storage.Status.MgsNode
 		Expect(k8sClient.Create(context.TODO(), storage)).To(Succeed())
@@ -101,8 +117,13 @@ var _ = Describe("Data Movement Controller", func() {
 				return expected.Status.MgsNode
 			}).Should(Equal(mgsNode), "update the nnf storage resource status")
 		}
-
 		Expect(k8sClient.Get(context.TODO(), storageKey, storage)).To(Succeed())
+
+		Expect(k8sClient.Create(context.TODO(), access)).To(Succeed())
+		Eventually(func() error {
+			expected := &nnfv1alpha1.NnfAccess{}
+			return k8sClient.Get(context.TODO(), storageKey, expected)
+		}).Should(Succeed(), "create the nnf access resource")
 	})
 
 	// Before each test, create a skeletal template for the Data Movement resource.
@@ -122,6 +143,11 @@ var _ = Describe("Data Movement Controller", func() {
 					Kind:      "NnfStorage",
 					Name:      storage.Name,
 					Namespace: storage.Namespace,
+				},
+				Access: corev1.ObjectReference{
+					Kind:      "NnfAccess",
+					Name:      access.Name,
+					Namespace: access.Namespace,
 				},
 			},
 		}
@@ -196,7 +222,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Namespace: corev1.NamespaceDefault,
 					},
 					Spec: lusv1alpha1.LustreFileSystemSpec{
-						Name:      "lustre-test",
+						Name:      "lustre",
 						MgsNid:    "172.0.0.1@tcp",
 						MountRoot: "/lus/test",
 					},
@@ -324,7 +350,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
 					})
 
-					It("Creates MPIJob", func() {
+					PIt("Creates MPIJob", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
@@ -528,7 +554,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Namespace: corev1.NamespaceDefault,
 					},
 					Spec: lusv1alpha1.LustreFileSystemSpec{
-						Name:      "lustre-test",
+						Name:      "lustre",
 						MgsNid:    "172.0.0.1@tcp",
 						MountRoot: "/lus/test",
 					},
@@ -593,7 +619,7 @@ var _ = Describe("Data Movement Controller", func() {
 						expected := &nnfv1alpha1.NnfDataMovement{}
 						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
-					}).Should(ContainElements(
+					}, "3s").Should(ContainElements(
 						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
 						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeRunning),
 					), "transition to running")
@@ -616,6 +642,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 						for _, item := range rsyncNodes.Items {
 							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(ownerLabelRsyncNodeDataMovement, dm.Name))
+							Expect(item.ObjectMeta.Annotations).To(HaveKeyWithValue(ownerLabelRsyncNodeDataMovement, dm.Name+"/"+dm.Namespace))
 
 							// TODO: Expect the correct Source and Destination paths. Source should be the lustre volume
 						}

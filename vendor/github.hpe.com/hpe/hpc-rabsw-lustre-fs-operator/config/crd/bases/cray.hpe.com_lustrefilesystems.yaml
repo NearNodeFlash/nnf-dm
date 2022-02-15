@@ -49,7 +49,17 @@ spec:
                 type: string
               name:
                 description: Name is the name of the Lustre file system.
+                maxLength: 8
                 type: string
+              storageClassName:
+                default: nnf-lustre-fs
+                description: StorageClassName refers to the StorageClass to use for
+                  this file system.
+                type: string
+            required:
+            - mgsNid
+            - mountRoot
+            - name
             type: object
           status:
             description: LustreFileSystemStatus defines the observed state of LustreFileSystem

@@ -57,8 +57,8 @@ type LustreFileSystemReconciler struct {
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;update;create;patch;delete
-//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;update;create;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;update;create;patch;delete;watch
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;update;create;patch;delete;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -119,12 +119,6 @@ func createOrUpdatePersistentVolume(ctx context.Context, r *LustreFileSystemReco
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fs.Name + PersistentVolumeSuffix,
-
-			// TODO: For some reason when the namespace is "default", a GET on the PersistentVolume returns an empty namespace string
-			//       This causes the modification of the ObjectMeta.Namespace parameter, which is illegal form of a mutate function.
-			//       This needs to be investigated further - why does the get not return "default"? Maybe it's because Persistent
-			//       Volumes are cluster scoped, and so the namespace is dropped from the return of GET? I'm very confused by this.
-			//Namespace: fs.Namespace,
 		},
 	}
 
@@ -137,8 +131,10 @@ func createOrUpdatePersistentVolume(ctx context.Context, r *LustreFileSystemReco
 		//	return err
 		//}
 
-		pv.ObjectMeta.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
-
+		// A 'describe' of this PV shows a warning about the namespace
+		// and the owner.
+		//pv.ObjectMeta.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
+		pv.Spec.StorageClassName = fs.Spec.StorageClassName
 		pv.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
 			corev1.ReadWriteMany,
 		}
@@ -177,6 +173,7 @@ func createOrUpdatePersistentVolumeClaim(ctx context.Context, r *LustreFileSyste
 	mutateFn := func() error {
 		pvc.ObjectMeta.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
 
+		pvc.Spec.StorageClassName = &fs.Spec.StorageClassName
 		pvc.Spec.VolumeName = fs.Name + PersistentVolumeSuffix
 
 		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{

@@ -9,7 +9,6 @@ fi
 CMD=$1
 
 if [[ "$CMD" == lustre ]]; then
-
   echo "$(tput bold)Creating override config $(tput sgr 0)"
   kubectl delete configmap/data-movement-config &> /dev/null
   cat <<-EOF | kubectl create -f -
