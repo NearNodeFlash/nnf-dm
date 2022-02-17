@@ -14,6 +14,8 @@ import (
 
 func main() {
 
+	workflow := flag.String("workflow", os.Getenv("DW_WORKFLOW_NAME"), "parent workflow name")
+	namespace := flag.String("namespace", os.Getenv("DW_WORKFLOW_NAMESPACE"), "parent workflow namespace")
 	source := flag.String("source", "", "source file or directory")
 	destination := flag.String("destination", "", "destination file or directory")
 	dryrun := flag.Bool("dryrun", false, "perfrom dry run of operation")
@@ -21,6 +23,10 @@ func main() {
 
 	flag.Parse()
 
+	if len(*workflow) == 0 {
+		log.Printf("workflow name required")
+		os.Exit(1)
+	}
 	if len(*source) == 0 || len(*destination) == 0 {
 		log.Printf("source and destination required")
 		os.Exit(1)
@@ -40,7 +46,7 @@ func main() {
 
 	c := pb.NewRsyncDataMoverClient(conn)
 
-	uid, err := createRequest(ctx, c, *source, *destination, *dryrun)
+	uid, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
 	if err != nil {
 		log.Fatalf("could not create data movement request: %v", err)
 	}
@@ -59,13 +65,21 @@ func main() {
 
 		time.Sleep(time.Second)
 	}
-
 	log.Printf("Data movement completed: %s", uid)
+
+	log.Printf("Deleting request: %s", uid)
+	status, err := deleteRequest(ctx, c, uid)
+	if err != nil {
+		log.Fatalf("could not delete data movement request: %v", err)
+	}
+	log.Printf("Data movement request deleted: %s %s", uid, status.String())
 }
 
-func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, source string, destination string, dryrun bool) (string, error) {
+func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, workflow, namespace, source, destination string, dryrun bool) (string, error) {
 
 	rsp, err := client.Create(ctx, &pb.RsyncDataMovementCreateRequest{
+		Workflow:    workflow,
+		Namespace:   namespace,
 		Source:      source,
 		Destination: destination,
 		Dryrun:      dryrun,
@@ -88,4 +102,16 @@ func getStatus(ctx context.Context, client pb.RsyncDataMoverClient, uid string) 
 	}
 
 	return rsp.GetState(), rsp.GetStatus(), nil
+}
+
+func deleteRequest(ctx context.Context, client pb.RsyncDataMoverClient, uid string) (pb.RsyncDataMovementDeleteResponse_Status, error) {
+	rsp, err := client.Delete(ctx, &pb.RsyncDataMovementDeleteRequest{
+		Uid: uid,
+	})
+
+	if err != nil {
+		return pb.RsyncDataMovementDeleteResponse_UNKNOWN, err
+	}
+
+	return rsp.GetStatus(), nil
 }

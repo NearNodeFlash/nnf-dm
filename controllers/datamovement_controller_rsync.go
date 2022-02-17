@@ -22,8 +22,6 @@ import (
 
 const (
 	rsyncSuffix = "-rsync"
-
-	ownerLabelRsyncNodeDataMovement = "dm.cray.hpe.com/owner"
 )
 
 func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
@@ -75,7 +73,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 
 	access := &nnfv1alpha1.NnfAccess{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: dm.Spec.Access.Name,
+			Name:      dm.Spec.Access.Name,
 			Namespace: dm.Spec.Access.Namespace,
 		},
 	}
@@ -99,17 +97,17 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					Name:      fmt.Sprintf("%s-%d", dm.Name, i),
 					Namespace: node.Name,
 					Labels: map[string]string{
-						// Bare name (without namespace) is used to List() all the Rsync Nodes by label. 
+						// Bare name (without namespace) is used to List() all the Rsync Nodes by label.
 						// This requires dm.Name to be unique across Namespaces, which is always the case when
 						// data movement resource is created from a workflow.
 						// We can't append "/namespace" here because of the label regex validation rules do not
 						// permit the forward slash "/"
-						ownerLabelRsyncNodeDataMovement: dm.Name, 
+						dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name,
 					},
 					Annotations: map[string]string{
 						// Annotation is used to watch Rsync Nodes and reconcile the Data Movement resource
 						// when they change. This is namespace scoped.
-						ownerLabelRsyncNodeDataMovement: dm.Name + "/" + dm.Namespace,
+						dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name + "/" + dm.Namespace,
 					},
 				},
 				Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
@@ -154,7 +152,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 	log := log.FromContext(ctx)
 
 	nodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-	if err := r.List(ctx, nodes, client.MatchingLabels{ownerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+	if err := r.List(ctx, nodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
 		return nil, "", "", err
 	}
 
@@ -208,7 +206,7 @@ func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1
 	log := log.FromContext(ctx)
 
 	rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-	if err := r.List(ctx, rsyncNodes, client.MatchingLabels{ownerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+	if err := r.List(ctx, rsyncNodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
 		return nil, err
 	}
 
@@ -227,7 +225,7 @@ func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1
 
 func rsyncNodeDataMovementEnqueueRequestMapFunc(o client.Object) []reconcile.Request {
 
-	if owner, found := o.GetAnnotations()[ownerLabelRsyncNodeDataMovement]; found {
+	if owner, found := o.GetAnnotations()[dmv1alpha1.OwnerLabelRsyncNodeDataMovement]; found {
 		components := strings.Split(owner, "/")
 		if len(components) == 2 {
 			return []reconcile.Request{{

@@ -117,6 +117,10 @@ Retry:
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
 			Namespace: s.namespace,
+			Labels: map[string]string{
+				dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          req.Workflow,
+				dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: req.Namespace,
+			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 			Source:      req.GetSource(),
@@ -142,6 +146,13 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 
 	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.RsyncDataMovementStatusResponse{
+				State:  pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
+				Status: pb.RsyncDataMovementStatusResponse_NOT_FOUND,
+			}, nil
+		}
+
 		return nil, err
 	}
 
@@ -183,4 +194,38 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	}
 
 	return &pb.RsyncDataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
+}
+
+func (s *defaultServer) Delete(ctx context.Context, req *pb.RsyncDataMovementDeleteRequest) (*pb.RsyncDataMovementDeleteResponse, error) {
+
+	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
+	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.RsyncDataMovementDeleteResponse{
+				Status: pb.RsyncDataMovementDeleteResponse_NOT_FOUND,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	if rsync.Status.State != nnfv1alpha1.DataMovementConditionTypeFinished {
+		return &pb.RsyncDataMovementDeleteResponse{
+			Status: pb.RsyncDataMovementDeleteResponse_ACTIVE,
+		}, nil
+	}
+
+	if err := s.client.Delete(ctx, rsync); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.RsyncDataMovementDeleteResponse{
+				Status: pb.RsyncDataMovementDeleteResponse_NOT_FOUND,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	return &pb.RsyncDataMovementDeleteResponse{
+		Status: pb.RsyncDataMovementDeleteResponse_DELETED,
+	}, nil
 }

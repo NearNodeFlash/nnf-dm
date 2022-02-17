@@ -24,6 +24,9 @@ type RsyncDataMoverClient interface {
 	// Status requests the status of a previously submitted data movement request. It accepts a unique
 	// identifier that identifies the request and returns a status message.
 	Status(ctx context.Context, in *RsyncDataMovementStatusRequest, opts ...grpc.CallOption) (*RsyncDataMovementStatusResponse, error)
+	// Delete will attempt to delete a completed data movement request. It accepts a unique identifer
+	// that identifies the request and returns the status of the delete operation.
+	Delete(ctx context.Context, in *RsyncDataMovementDeleteRequest, opts ...grpc.CallOption) (*RsyncDataMovementDeleteResponse, error)
 }
 
 type rsyncDataMoverClient struct {
@@ -52,6 +55,15 @@ func (c *rsyncDataMoverClient) Status(ctx context.Context, in *RsyncDataMovement
 	return out, nil
 }
 
+func (c *rsyncDataMoverClient) Delete(ctx context.Context, in *RsyncDataMovementDeleteRequest, opts ...grpc.CallOption) (*RsyncDataMovementDeleteResponse, error) {
+	out := new(RsyncDataMovementDeleteResponse)
+	err := c.cc.Invoke(ctx, "/datamovement.RsyncDataMover/Delete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RsyncDataMoverServer is the server API for RsyncDataMover service.
 // All implementations must embed UnimplementedRsyncDataMoverServer
 // for forward compatibility
@@ -62,6 +74,9 @@ type RsyncDataMoverServer interface {
 	// Status requests the status of a previously submitted data movement request. It accepts a unique
 	// identifier that identifies the request and returns a status message.
 	Status(context.Context, *RsyncDataMovementStatusRequest) (*RsyncDataMovementStatusResponse, error)
+	// Delete will attempt to delete a completed data movement request. It accepts a unique identifer
+	// that identifies the request and returns the status of the delete operation.
+	Delete(context.Context, *RsyncDataMovementDeleteRequest) (*RsyncDataMovementDeleteResponse, error)
 	mustEmbedUnimplementedRsyncDataMoverServer()
 }
 
@@ -74,6 +89,9 @@ func (UnimplementedRsyncDataMoverServer) Create(context.Context, *RsyncDataMovem
 }
 func (UnimplementedRsyncDataMoverServer) Status(context.Context, *RsyncDataMovementStatusRequest) (*RsyncDataMovementStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+}
+func (UnimplementedRsyncDataMoverServer) Delete(context.Context, *RsyncDataMovementDeleteRequest) (*RsyncDataMovementDeleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedRsyncDataMoverServer) mustEmbedUnimplementedRsyncDataMoverServer() {}
 
@@ -124,6 +142,24 @@ func _RsyncDataMover_Status_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RsyncDataMover_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RsyncDataMovementDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RsyncDataMoverServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/datamovement.RsyncDataMover/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RsyncDataMoverServer).Delete(ctx, req.(*RsyncDataMovementDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RsyncDataMover_ServiceDesc is the grpc.ServiceDesc for RsyncDataMover service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -138,6 +174,10 @@ var RsyncDataMover_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Status",
 			Handler:    _RsyncDataMover_Status_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _RsyncDataMover_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

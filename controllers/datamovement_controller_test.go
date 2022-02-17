@@ -636,13 +636,13 @@ var _ = Describe("Data Movement Controller", func() {
 						rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
 
 						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{ownerLabelRsyncNodeDataMovement})).To(Succeed())
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement})).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(HaveLen(expectedRsyncNodeCount), "expected number of rsync nodes")
 
 						for _, item := range rsyncNodes.Items {
-							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(ownerLabelRsyncNodeDataMovement, dm.Name))
-							Expect(item.ObjectMeta.Annotations).To(HaveKeyWithValue(ownerLabelRsyncNodeDataMovement, dm.Name+"/"+dm.Namespace))
+							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(dmv1alpha1.OwnerLabelRsyncNodeDataMovement, dm.Name))
+							Expect(item.ObjectMeta.Annotations).To(HaveKeyWithValue(dmv1alpha1.OwnerLabelRsyncNodeDataMovement, dm.Name+"/"+dm.Namespace))
 
 							// TODO: Expect the correct Source and Destination paths. Source should be the lustre volume
 						}
@@ -677,7 +677,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 						// Validate the Rsync Nodes delete
 						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{ownerLabelRsyncNodeDataMovement})).To(Succeed())
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement})).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(BeEmpty(), "expected zero rsync nodes on delete")
 					})

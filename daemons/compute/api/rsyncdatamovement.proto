@@ -19,15 +19,21 @@ service RsyncDataMover {
     // Status requests the status of a previously submitted data movement request. It accepts a unique
     // identifier that identifies the request and returns a status message.
     rpc Status (RsyncDataMovementStatusRequest) returns (RsyncDataMovementStatusResponse) {}
+
+    // Delete will attempt to delete a completed data movement request. It accepts a unique identifer
+    // that identifies the request and returns the status of the delete operation.
+    rpc Delete (RsyncDataMovementDeleteRequest) returns (RsyncDataMovementDeleteResponse) {}
 }
 
 // The data movemement create request message containing the source and destination files or directories. The
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
 message RsyncDataMovementCreateRequest {
-    string source = 1;
-    string destination = 2;
-    bool dryrun = 3;
+    string workflow = 1;
+    string namespace = 2;
+    string source = 3;
+    string destination = 4;
+    bool dryrun = 5;
 }
 
 // The data movement create response message contains a unique identifier amont all data movement requests for
@@ -57,11 +63,30 @@ message RsyncDataMovementStatusResponse {
     State state = 1;
 
     enum Status {
-        FAILED = 0;
-        SUCCESS = 1;
-        INVALID = 2;
-        UNKNOWN_STATUS = 3;
+        INVALID = 0;
+        NOT_FOUND = 1;
+        SUCCESS = 2;
+        FAILED = 3;
+        UNKNOWN_STATUS = 4;
     }
     Status status = 2;
     string message = 3;
+}
+
+// The data movement delete request permits users to delete a completed data movement request (any request with a 
+// status of COMPLETED) by specifying the request's unique identifier.
+message RsyncDataMovementDeleteRequest {
+    string uid = 1;
+}
+
+// The data movement delete response returns the status of the delete operation.
+message RsyncDataMovementDeleteResponse {
+    enum Status {
+        INVALID = 0;
+        NOT_FOUND = 1;
+        DELETED = 2;
+        ACTIVE = 3;
+        UNKNOWN = 4;
+    }
+    Status status = 1;
 }
