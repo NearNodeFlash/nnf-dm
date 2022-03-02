@@ -30,6 +30,7 @@ type LustreFileSystemSpec struct {
 
 	// Name is the name of the Lustre file system.
 	// +kubebuilder:validation:MaxLength:=8
+	// +kubebuilder:validation:MinLength:=1
 	Name string `json:"name"`
 
 	// MgsNid is the NID of the MGS to use for accessing the Lustre file system. The MGS NID is combined with the
@@ -54,6 +55,10 @@ type LustreFileSystemStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="FSNAME",type="string",JSONPath=".spec.name",description="Lustre file system name"
+//+kubebuilder:printcolumn:name="MgsNID",type="string",JSONPath=".spec.mgsNid",description="MGS NID"
+//+kubebuilder:printcolumn:name="MountRoot",type="string",JSONPath=".spec.mountRoot",priority=1,description="Mount path used to mount filesystem"
+//+kubebuilder:printcolumn:name="StorageClass",type="string",JSONPath=".spec.storageClassName",priority=1,description="StorageClass to use"
 
 // LustreFileSystem is the Schema for the lustrefilesystems API
 type LustreFileSystem struct {

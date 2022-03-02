@@ -29,11 +29,13 @@ service RsyncDataMover {
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
 message RsyncDataMovementCreateRequest {
-    string workflow = 1;
-    string namespace = 2;
-    string source = 3;
-    string destination = 4;
-    bool dryrun = 5;
+    string initiator = 1;
+    string target = 2;
+    string workflow = 3;
+    string namespace = 4;
+    string source = 5;
+    string destination = 6;
+    bool dryrun = 7;
 }
 
 // The data movement create response message contains a unique identifier amont all data movement requests for

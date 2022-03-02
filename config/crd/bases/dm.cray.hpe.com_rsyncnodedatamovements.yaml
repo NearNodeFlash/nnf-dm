@@ -38,17 +38,34 @@ spec:
             description: RsyncNodeDataMovementSpec defines the desired state of RsyncNodeDataMovement
             properties:
               destination:
+                description: Destination file or directory, the receipent of the source
+                  contents
                 type: string
               dryRun:
+                description: DryRun specifies that this data movement request should
+                  show what would have been transferred without actually performing
+                  any copy operation.
                 type: boolean
               groupId:
+                description: GroupId is the group ID of a compute initiated data movement.
+                  This value is used to ensure correct permissions are granted to
+                  the initiator.
                 format: int32
                 type: integer
-              id:
+              initiator:
+                description: Initiator is used to define the compute resource that
+                  initiated the data movement request. This value must match one of
+                  the compute resources selected by the WLM to run the job, or be
+                  empty if this is not a compute initiated data transfer.
                 type: string
               source:
+                description: Source file or directory, the contents of which are copied
+                  to the destination
                 type: string
               userId:
+                description: UserId is the user ID of a compute initated data movement.
+                  This value is used to ensure correct permissions are granted to
+                  the initiator.
                 format: int32
                 type: integer
             type: object

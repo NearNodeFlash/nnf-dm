@@ -44,7 +44,7 @@ const (
 func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx, "DataMovement", "Lustre")
 
-	// We need to label all the nodes in the Servers object with a unique label that describes this
+	// We need to label all the nodes in the NNF Storage object with a unique label that describes this
 	// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
 	// targets all the nodes
 	result, workerCount, err := r.labelStorageNodes(ctx, dm)
@@ -80,12 +80,17 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nn
 func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, int32, error) {
 	log := log.FromContext(ctx).WithName("label")
 
+	access, err := r.getNnfAccess(ctx, dm)
+	if err != nil {
+		return nil, -1, err
+	}
+
 	// List of target node names that are to perform lustre data movement
 	targetNodeNames := make([]string, 0)
 
-	switch dm.Spec.Storage.Kind {
+	switch access.Spec.StorageReference.Kind {
 	case "NnfStorage":
-		storageRef := dm.Spec.Storage
+		storageRef := access.Spec.StorageReference
 		storage := &nnfv1alpha1.NnfStorage{}
 		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 			return nil, -1, err
@@ -108,7 +113,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 
 		break
 	default:
-		panic(fmt.Sprintf("Unsupported storage type: %s", dm.Spec.Storage.Kind))
+		panic(fmt.Sprintf("Unsupported storage type: %s", access.Spec.StorageReference.Kind))
 	}
 
 	// Retrieve all the NNF Nodes in the cluster - these nodes will be matched against the requested
@@ -177,12 +182,17 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
 	log := log.FromContext(ctx).WithName("pv")
 
-	if dm.Spec.Storage.Kind != "NnfStorage" {
+	access, err := r.getNnfAccess(ctx, dm)
+	if err != nil {
+		return err
+	}
+
+	if access.Spec.StorageReference.Kind != "NnfStorage" {
 		panic("Create Persistent Volume requires NNF Storage type")
 	}
 
 	storage := &nnfv1alpha1.NnfStorage{}
-	if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Storage.Name, Namespace: dm.Spec.Storage.Namespace}, storage); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: access.Spec.StorageReference.Name, Namespace: access.Spec.StorageReference.Namespace}, storage); err != nil {
 		return err
 	}
 
@@ -433,6 +443,27 @@ func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(c
 	}
 
 	panic("Unsupported Lustre Destination PVC: " + ref.Kind)
+}
+
+// Returns the NnfAccess for the given data movement. The precedence is given to the Source specification if both source and destination
+// are present. Lustre 2 lustre does not currently support both, so it should be only one is present - this is validated in validateSpec()
+func (r *DataMovementReconciler) getNnfAccess(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*nnfv1alpha1.NnfAccess, error) {
+
+	accessReference := &corev1.ObjectReference{}
+	if dm.Spec.Source.Access != nil {
+		accessReference = dm.Spec.Source.Access
+	} else if dm.Spec.Destination.Access != nil {
+		accessReference = dm.Spec.Destination.Access
+	} else {
+		return nil, fmt.Errorf("No NNF Access defined")
+	}
+
+	access := &nnfv1alpha1.NnfAccess{}
+	if err := r.Get(ctx, types.NamespacedName{Name: accessReference.Name, Namespace: accessReference.Namespace}, access); err != nil {
+		return nil, err
+	}
+
+	return access, nil
 }
 
 func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {

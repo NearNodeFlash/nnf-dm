@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +40,8 @@ import (
 const (
 	PersistentVolumeSuffix      = "-pv"
 	PersistentVolumeClaimSuffix = "-pvc"
+
+	finalizerFS = "cray.hpe.com/lustre_fs_operator"
 )
 
 var (
@@ -72,20 +74,52 @@ type LustreFileSystemReconciler struct {
 func (r *LustreFileSystemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithValues("LustreFileSystem", req.NamespacedName.String())
 
+	fs := &v1alpha1.LustreFileSystem{}
+	if err := r.Get(ctx, req.NamespacedName, fs); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	log.Info("Starting reconcile loop")
 	defer log.Info("Finish reconcile loop")
 
-	fs := &v1alpha1.LustreFileSystem{}
-	if err := r.Get(ctx, req.NamespacedName, fs); err != nil {
-		if errors.IsNotFound(err) {
+	// Check if the object is being deleted.
+	if !fs.GetDeletionTimestamp().IsZero() {
+
+		if !controllerutil.ContainsFinalizer(fs, finalizerFS) {
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
+
+		// Delete the PV, if it still exists.  The PVC will be
+		// cleaned up by garbage collection.
+		pv := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fs.Name + PersistentVolumeSuffix,
+			},
+		}
+		if err := r.Delete(ctx, pv); err != nil {
+			log.Error(err, "Unable to delete PV", "pv", pv.GetName())
+			if !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+		} else {
+			log.Info("Deleted PV", "pv", pv.GetName())
+		}
+
+		controllerutil.RemoveFinalizer(fs, finalizerFS)
+		if err := r.Update(ctx, fs); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
 	}
 
-	// TODO: Check if FS is being deleted
-
-	// TODO: Check if FS has Finalizer; Do we need to add a finalizer to delete the object chain?
+	if !controllerutil.ContainsFinalizer(fs, finalizerFS) {
+		controllerutil.AddFinalizer(fs, finalizerFS)
+		if err := r.Update(ctx, fs); err != nil {
+			return ctrl.Result{Requeue: true}, nil
+		}
+		return ctrl.Result{}, nil
+	}
 
 	ownerRef := metav1.NewControllerRef(
 		&fs.ObjectMeta,
@@ -95,7 +129,7 @@ func (r *LustreFileSystemReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			Kind:    "LustreFileSystem",
 		})
 
-	for i, fn := range []createOrUpdateFn{createOrUpdatePersistentVolume, createOrUpdatePersistentVolumeClaim} {
+	for i, fn := range []createOrUpdateFn{createOrUpdatePersistentVolumeClaim, createOrUpdatePersistentVolume} {
 		result, err := fn(ctx, r, fs, ownerRef, log)
 		if err != nil {
 			log.Error(err, "create or update failed", "index", i, "result", result)
@@ -124,16 +158,11 @@ func createOrUpdatePersistentVolume(ctx context.Context, r *LustreFileSystemReco
 
 	mutateFn := func() error {
 
-		// WARNING: A cluster-scoped resource like Persistent Volume must not have a namespace-scoped owner (LustreFileSystem),
-		//          even if that namespace is "default". So even though this is a controller reference, we are stuck supplying
-		//          just the owner reference.
-		//if err := ctrl.SetControllerReference(fs, pv, r.Scheme); err != nil {
-		//	return err
-		//}
+		// A cluster-scoped resource like Persistent Volume must not
+		// have a namespace-scoped owner (LustreFileSystem), even if
+		// that namespace is "default".  A 'describe' of the resource
+		// will show warnings, if an ownerRef has been set.
 
-		// A 'describe' of this PV shows a warning about the namespace
-		// and the owner.
-		//pv.ObjectMeta.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
 		pv.Spec.StorageClassName = fs.Spec.StorageClassName
 		pv.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
 			corev1.ReadWriteMany,
@@ -142,6 +171,20 @@ func createOrUpdatePersistentVolume(ctx context.Context, r *LustreFileSystemReco
 		pv.Spec.Capacity = corev1.ResourceList{
 			corev1.ResourceStorage: PersistentVolumeResourceQuantity,
 		}
+
+		if pv.Spec.ClaimRef != nil && pv.Status.Phase == corev1.VolumeReleased {
+			// The PV is being updated, and it was bound to a PVC
+			// but now it's released.  Clear the uid of the
+			// earlier PVC from the claimRef.
+			// This allows it to bind to a new PVC.
+			pv.Spec.ClaimRef.UID = ""
+		}
+		if pv.Spec.ClaimRef == nil {
+			pv.Spec.ClaimRef = &corev1.ObjectReference{}
+		}
+		// Reserve this PV for the matching PVC.
+		pv.Spec.ClaimRef.Name = fs.Name + PersistentVolumeClaimSuffix
+		pv.Spec.ClaimRef.Namespace = fs.Namespace
 
 		pv.Spec.PersistentVolumeSource = corev1.PersistentVolumeSource{
 			CSI: &corev1.CSIPersistentVolumeSource{
@@ -174,6 +217,7 @@ func createOrUpdatePersistentVolumeClaim(ctx context.Context, r *LustreFileSyste
 		pvc.ObjectMeta.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
 
 		pvc.Spec.StorageClassName = &fs.Spec.StorageClassName
+		// Reserve this PVC for the matching PV.
 		pvc.Spec.VolumeName = fs.Name + PersistentVolumeSuffix
 
 		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
@@ -196,5 +240,6 @@ func createOrUpdatePersistentVolumeClaim(ctx context.Context, r *LustreFileSyste
 func (r *LustreFileSystemReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.LustreFileSystem{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

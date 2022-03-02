@@ -33,16 +33,27 @@ type RsyncNodeDataMovementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Id string `json:"id,omitempty"`
+	// Initiator is used to define the compute resource that initiated the data movement request. This value must match
+	// one of the compute resources selected by the WLM to run the job, or be empty if this is not a compute initiated
+	// data transfer.
+	Initiator string `json:"initiator,omitempty"`
 
+	// Source file or directory, the contents of which are copied to the destination
 	Source string `json:"source,omitempty"`
 
+	// Destination file or directory, the receipent of the source contents
 	Destination string `json:"destination,omitempty"`
 
+	// UserId is the user ID of a compute initated data movement. This value is used to ensure correct permissions
+	// are granted to the initiator.
 	UserId uint32 `json:"userId,omitempty"`
 
+	// GroupId is the group ID of a compute initiated data movement. This value is used to ensure correct permissions
+	// are granted to the initiator.
 	GroupId uint32 `json:"groupId,omitempty"`
 
+	// DryRun specifies that this data movement request should show what would have been transferred without actually
+	// performing any copy operation.
 	DryRun bool `json:"dryRun,omitempty"`
 }
 

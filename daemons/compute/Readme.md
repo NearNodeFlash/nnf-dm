@@ -2,13 +2,13 @@
 The nnf-dm service is a compute resident daemon that provides an interface for submitting copy offload requests to the Rabbit.
 
 ## Build
-The nnf-dm service resides in ./server directory and can be built using `go build -o nnf-dm`
+The nnf-dm service resides in [./server](./server) directory and can be built using `go build -o nnf-dm`
 
 ## Installation
 Copy the nnf-dm daemon to a suitable location such as `/usr/bin`. After defining the necessary [environmental variables](#environmental-variables), install the daemon by running `nnf-dm install`. Verify the daemon is running using `systemctl status nnf-dm`
 
 ### Authentication
-NNF software defines a Kubernetes service account for communicating data movement requests to the kubeapi server. The token file and certificate file can be download by running `.cert-load.sh` and verified with `cert-test.sh` The token file and certificate file must be provided to the nnf-dm daemon.
+NNF software defines a Kubernetes service account for communicating data movement requests to the kubeapi server. The token file and certificate file can be download by running `cert-load.sh` and verified with `cert-test.sh` The token file and certificate file must be provided to the nnf-dm daemon.
 
 ### Customizing the Configuration
 Installing the nnf-dm daemon will create a default configuration located at `/etc/systemd/system/nnf-dm.service`. The default configuration created on install is sparse as the use of environmental variables is assumed; If desired, one can edit the configuration with the [command line options](#command-line-options). An example is show below.
@@ -47,9 +47,11 @@ ExecStart=/root/nnf-dm --simulated
 | ---- | ----------- |
 | `KUBERNETES_SERVICE_HOST` | Specifies the kubernetes service host |
 | `KUBERNETES_SERVICE_PORT` | Specifies the kubernetes service port |
+| `NODE_NAME` | Specifies the node name of this host |
+| `NNF_NODE_NAME` | Specifies the NNF node name connected to this host |
 | `NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE` | Specifies the path to the NNF Data Movement service token file |
 | `NNF_DATA_MOVEMENT_SERVICE_CERT_FILE`  | Specifies the path to the NNF Data Movement service certificate file |
-| `NNF_NODE_NAME` | Specifies the NNF node name connected to this host |
+
 
 ## Command Line Options
 Command line options are defined below; Most default to their corresponding environmental variables of the same name in upper-case with hyphens replaced by underscores
@@ -59,9 +61,11 @@ Command line options are defined below; Most default to their corresponding envi
 | `--socket=[PATH]` | `/var/run/nnf-dm.sock` | Specifies the listening socket for the NNF Data Movement daemon |
 | `--kubernetes-service-host=[HOST]` | `KUBERNETES_SERVICE_HOST` | Specifies the kubernetes service host |
 | `--kubernetes-service-port=[PORT]` | `KUBERNETES_SERVICE_PORT` | Specifies the kubernetes service port |
+| `--node-name=[NAME]` | `NODE_NAME` | Specifies the node name of this host |
+| `--nnf-node-name=[NAME]` | `NNF_NODE_NAME` | Specifies the NNF node name connected to this host |
 | `--nnf-data-movement-service-token-file=[PATH]` | `NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE` | Specifies the path to the NNF Data Movement service token file |
 | `--nnf-data-movement-service-cert-file=[PATH]` | `NNF_DATA_MOVEMENT_SERVICE_CERT_FILE`  | Specifies the path to the NNF Data Movement service certificate file |
-| `--nnf-node-name=[NAME]` | `NNF_NODE_NAME` | Specifies the NNF node name connected to this host |
+
 
 # Data Movement Interface
 The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating, querying, and deleting data movement requests. The definitions for these can be found in [./api/rsyncdatamovement.proto](./api/rsyncdatamovement.proto) file. Consulting this file should be done in addition to the context in this section to ensure the latest API definitions are used.
@@ -71,7 +75,9 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 ### Create Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `workflow` | string | Name of the workflow that is associated with this data movement request. TWLM must proivded this as en environmental variable (i.e. `DW_WORKFLOW_NAME`) |
+| `initiator` | string | Name of the initiating resource. Defaults to the environmental variable `NODE_NAME` |
+| `target` | string | Name of the target resource which should execute this request. Defaults to the environmental variable `NNF_NODE_NAME` |
+| `workflow` | string | Name of the workflow that is associated with this data movement request. WLM must proivded this as en environmental variable (i.e. `DW_WORKFLOW_NAME`) |
 | `namespace` | string | Namespace of the workflow that is associated with this data movement request. WLM must proivded this as en environmental variable (i.e. `DW_WORKFLOW_NAMESPACE`) |
 | `source` | string | The source file or directory |
 | `destination` | string | The destination file or directory |

@@ -76,6 +76,11 @@ var _ = Describe("Data Movement Controller", func() {
 			Spec: nnfv1alpha1.NnfAccessSpec{
 				Target:       "all",
 				DesiredState: "mounted",
+				StorageReference: corev1.ObjectReference{
+					Kind:      "NnfStorage",
+					Name:      storage.Name,
+					Namespace: storage.Namespace,
+				},
 			},
 		}
 	})
@@ -139,15 +144,19 @@ var _ = Describe("Data Movement Controller", func() {
 				Namespace: dmKey.Namespace,
 			},
 			Spec: nnfv1alpha1.NnfDataMovementSpec{
-				Storage: corev1.ObjectReference{
-					Kind:      "NnfStorage",
-					Name:      storage.Name,
-					Namespace: storage.Namespace,
+				Source: nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+					Access: &corev1.ObjectReference{
+						Kind:      "NnfAccess",
+						Name:      access.Name,
+						Namespace: access.Namespace,
+					},
 				},
-				Access: corev1.ObjectReference{
-					Kind:      "NnfAccess",
-					Name:      access.Name,
-					Namespace: access.Namespace,
+				Destination: nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+					Access: &corev1.ObjectReference{
+						Kind:      "NnfAccess",
+						Name:      access.Name,
+						Namespace: access.Namespace,
+					},
 				},
 			},
 		}
@@ -266,23 +275,20 @@ var _ = Describe("Data Movement Controller", func() {
 
 					storage.Status.MgsNode = "172.0.0.1@tcp"
 
-					dm.Spec.Source = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-						Path: "example.file",
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "LustreFileSystem",
-							Name:      lustre.Name,
-							Namespace: lustre.Namespace,
-						},
+					dm.Spec.Source.Path = "example.file"
+					dm.Spec.Source.StorageInstance = &corev1.ObjectReference{
+						Kind:      "LustreFileSystem",
+						Name:      lustre.Name,
+						Namespace: lustre.Namespace,
 					}
 
-					dm.Spec.Destination = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-						Path: "/",
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "NnfJobStorageInstance",
-							Name:      jsi.Name,
-							Namespace: jsi.Namespace,
-						},
+					dm.Spec.Destination.Path = "/"
+					dm.Spec.Destination.StorageInstance = &corev1.ObjectReference{
+						Kind:      "NnfJobStorageInstance",
+						Name:      jsi.Name,
+						Namespace: jsi.Namespace,
 					}
+
 				})
 
 				JustBeforeEach(func() {
@@ -595,22 +601,18 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				BeforeEach(func() {
-					dm.Spec.Source = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-						Path: "/", // Doesn't matter, using overrides
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "LustreFileSystem",
-							Name:      lustre.Name,
-							Namespace: lustre.Namespace,
-						},
+					dm.Spec.Source.Path = "/" // Doesn't matter, using overrides
+					dm.Spec.Source.StorageInstance = &corev1.ObjectReference{
+						Kind:      "LustreFileSystem",
+						Name:      lustre.Name,
+						Namespace: lustre.Namespace,
 					}
 
-					dm.Spec.Destination = nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-						Path: "/", // Doesn't matter, using overrides
-						StorageInstance: &corev1.ObjectReference{
-							Kind:      "NnfJobStorageInstance",
-							Name:      jsi.Name,
-							Namespace: jsi.Namespace,
-						},
+					dm.Spec.Destination.Path = "/" // Doesn't matter, using overrides
+					dm.Spec.Destination.StorageInstance = &corev1.ObjectReference{
+						Kind:      "NnfJobStorageInstance",
+						Name:      jsi.Name,
+						Namespace: jsi.Namespace,
 					}
 				})
 

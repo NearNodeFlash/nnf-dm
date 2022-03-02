@@ -42,6 +42,7 @@ type defaultServer struct {
 	pb.UnimplementedRsyncDataMoverServer
 
 	client    client.Client
+	name      string
 	namespace string
 }
 
@@ -98,7 +99,7 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
 	// TODO: We need to create the NNFDataMovement CR on the associated rabbit namespace
 
-	return &defaultServer{client: client, namespace: opts.nodeName}, nil
+	return &defaultServer{client: client, name: opts.name, namespace: opts.nodeName}, nil
 }
 
 func (s *defaultServer) Create(ctx context.Context, req *pb.RsyncDataMovementCreateRequest) (*pb.RsyncDataMovementCreateResponse, error) {
@@ -106,6 +107,13 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.RsyncDataMovementCre
 	userId, groupId, err := auth.GetAuthInfo(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(req.GetInitiator()) == 0 {
+		req.Initiator = s.name
+	}
+	if len(req.GetTarget()) == 0 {
+		req.Target = s.namespace
 	}
 
 Retry:
@@ -116,13 +124,17 @@ Retry:
 	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
-			Namespace: s.namespace,
+			Namespace: req.GetTarget(),
 			Labels: map[string]string{
 				dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          req.Workflow,
 				dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: req.Namespace,
 			},
+			Annotations: map[string]string{
+				dmv1alpha1.OwnerLabelRsyncNodeDataMovement: req.Workflow + "/" + req.Namespace,
+			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
+			Initiator:   req.GetInitiator(),
 			Source:      req.GetSource(),
 			Destination: req.GetDestination(),
 			UserId:      userId,

@@ -243,6 +243,10 @@ func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) e
 		return fmt.Errorf("one of source or destination must be a storage instance")
 	}
 
+	if dm.Spec.Source.Access == nil && dm.Spec.Destination.Access == nil {
+		return fmt.Errorf("at least one of source or destination must have an access")
+	}
+
 	return nil
 }
 

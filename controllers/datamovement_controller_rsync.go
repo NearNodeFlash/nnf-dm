@@ -36,10 +36,44 @@ func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *nnf
 
 func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]nnfv1alpha1.NnfStorageAllocationNodes, error) {
 
+	// Retrieve the NnfAccess for this data movement request. This will reference the NnfStorage object so we can target the nodes
+	// that make up the storage for data movement. We currently support data movement from Lustre (global or persistence) to/from
+	// the NNF Nodes describe by a single NnfAccess.
+
+	sourceFileSystemType, err := r.getStorageInstanceFileSystemType(dm.Spec.Source.StorageInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	destinationFileSystemType, err := r.getStorageInstanceFileSystemType(dm.Spec.Destination.StorageInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	if sourceFileSystemType != "lustre" && destinationFileSystemType != "lustre" {
+		return nil, fmt.Errorf("rsync data movement requires one of source or destination to be a lustre file system")
+	}
+
+	var accessReference *corev1.ObjectReference = nil
+	if sourceFileSystemType != "lustre" {
+		accessReference = dm.Spec.Source.Access
+	} else if destinationFileSystemType != "lustre" {
+		accessReference = dm.Spec.Destination.Access
+	}
+
+	if accessReference == nil {
+		return nil, fmt.Errorf("no access defined for rsync data movement")
+	}
+
+	access := &nnfv1alpha1.NnfAccess{}
+	if err := r.Get(ctx, types.NamespacedName{Name: accessReference.Name, Namespace: accessReference.Namespace}, access); err != nil {
+		return nil, err
+	}
+
 	// Retrieve the NnfStorage object that is associated with this Rsync job. This provides the list of Rabbits that will receive
 	// RsyncNodeDataMovement resources.
 	storage := &nnfv1alpha1.NnfStorage{}
-	if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Storage.Name, Namespace: dm.Spec.Storage.Namespace}, storage); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: access.Spec.StorageReference.Name, Namespace: access.Spec.StorageReference.Namespace}, storage); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +97,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 		return nil, err
 	}
 
-	// From the provided NnfAccess, we'll need the source/destination to load the PrefixPath; this is the
+	// From the provided NNF Access, we'll need the source/destination to load the PrefixPath; this is the
 	// path that is the basis for this data movement request, and we should append "/compute-%id" onto the prefix
 	// path, and then append the rsync.Spec.Source/rsync.Spec.Destination as needed.
 	//
@@ -71,14 +105,18 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 	// a prefix path that corresponds to the XFS File System at something like /mnt/nnf/job-1234/. In this case
 	// we would create rsync jobs with Destination=/mnt/nnf/job-1234/compute-%id/file.out
 
-	access := &nnfv1alpha1.NnfAccess{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dm.Spec.Access.Name,
-			Namespace: dm.Spec.Access.Namespace,
-		},
+	sourceAccess := &nnfv1alpha1.NnfAccess{}
+	if dm.Spec.Source.Access != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Source.Access.Name, Namespace: dm.Spec.Source.Access.Namespace}, sourceAccess); err != nil {
+			return nil, err
+		}
 	}
-	if err := r.Get(ctx, client.ObjectKeyFromObject(access), access); err != nil {
-		return nil, err
+
+	destinationAccess := &nnfv1alpha1.NnfAccess{}
+	if dm.Spec.Destination.Access != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Destination.Access.Name, Namespace: dm.Spec.Destination.Access.Namespace}, destinationAccess); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, node := range nodes {
@@ -111,8 +149,8 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					},
 				},
 				Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
-					Source:      r.getRsyncPath(dm.Spec.Source, config, access.Spec.MountPathPrefix, i, configSourcePath),
-					Destination: r.getRsyncPath(dm.Spec.Destination, config, access.Spec.MountPathPrefix, i, configDestinationPath),
+					Source:      r.getRsyncPath(dm.Spec.Source, config, sourceAccess.Spec.MountPathPrefix, i, configSourcePath),
+					Destination: r.getRsyncPath(dm.Spec.Destination, config, destinationAccess.Spec.MountPathPrefix, i, configDestinationPath),
 				},
 			}
 

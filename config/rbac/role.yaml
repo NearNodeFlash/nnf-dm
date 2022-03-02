@@ -129,6 +129,20 @@ rules:
   - patch
   - update
 - apiGroups:
+  - dws.cray.hpe.com
+  resources:
+  - clientmounts
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dws.cray.hpe.com
+  resources:
+  - clientmounts/status
+  verbs:
+  - get
+  - list
+- apiGroups:
   - kubeflow.org
   resources:
   - mpijobs

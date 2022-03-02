@@ -12,15 +12,16 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.18.1
 	github.com/takama/daemon v1.0.0
-	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20211216142843-0b84f0d84e3f
-	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220207222326-93e1e70f148c
-	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220214205208-b4e3cff0a25c
+	github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220225210758-3b935bf8c9ef
+	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a
+	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556e0
+	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220302141532-6cb238a3f873
 	go.uber.org/zap v1.19.1
 	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
-	k8s.io/api v0.23.3
-	k8s.io/apimachinery v0.23.3
-	k8s.io/client-go v0.23.3
-	sigs.k8s.io/controller-runtime v0.11.0
+	k8s.io/api v0.23.4
+	k8s.io/apimachinery v0.23.4
+	k8s.io/client-go v0.23.4
+	sigs.k8s.io/controller-runtime v0.11.1
 )

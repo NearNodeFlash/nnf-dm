@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -91,17 +90,13 @@ func (r *LustreFileSystem) validateMgsNid() *field.Error {
 
 	hostname := strings.SplitN(nid, "@", 2)[0]
 	if net.ParseIP(hostname) != nil {
+		// Valid IP
 		return nil
 	}
 
-	parsedUrl, err := url.Parse(hostname)
+	_, err := url.Parse(hostname)
 	if err != nil {
 		return field.Invalid(f, nid, "invalid hostname format")
-	}
-
-	hostname = parsedUrl.Hostname()
-	if len(hostname) == 0 {
-		return field.Invalid(f, nid, fmt.Sprintf("hostname '%s' invalid", hostname))
 	}
 
 	return nil

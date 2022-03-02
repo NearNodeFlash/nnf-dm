@@ -14,6 +14,11 @@ import (
 
 func main() {
 
+	hostname, err := os.Hostname()
+	if err != nil || len(hostname) == 0 {
+		hostname = os.Getenv("NODE_NAME")
+	}
+	nodename := flag.String("nodename", hostname, "name of this node")
 	workflow := flag.String("workflow", os.Getenv("DW_WORKFLOW_NAME"), "parent workflow name")
 	namespace := flag.String("namespace", os.Getenv("DW_WORKFLOW_NAMESPACE"), "parent workflow namespace")
 	source := flag.String("source", "", "source file or directory")
@@ -23,6 +28,10 @@ func main() {
 
 	flag.Parse()
 
+	if len(*nodename) == 0 {
+		log.Printf("node name is required")
+		os.Exit(1)
+	}
 	if len(*workflow) == 0 {
 		log.Printf("workflow name required")
 		os.Exit(1)
@@ -46,7 +55,7 @@ func main() {
 
 	c := pb.NewRsyncDataMoverClient(conn)
 
-	uid, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
+	uid, err := createRequest(ctx, c, *nodename, *workflow, *namespace, *source, *destination, *dryrun)
 	if err != nil {
 		log.Fatalf("could not create data movement request: %v", err)
 	}
@@ -75,9 +84,10 @@ func main() {
 	log.Printf("Data movement request deleted: %s %s", uid, status.String())
 }
 
-func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, workflow, namespace, source, destination string, dryrun bool) (string, error) {
+func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, nodename, workflow, namespace, source, destination string, dryrun bool) (string, error) {
 
 	rsp, err := client.Create(ctx, &pb.RsyncDataMovementCreateRequest{
+		Initiator:   nodename,
 		Workflow:    workflow,
 		Namespace:   namespace,
 		Source:      source,
