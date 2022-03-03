@@ -7,6 +7,9 @@ generatorOptions:
 configurations:
 - rsync_template_config.yaml
 
+#patchesStrategicMerge:
+#- manager_imagepullsecret_patch.yaml
+
 configMapGenerator:
 - files:
   - controller_manager_config.yaml

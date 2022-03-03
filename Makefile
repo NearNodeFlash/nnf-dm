@@ -1,3 +1,8 @@
+# Default container tool to use.
+#   To use podman:
+#   $ DOCKER=podman make docker-build
+DOCKER ?= docker
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -90,8 +95,8 @@ test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 container-unit-test: ## Run tests inside a container image
-	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
-	docker run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
+	$(DOCKER) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
+	$(DOCKER) run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 	
 ##@ Build
 
@@ -102,16 +107,18 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	$(DOCKER) build -t ${IMG} .
 
 docker-build-only:
-	docker build -t ${IMG} .
+	$(DOCKER) build -t ${IMG} .
 	
 docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+	$(DOCKER) push ${IMG}
 
 kind-push:
 	kind load docker-image ${IMG}
+	$(DOCKER) pull arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
+	kind load docker-image --nodes `kubectl get node -l cray.nnf.node=true --no-headers -o custom-columns=:metadata.name | paste -d, -s -` arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
 
 ##@ Deployment
 
@@ -121,7 +128,7 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
@@ -163,7 +170,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(DOCKER) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
