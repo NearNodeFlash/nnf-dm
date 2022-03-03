@@ -867,8 +867,8 @@ github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220225210758-3b935bf8c9ef h1:lBdbMKDGv0M/xAN/FNQFPRed0szOFB9CRr/9pw1L4/c=
-github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220225210758-3b935bf8c9ef/go.mod h1:XFjd/9FkdeH41vEzF3rKJBvO4vurBThbRHwibVgyFoY=
+github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220302173542-39bcdc40604e h1:g7s0CKEjVoCFBt3DO0XdRE3dnBAb2ePGagSqq3PYbx0=
+github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220302173542-39bcdc40604e/go.mod h1:XFjd/9FkdeH41vEzF3rKJBvO4vurBThbRHwibVgyFoY=
 github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20211216142843-0b84f0d84e3f/go.mod h1:3VOepCJRh1UbeNCrCRWKpT/JjGXc4MQ2bseCBQ7WEn4=
 github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a h1:E/FXrEMtT0p4+h+KXtL86xfTzwE0MAK+xy2zn5KzRjw=
 github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a/go.mod h1:3VOepCJRh1UbeNCrCRWKpT/JjGXc4MQ2bseCBQ7WEn4=
@@ -877,8 +877,8 @@ github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556e0/go.mod h1:+zqLlSXsmnkxGoE4vxy79K00ErFTeC0q9zCQfLSz73c=
 github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220224221647-3adb22fcc1d6 h1:ZIsPwZFsQke4TP2b/OupYgAxQ+R7LIfPLRabfHYvidA=
 github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220224221647-3adb22fcc1d6/go.mod h1:KTZsXDcX0VvrW79hC9eL3a3wTHfnnBD03X8IV/5+k0k=
-github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220302141532-6cb238a3f873 h1:IQIWXdoEwKfjb9YjM0lwyjFFmxDof6rJIf6zeznicjQ=
-github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220302141532-6cb238a3f873/go.mod h1:RuJS4GSmXxOZIKg0V9VHqdQR9eaJk9cy4caPDOkJOyM=
+github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220303150831-47b7d11cc031 h1:l9uFimx3c5fkKDRHTee0DnLKYmneP/TDaWZdTF3cAlY=
+github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220303150831-47b7d11cc031/go.mod h1:hhblJRRZak6av92rlZigrNGht0mwIKORn/Vd3Dmm/4U=
 go.chromium.org/luci v0.0.0-20210915061045-7722a2154c29/go.mod h1:gk1qa1CBZAdya1PqugRJjkwk8LIymAoB5wf5UA7NrFk=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
