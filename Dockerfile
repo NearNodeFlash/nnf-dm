@@ -15,6 +15,8 @@ COPY main.go main.go
 COPY api/ api/
 COPY controllers/ controllers/
 
+ENV GOPRIVATE=github.hpe.com
+
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 
@@ -30,14 +32,14 @@ RUN curl -sSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/${K8S_V
     && tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
 
 COPY config/ config/
-COPY runContainerTest.sh .
+COPY initiateContainerTest.sh .
 
-ENTRYPOINT [ "sh", "runContainerTest.sh" ]
+ENTRYPOINT [ "sh", "initiateContainerTest.sh" ]
 
 ###############################################################################
-FROM arti.dev.cray.com/baseos-docker-master-local/centos8:centos8
+FROM arti.dev.cray.com/baseos-docker-master-local/alpine:latest
 
-RUN dnf install -y rsync
+RUN apk add rsync
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
