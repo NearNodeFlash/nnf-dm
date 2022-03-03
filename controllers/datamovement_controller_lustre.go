@@ -30,6 +30,7 @@ const (
 	persistentVolumeClaimSuffix = "-pvc"
 	mpiJobSuffix                = "-mpi"
 	configSuffix                = "-config"
+	configNamespace             = "nnf-dm-system"
 )
 
 const (

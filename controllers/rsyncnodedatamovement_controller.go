@@ -119,8 +119,9 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	} else if rsyncNode.Status.EndTime.IsZero() {
 		log.V(1).Info("Rsync may be running...")
 
-		// Problem here is the rsync could still be running _or_ it could have completed
-		// but the EndTime was never recorded. I'm not sure how to solve for this condition.
+		// TODO: RABSW-780: Data Movement - Handle rsync resource conflicts while job is running
+		// Problem here is the rsync could still be running _or_ it could have completed  but the EndTime
+		// was never recorded. I'm not sure how to solve for this condition, talk to Dean
 	}
 
 	return ctrl.Result{}, nil

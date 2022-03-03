@@ -16,7 +16,7 @@ if [[ "$CMD" == lustre ]]; then
   kind: ConfigMap
   metadata:
     name: data-movement-config
-    namespace: default
+    namespace: nnf-dm-system
   data:
     image: arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
     sourceVolume:      '{ "hostPath": { "path": "/nnf", "type": "Directory" } }'
@@ -60,7 +60,7 @@ if [[ "$CMD" == xfs ]]; then
   kind: ConfigMap
   metadata:
     name: data-movement-config
-    namespace: default
+    namespace: nnf-dm-system
   data:
     sourcePath: "/mnt/nnf/file.in"
     destinationPath: "/mnt/nnf/file.out"

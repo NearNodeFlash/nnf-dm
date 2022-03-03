@@ -404,7 +404,7 @@ var _ = Describe("Data Movement Controller", func() {
 						config = &corev1.ConfigMap{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "data-movement" + configSuffix,
-								Namespace: corev1.NamespaceDefault,
+								Namespace: configNamespace,
 							},
 							Data: map[string]string{
 								configImage:             "testImage",
@@ -533,7 +533,7 @@ var _ = Describe("Data Movement Controller", func() {
 			config = &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "data-movement" + configSuffix,
-					Namespace: corev1.NamespaceDefault,
+					Namespace: configNamespace,
 				},
 				Data: map[string]string{
 					configSourcePath:      "test.in",

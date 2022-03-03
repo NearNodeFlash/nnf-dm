@@ -25,7 +25,7 @@ cat <<-EOF | kubectl create -f -
   kind: ConfigMap
   metadata:
     name: data-movement-config
-    namespace: default
+    namespace: nnf-dm-system
   data:
     sourcePath: "/mnt/nnf/file.in"
     destinationPath: "/mnt/nnf/file.out"

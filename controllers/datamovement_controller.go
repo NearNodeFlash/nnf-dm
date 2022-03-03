@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 )
@@ -88,7 +90,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		isLustre2Lustre, _ := r.isLustre2Lustre(dm)
+		isLustre2Lustre, _ := r.isLustre2Lustre(ctx, dm)
 		teardownFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
 			false: r.teardownRsyncJob,
 			true:  r.teardownLustreJob,
@@ -150,7 +152,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	isLustre2Lustre, err := r.isLustre2Lustre(dm)
+	isLustre2Lustre, err := r.isLustre2Lustre(ctx, dm)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -170,7 +172,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			log.Error(err, "Failed to start")
 			return ctrl.Result{}, err
-		} else if !result.IsZero() {
+		} else if result != nil && !result.IsZero() {
 			return *result, nil
 		}
 
@@ -197,7 +199,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			log.Error(err, "Failed to monitor")
 			return ctrl.Result{}, err
-		} else if !result.IsZero() {
+		} else if result != nil && !result.IsZero() {
 			return *result, nil
 		}
 
@@ -252,7 +254,7 @@ func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) e
 	return nil
 }
 
-func (r *DataMovementReconciler) isLustre2Lustre(dm *nnfv1alpha1.NnfDataMovement) (isLustre bool, err error) {
+func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (isLustre bool, err error) {
 	// Data Movement is a Lustre2Lustre copy if...
 	//   COPY_IN and Source is LustreFileSystem and
 	//      Destination is JobStorageInstance.fsType == lustre or
@@ -262,10 +264,10 @@ func (r *DataMovementReconciler) isLustre2Lustre(dm *nnfv1alpha1.NnfDataMovement
 	//      Source is JobStorageInstance.fsType == lustre or
 	//      Source is PersistentStorageInstance.fsType == lustre
 	fsType := ""
-	if dm.Spec.Source.StorageInstance != nil && dm.Spec.Source.StorageInstance.Kind == "LustreFileSystem" {
-		fsType, err = r.getStorageInstanceFileSystemType(dm.Spec.Destination.StorageInstance)
-	} else if dm.Spec.Destination.StorageInstance != nil && dm.Spec.Destination.StorageInstance.Kind == "LustreFileSystem" {
-		fsType, err = r.getStorageInstanceFileSystemType(dm.Spec.Source.StorageInstance)
+	if dm.Spec.Source.StorageInstance != nil && dm.Spec.Source.StorageInstance.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.StorageInstance)
+	} else if dm.Spec.Destination.StorageInstance != nil && dm.Spec.Destination.StorageInstance.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.StorageInstance)
 	}
 
 	return fsType == "lustre", err
@@ -285,18 +287,25 @@ func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string
 	})
 }
 
-func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1.ObjectReference) (string, error) {
+func (r *DataMovementReconciler) getStorageInstanceFileSystemType(ctx context.Context, object *corev1.ObjectReference) (string, error) {
 	switch object.Kind {
-	case "NnfJobStorageInstance":
+	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name():
 
 		jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
-		if err := r.Get(context.TODO(), types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
 			return "", err
 		}
 
 		return jobStorageInstance.Spec.FsType, nil
 
-	case "NnfPersistentStorageInstance":
+	case reflect.TypeOf(nnfv1alpha1.NnfPersistentStorageInstance{}).Name():
+
+		persistentStorageInstance := &nnfv1alpha1.NnfPersistentStorageInstance{}
+		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, persistentStorageInstance); err != nil {
+			return "", err
+		}
+
+		return persistentStorageInstance.Spec.FsType, nil
 	}
 
 	return "lustre", nil
@@ -305,8 +314,7 @@ func (r *DataMovementReconciler) getStorageInstanceFileSystemType(object *corev1
 func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
 	config := &corev1.ConfigMap{}
 
-	// TODO: This should move to the Data Movement Namespace
-	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: corev1.NamespaceDefault}, config); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: configNamespace}, config); err != nil {
 		if !errors.IsNotFound(err) {
 			return nil, err
 		}

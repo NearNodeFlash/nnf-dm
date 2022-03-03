@@ -40,12 +40,12 @@ func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *nnfv1a
 	// that make up the storage for data movement. We currently support data movement from Lustre (global or persistence) to/from
 	// the NNF Nodes describe by a single NnfAccess.
 
-	sourceFileSystemType, err := r.getStorageInstanceFileSystemType(dm.Spec.Source.StorageInstance)
+	sourceFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.StorageInstance)
 	if err != nil {
 		return nil, err
 	}
 
-	destinationFileSystemType, err := r.getStorageInstanceFileSystemType(dm.Spec.Destination.StorageInstance)
+	destinationFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.StorageInstance)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSp
 	switch spec.StorageInstance.Kind {
 	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
 		return spec.Path
-	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name(), "NnfPersistentStorageInstance":
+	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name(), reflect.TypeOf(nnfv1alpha1.NnfPersistentStorageInstance{}).Name():
 		return prefixPath + fmt.Sprintf("/compute-%d", index) + spec.Path
 	}
 
@@ -210,8 +210,6 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 			continue
 		}
 
-		log.Info("Refresh Node Status", "node", node.Namespace, "state", node.Status.State, "message", node.Status.Message)
-
 		switch node.Status.State {
 		case nnfv1alpha1.DataMovementConditionTypeRunning:
 			status.Running++
@@ -232,7 +230,10 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 		}
 		if len(status.Messages) != 0 {
 			currentStatus = nnfv1alpha1.DataMovementConditionReasonFailed
-			currentMessage = "Failure detected on nodes TODO" // TODO: Talk with Dean on how we want to report rsync errors
+			currentMessage = "Failure detected on nodes TODO"
+
+			// TODO: RABSW-779: Data Movement - Handle Rsync Errors - we could
+			// return all the errors or just one; or several. Talk to Dean.
 		}
 	}
 
