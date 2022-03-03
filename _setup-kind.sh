@@ -9,7 +9,7 @@ echo "$(tput bold)Creating temporary source file for data movement $(tput sgr 0)
 mkdir -p /tmp/nnf && dd if=/dev/zero of=/tmp/nnf/file.in bs=128 count=0 seek=$[1024 * 1024]
 
 echo "$(tput bold)Creating kind cluster with two worker nodes and /nnf mount $(tput sgr 0)"
-kind create cluster --wait 60s --image=kindest/node:v1.20.0 --config kind-config.yaml
+kind create cluster --wait 60s --image=kindest/node:v1.22.5 --config kind-config.yaml
 
 kubectl taint node kind-control-plane node-role.kubernetes.io/master:NoSchedule-
 kubectl label node kind-control-plane cray.nnf.manager=true

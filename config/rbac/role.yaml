@@ -157,6 +157,14 @@ rules:
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
+  - nnfaccesses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
   - nnfdatamovements
   verbs:
   - create
@@ -184,6 +192,14 @@ rules:
   - nnf.cray.hpe.com
   resources:
   - nnfjobstorageinstances
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfpersistentstorageinstances
   verbs:
   - get
   - list

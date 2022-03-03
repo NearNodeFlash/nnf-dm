@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Setup the current cluster with the resources necessary to run a data-movement resource as a stand alone resource.
-# This is useful if you want to run data movement outside of any controlling resource, like nnf-workflow manager.
+# This is useful if you want to run data movement outside of any controlling resource, like nnf-sos manager.
 
 if [ $# -eq 0 ]; then
   echo "Setup Cluster requires one of 'lustre' or 'xfs'"
@@ -15,10 +15,13 @@ echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfjobstorageinstances.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
+kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
 kubectl apply -f config/mpi/mpi-operator.yaml
 
 # Install the sample resources
+
+# Source is always a global lustre file system
 echo "$(tput bold)Installing sample LustreFileSystem $(tput sgr 0)"
 cat <<-EOF | kubectl apply -f -
 apiVersion: cray.hpe.com/v1alpha1
@@ -30,6 +33,23 @@ spec:
   mgsNid: 172.0.0.1@tcp
   mountRoot: /lus/maui
 EOF
+
+echo "$(tput bold)Installing sample NNF Access $(tput sgr 0)"
+cat <<-EOF | kubectl apply -f -
+  apiVersion: nnf.cray.hpe.com/v1alpha1
+  kind: NnfAccess
+  metadata:
+    name: nnfaccess-sample
+  spec:
+    desiredState: mounted
+    target: all
+    mountPathPrefix: "/nnf/tmp"
+    storageReference:
+      kind: NnfStorage
+      name: nnfstorage-sample
+      namespace: default
+EOF
+
 
 if [[ "$CMD" == lustre ]]; then
   echo "$(tput bold)Installing sample Lustre NnfJobStorageInstance $(tput sgr 0)"
@@ -137,6 +157,7 @@ EOF
 EOF
 
 fi
+
 
 echo "$(tput bold)Running make deploy to install data movement $(tput sgr 0)"
 make deploy

@@ -44,10 +44,10 @@ EOF
         kind: NnfJobStorageInstance
         name: nnfjobstorageinstance-sample-lustre
         namespace: default
-    storage:
-      kind: NnfStorage
-      name: nnfstorage-sample
-      namespace: default
+      access:
+        kind: NnfAccess
+        name: nnfaccess-sample
+        namespace: default
 EOF
 
 fi
@@ -87,10 +87,10 @@ EOF
         kind: NnfJobStorageInstance
         name: nnfjobstorageinstance-sample
         namespace: default
-    storage:
-      kind: NnfStorage
-      name: nnfstorage-sample
-      namespace: default
+      access:
+        kind: NnfAccess
+        name: nnfaccess-sample
+        namespace: default
 EOF
 
 fi
