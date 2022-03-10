@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +38,8 @@ import (
 type RsyncNodeDataMovementReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	completions sync.Map
 }
 
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete
@@ -62,66 +65,81 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if rsyncNode.Status.StartTime.IsZero() {
+	if !rsyncNode.Status.StartTime.IsZero() && rsyncNode.Status.EndTime.IsZero() {
 
-		rsyncNode.Status.StartTime = metav1.Now()
-		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
-		if err := r.Status().Update(ctx, rsyncNode); err != nil {
-			return ctrl.Result{}, err
-		}
+		// The rsync operation may have completed but we failed to record the completion status
+		// due to an error (most likely a resource conflict). Check if the reconciler has a
+		// record of the completed rsync operation, and return the results if found.
+		completedRsyncNode, found := r.loadCompletion(rsyncNode.Name)
 
-		arguments := []string{}
-		if rsyncNode.Spec.DryRun {
-			arguments = append(arguments, "--dry-run")
-		}
-
-		// Start the rsync operation
-		source, err := r.getSourcePath(ctx, rsyncNode)
-		if err != nil {
-			rsyncNode.Status.EndTime = metav1.Now()
-			rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-			rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
-			if err := r.Status().Update(ctx, rsyncNode); err != nil {
+		if found {
+			if err := r.Status().Update(ctx, &completedRsyncNode); err != nil {
 				return ctrl.Result{}, err
 			}
+
+			r.deleteCompletion(rsyncNode.Name)
+
 			return ctrl.Result{}, nil
 		}
+	}
 
-		destination := rsyncNode.Spec.Destination
-		log.V(1).Info("Executing rsync command", "source", source, "destination", destination)
+	// Record that this rsync node data movement operation was received and is running. It is important
+	// to record that the request started so we can reliably return status to any entity that is monitoring
+	// this job (like a compute node), differentiating from a pending request and a received request.
+	rsyncNode.Status.StartTime = metav1.Now()
+	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
+	if err := r.Status().Update(ctx, rsyncNode); err != nil {
+		return ctrl.Result{}, err
+	}
 
-		arguments = append(arguments, source)
-		arguments = append(arguments, destination)
-		out, err := exec.CommandContext(ctx, "rsync", arguments...).Output()
+	arguments := []string{}
+	if rsyncNode.Spec.DryRun {
+		arguments = append(arguments, "--dry-run")
+	}
 
-		if err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
-			}
-		} else {
-			log.V(1).Info("rsync completed", "output", string(out))
-		}
-
+	// Find the source path for this request. This could be a translation from the compute-local
+	// path (if initiator is a compute node); otherwise it is the rabbit-local path.
+	source, err := r.getSourcePath(ctx, rsyncNode)
+	if err != nil {
 		rsyncNode.Status.EndTime = metav1.Now()
 		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-
-		if err != nil {
-			rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
-			rsyncNode.Status.Message = err.Error()
-		} else {
-			rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
-		}
-
+		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
 		if err := r.Status().Update(ctx, rsyncNode); err != nil {
-			log.Error(err, "failed to update rsync status with completion")
 			return ctrl.Result{}, err
 		}
-	} else if rsyncNode.Status.EndTime.IsZero() {
-		log.V(1).Info("Rsync may be running...")
+		return ctrl.Result{}, nil
+	}
 
-		// TODO: RABSW-780: Data Movement - Handle rsync resource conflicts while job is running
-		// Problem here is the rsync could still be running _or_ it could have completed  but the EndTime
-		// was never recorded. I'm not sure how to solve for this condition, talk to Dean
+	destination := rsyncNode.Spec.Destination
+	log.V(1).Info("Executing rsync command", "source", source, "destination", destination)
+
+	arguments = append(arguments, source)
+	arguments = append(arguments, destination)
+	out, err := exec.CommandContext(ctx, "rsync", arguments...).Output()
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
+		}
+	} else {
+		log.V(1).Info("rsync completed", "output", string(out))
+	}
+
+	// Record the completion status.
+	rsyncNode.Status.EndTime = metav1.Now()
+	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+
+	if err != nil {
+		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+		rsyncNode.Status.Message = err.Error()
+	} else {
+		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
+	}
+
+	if err := r.Status().Update(ctx, rsyncNode); err != nil {
+		log.Error(err, "failed to update rsync status with completion")
+		r.recordCompletion(*rsyncNode)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -189,7 +207,19 @@ func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsy
 	}
 
 	return "", fmt.Errorf("Initiator '%s' not found in list of client mounts", rsync.Spec.Initiator)
+}
 
+func (r *RsyncNodeDataMovementReconciler) recordCompletion(rsyncNode dmv1alpha1.RsyncNodeDataMovement) {
+	r.completions.Store(rsyncNode.Name, rsyncNode)
+}
+
+func (r *RsyncNodeDataMovementReconciler) loadCompletion(name string) (dmv1alpha1.RsyncNodeDataMovement, bool) {
+	rsyncNode, found := r.completions.Load(name)
+	return rsyncNode.(dmv1alpha1.RsyncNodeDataMovement), found
+}
+
+func (r *RsyncNodeDataMovementReconciler) deleteCompletion(name string) {
+	r.completions.Delete(name)
 }
 
 // SetupWithManager sets up the controller with the Manager.

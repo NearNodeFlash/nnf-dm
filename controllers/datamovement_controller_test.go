@@ -33,8 +33,22 @@ var _ = Describe("Data Movement Controller", func() {
 		storage           *nnfv1alpha1.NnfStorage
 		access            *nnfv1alpha1.NnfAccess
 		dm                *nnfv1alpha1.NnfDataMovement
+		dmns              *corev1.Namespace
 		dmOwnerRef        metav1.OwnerReference
 	)
+
+	// Create the nnf-dm-system namespace that is used by data-movement
+	BeforeEach(func() {
+		dmns = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: configNamespace,
+		}}
+
+		Expect(k8sClient.Create(context.TODO(), dmns)).Should(Succeed())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.Delete(context.TODO(), dmns)).Should(Succeed())
+	})
 
 	// Before each test ensure there is a Node with the proper label (cray.nnf.node=true), and
 	// there is NNF Storage that contains that node as its one and only allocation.
