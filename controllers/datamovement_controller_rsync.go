@@ -189,19 +189,24 @@ func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSp
 func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {
 	log := log.FromContext(ctx)
 
-	nodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-	if err := r.List(ctx, nodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
-		return nil, "", "", err
-	}
-
 	// Create a map by node name so the status' can be refreshed
 	statusMap := map[string]*nnfv1alpha1.NnfDataMovementNodeStatus{}
 	for statusIdx, status := range dm.Status.NodeStatus {
 		dm.Status.NodeStatus[statusIdx].Complete = 0
 		dm.Status.NodeStatus[statusIdx].Running = 0
+		dm.Status.NodeStatus[statusIdx].Messages = make([]string, 0)
 		statusMap[status.Node] = &dm.Status.NodeStatus[statusIdx]
 	}
 
+	// Fetch all the rsync node data movements that are labeled with data movement resource.
+	nodes := &dmv1alpha1.RsyncNodeDataMovementList{}
+	if err := r.List(ctx, nodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+		return nil, "", "", err
+	}
+
+	// Iterate over all the rsync nodes retrieved and accumulate their status/progress into
+	// this data movement resource. After this enumeration, we know the current status of
+	// all rsync nodes in operation.
 	for _, node := range nodes.Items {
 
 		status, found := statusMap[node.Namespace]
@@ -222,18 +227,30 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 		}
 	}
 
+	// Iterate over all the accumulated node status' and set the global state of
+	// this data movement operation. Any node which has an error impacts the
+	// entire data movement resource. Only the first error is recorded, the rest
+	// are available in the individual logs.
 	currentStatus := nnfv1alpha1.DataMovementConditionReasonSuccess
 	currentMessage := ""
 	for _, status := range dm.Status.NodeStatus {
-		if status.Complete < status.Count {
+		
+		if status.Complete < status.Count && currentStatus != nnfv1alpha1.DataMovementConditionReasonFailed {
 			currentStatus = nnfv1alpha1.DataMovementConditionTypeRunning
 		}
+
 		if len(status.Messages) != 0 {
 			currentStatus = nnfv1alpha1.DataMovementConditionReasonFailed
-			currentMessage = "Failure detected on nodes TODO"
 
-			// TODO: RABSW-779: Data Movement - Handle Rsync Errors - we could
-			// return all the errors or just one; or several. Talk to Dean.
+			if len(currentMessage) == 0 {
+				if len(status.Messages) == 1 {
+					currentMessage = fmt.Sprintf("Failure detected on node %s: Error: %s", status.Node, status.Messages[0])
+				} else {
+					currentMessage = fmt.Sprintf("Failure detected on node %s: Multiple Errors: %s", status.Node, strings.Join(status.Messages, ", "))
+				}
+			} else {
+				currentMessage = fmt.Sprintf("Failure detected on multiple nodes")
+			}
 		}
 	}
 

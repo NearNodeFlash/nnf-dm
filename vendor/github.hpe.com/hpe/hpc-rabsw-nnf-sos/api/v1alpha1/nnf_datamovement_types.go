@@ -72,9 +72,6 @@ type NnfDataMovementNodeStatus struct {
 	// Complete is the number of resource completed by this node
 	Complete uint32 `json:"complete,omitempty"`
 
-	// Status is an array of status strings reported by resources in this node
-	Status []string `json:"status,omitempty"`
-
 	// Messages is an array of error messages reported by resources in this node
 	Messages []string `json:"messages,omitempty"`
 }
