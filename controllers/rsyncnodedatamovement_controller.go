@@ -104,6 +104,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		rsyncNode.Status.EndTime = metav1.Now()
 		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
+		rsyncNode.Status.Message = err.Error()
 		if err := r.Status().Update(ctx, rsyncNode); err != nil {
 			return ctrl.Result{}, err
 		}

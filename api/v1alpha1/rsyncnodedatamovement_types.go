@@ -22,7 +22,7 @@ import (
 
 const (
 	OwnerLabelRsyncNodeDataMovement          = "dm.cray.hpe.com/owner"
-	OwnerNamespaceLabelRsyncNodeDataMovement = "dm.cray.hpe.com/owner/namespace"
+	OwnerNamespaceLabelRsyncNodeDataMovement = "dm.cray.hpe.com/owner.namespace"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

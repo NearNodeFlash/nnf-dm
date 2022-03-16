@@ -24,6 +24,7 @@ func main() {
 	source := flag.String("source", "", "source file or directory")
 	destination := flag.String("destination", "", "destination file or directory")
 	dryrun := flag.Bool("dryrun", false, "perfrom dry run of operation")
+	skipDelete := flag.Bool("skip-delete", false, "skip deleting the resource after completion")
 	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
 
 	flag.Parse()
@@ -76,12 +77,18 @@ func main() {
 	}
 	log.Printf("Data movement completed: %s", uid)
 
-	log.Printf("Deleting request: %s", uid)
-	status, err := deleteRequest(ctx, c, uid)
-	if err != nil {
-		log.Fatalf("could not delete data movement request: %v", err)
+	// Permit skipping the delete step for testing the NNF Data Movement Workflow. This simulates the condition where
+	// the user creates a data movement request but fails to delete the request after it is complete (i.e. software crashed
+	// and couldn't recover the data movement request). The NNF Data Movement Workflow ensures that these requests are
+	// deleted.
+	if !*skipDelete {
+		log.Printf("Deleting request: %s", uid)
+		status, err := deleteRequest(ctx, c, uid)
+		if err != nil {
+			log.Fatalf("could not delete data movement request: %v", err)
+		}
+		log.Printf("Data movement request deleted: %s %s", uid, status.String())
 	}
-	log.Printf("Data movement request deleted: %s %s", uid, status.String())
 }
 
 func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, nodename, workflow, namespace, source, destination string, dryrun bool) (string, error) {

@@ -135,12 +135,8 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					Name:      fmt.Sprintf("%s-%d", dm.Name, i),
 					Namespace: node.Name,
 					Labels: map[string]string{
-						// Bare name (without namespace) is used to List() all the Rsync Nodes by label.
-						// This requires dm.Name to be unique across Namespaces, which is always the case when
-						// data movement resource is created from a workflow.
-						// We can't append "/namespace" here because of the label regex validation rules do not
-						// permit the forward slash "/"
 						dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name,
+						dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: dm.Namespace,
 					},
 					Annotations: map[string]string{
 						// Annotation is used to watch Rsync Nodes and reconcile the Data Movement resource
