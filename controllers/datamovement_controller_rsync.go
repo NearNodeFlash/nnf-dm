@@ -135,7 +135,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					Name:      fmt.Sprintf("%s-%d", dm.Name, i),
 					Namespace: node.Name,
 					Labels: map[string]string{
-						dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name,
+						dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          dm.Name,
 						dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: dm.Namespace,
 					},
 					Annotations: map[string]string{
@@ -147,6 +147,8 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 				Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 					Source:      r.getRsyncPath(dm.Spec.Source, config, sourceAccess.Spec.MountPathPrefix, i, configSourcePath),
 					Destination: r.getRsyncPath(dm.Spec.Destination, config, destinationAccess.Spec.MountPathPrefix, i, configDestinationPath),
+					UserId:      dm.Spec.UserId,
+					GroupId:     dm.Spec.GroupId,
 				},
 			}
 
@@ -230,7 +232,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 	currentStatus := nnfv1alpha1.DataMovementConditionReasonSuccess
 	currentMessage := ""
 	for _, status := range dm.Status.NodeStatus {
-		
+
 		if status.Complete < status.Count && currentStatus != nnfv1alpha1.DataMovementConditionReasonFailed {
 			currentStatus = nnfv1alpha1.DataMovementConditionTypeRunning
 		}

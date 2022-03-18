@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +117,17 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 	arguments = append(arguments, source)
 	arguments = append(arguments, destination)
-	out, err := exec.CommandContext(ctx, "rsync", arguments...).Output()
+
+	cmd := exec.CommandContext(ctx, "rsync", arguments...)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: rsyncNode.Spec.UserId,
+			Gid: rsyncNode.Spec.GroupId,
+		},
+	}
+
+	out, err := cmd.Output()
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
