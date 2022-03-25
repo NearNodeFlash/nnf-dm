@@ -166,7 +166,7 @@ github.com/spf13/pflag
 # github.com/takama/daemon v1.0.0
 ## explicit
 github.com/takama/daemon
-# github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220318130952-4f68854f9c64
+# github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220325160101-c5b5698c9026
 ## explicit
 github.hpe.com/hpe/hpc-dpm-dws-operator/api/v1alpha1
 github.hpe.com/hpe/hpc-dpm-dws-operator/utils/dwdparse
@@ -178,9 +178,9 @@ github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases
 github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers
-# github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220316171944-11a0d077f5f8
+# github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220325155951-9fde9295b7de
 github.hpe.com/hpe/hpc-rabsw-nnf-ec/pkg/rfsf/pkg/models
-# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220318141537-75e5b031dec7
+# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220325175503-87226c721a1c
 ## explicit
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1
 github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases

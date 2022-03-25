@@ -25,7 +25,7 @@ type NnfStorageLustreSpec struct {
 	FileSystemName string `json:"fileSystemName,omitempty"`
 
 	// TargetType is the type of Lustre target to be created.
-	// +kubebuilder:validation:Enum=MGT;MDT;OST
+	// +kubebuilder:validation:Enum=MGT;MDT;MGTMDT;OST
 	TargetType string `json:"targetType,omitempty"`
 
 	// BackFs is the type of backing filesystem to use.
@@ -48,7 +48,7 @@ type NnfStorageAllocationSetSpec struct {
 
 	// FileSystemType defines the type of the desired filesystem, or raw
 	// block device.
-	// +kubebuilder:validation:Enum=raw;lvm;zfs;lustre;xfs
+	// +kubebuilder:validation:Enum=raw;lvm;zfs;xfs;gfs2;lustre
 	// +kubebuilder:default:=raw
 	FileSystemType string `json:"fileSystemType"`
 

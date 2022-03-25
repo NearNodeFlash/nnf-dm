@@ -12,10 +12,10 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.18.1
 	github.com/takama/daemon v1.0.0
-	github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220318130952-4f68854f9c64
+	github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220325160101-c5b5698c9026
 	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a
 	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556e0
-	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220318141537-75e5b031dec7
+	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220325175503-87226c721a1c
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220111092808-5a964db01320
 	google.golang.org/grpc v1.43.0
