@@ -181,17 +181,22 @@ func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsy
 		return "", err
 	}
 
-	relativePath := ""
+	computeMountInfo := dwsv1alpha1.ClientMountInfo{}
+
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
 			if strings.HasPrefix(rsync.Spec.Source, mount.MountPath) {
-				relativePath = strings.TrimPrefix(rsync.Spec.Source, mount.MountPath)
+				if mount.Device.DeviceReference == nil {
+					return "", fmt.Errorf("Source '%s' does not have NnfNodeStorage reference in client mount", rsync.Spec.Source)
+				}
+
+				computeMountInfo = mount
 				break
 			}
 		}
 	}
 
-	if len(relativePath) == 0 {
+	if computeMountInfo == (dwsv1alpha1.ClientMountInfo{}) {
 		return "", fmt.Errorf("Source '%s' not found in list of client mounts", rsync.Spec.Source)
 	}
 
@@ -212,8 +217,8 @@ func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsy
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
-			if mount.Compute == rsync.Spec.Initiator {
-				return mount.MountPath + relativePath, nil
+			if computeMountInfo.Device.DeviceReference == mount.Device.DeviceReference {
+				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, mount.MountPath), nil
 			}
 		}
 	}
