@@ -18,6 +18,11 @@ test.out
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Daemon executables & libraries
+daemons/compute/client-c/client
+daemons/compute/client-c/client.a
+daemons/compute/server/server
+
 # Kubernetes Generated files - skip generated files, except for vendored files
 
 !vendor/**/zz_generated.*
