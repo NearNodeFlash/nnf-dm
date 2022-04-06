@@ -24,6 +24,8 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      nodeSelector:
+        cray.nnf.manager: "true"
       containers:
       - command:
         - /manager

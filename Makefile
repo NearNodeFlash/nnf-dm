@@ -116,6 +116,9 @@ docker-push: ## Push docker image with the manager.
 	$(DOCKER) push ${IMG}
 
 kind-push:
+	# Nnf-dm is used on all nodes. It's on the management node for the
+	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
+	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image ${IMG}
 	$(DOCKER) pull arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
 	kind load docker-image --nodes `kubectl get node -l cray.nnf.node=true --no-headers -o custom-columns=:metadata.name | paste -d, -s -` arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
