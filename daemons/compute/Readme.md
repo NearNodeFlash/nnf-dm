@@ -138,3 +138,19 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 | 1 | Not Found | The request with the supplied UID was not found |
 | 2 | Deleted | The data movement request was deleted successfully |
 | 3 | Active | The data movement request is currently active and cannot be deleted |
+
+# Example Clients
+
+## Go
+
+The Go client, which resides in ./client-go, is the most customizable client example. It demonstrates a number of command line options to configure the Create request. It provides a debug hook to _not_ delete the request after completion so one can test the requests are cleaned up as part of the workflow.
+
+## C
+
+The C client, which resides in ./_client-c, is a simple client that uses CGo as an interface to the server. (The leading underscore "\_" in the directory is so Go ignores directory as part of a larger repository build). As there is no native C GRPC implementation, Go is used to interface with the GRPC server while providing an interface to the C code. A Makefile is provided to build the various components and assemble it into a final executable.
+
+## Python
+
+The Python client, which resides in ./client-py, is a very simple client. No customization options are provided
+
+

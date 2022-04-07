@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
+	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/client-go/api"
 )
 
 func main() {
