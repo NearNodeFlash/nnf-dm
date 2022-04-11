@@ -11,6 +11,13 @@ import (
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// DirectiveLifetimeJob specifies storage allocated for the lifetime of the job
+	DirectiveLifetimeJob = "job"
+	// DirectiveLifetimePersistent specifies storage allocated an indefinite lifetime usually longer than a job
+	DirectiveLifetimePersistent = "persistent"
+)
+
 // The DWRecord contains the index of the Datawarp directive (#DW) within the workflow
 // along with a copy of the actual #DW
 type DWRecord struct {
@@ -98,6 +105,10 @@ type DirectiveBreakdownStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="LIFETIME",type="string",JSONPath=".spec.lifetime",description="Duration of the allocation"
+//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Type of storage"
+//+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if allocation sets have been generated"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DirectiveBreakdown is the Schema for the directivebreakdown API
 type DirectiveBreakdown struct {

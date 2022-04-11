@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -120,11 +121,13 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 	cmd := exec.CommandContext(ctx, "rsync", arguments...)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: rsyncNode.Spec.UserId,
-			Gid: rsyncNode.Spec.GroupId,
-		},
+	if rsyncNode.Spec.UserId != uint32(os.Getuid()) || rsyncNode.Spec.GroupId != uint32(os.Getgid()) {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: rsyncNode.Spec.UserId,
+				Gid: rsyncNode.Spec.GroupId,
+			},
+		}
 	}
 
 	out, err := cmd.Output()
@@ -132,6 +135,8 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
+		} else {
+			log.V(1).Info("Rsync failure", "error", err)
 		}
 	} else {
 		log.V(1).Info("rsync completed", "output", string(out))
@@ -232,7 +237,10 @@ func (r *RsyncNodeDataMovementReconciler) recordCompletion(rsyncNode dmv1alpha1.
 
 func (r *RsyncNodeDataMovementReconciler) loadCompletion(name string) (dmv1alpha1.RsyncNodeDataMovement, bool) {
 	rsyncNode, found := r.completions.Load(name)
-	return rsyncNode.(dmv1alpha1.RsyncNodeDataMovement), found
+	if found {
+		return rsyncNode.(dmv1alpha1.RsyncNodeDataMovement), found
+	}
+	return dmv1alpha1.RsyncNodeDataMovement{}, false
 }
 
 func (r *RsyncNodeDataMovementReconciler) deleteCompletion(name string) {

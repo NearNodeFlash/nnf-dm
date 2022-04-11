@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +23,7 @@ import (
 	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 
 	lustrecsi "github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service"
+	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
 	lustrectrl "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers"
 )
 
@@ -419,13 +421,11 @@ func (r *DataMovementReconciler) getVolumeSource(ctx context.Context, dm *nnfv1a
 }
 
 func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) string {
-	ref := dm.Spec.Source.StorageInstance
+	ref := dm.Spec.Source.Storage
 
-	if ref.Kind == "LustreFileSystem" {
+	if ref.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
 		return ref.Name + lustrectrl.PersistentVolumeClaimSuffix
-	} else if ref.Kind == "NnfPersistentStorageInstance" {
-		return ref.Name + "TODO" // TODO: Should look this up via nnf-sos when creating persistent lustre volume
-	} else if ref.Kind == "NnfJobStorageInstance" {
+	} else if ref.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
 		return dm.Name + persistentVolumeClaimSuffix
 	}
 
@@ -433,13 +433,11 @@ func (r *DataMovementReconciler) getLustreSourcePersistentVolumeClaimName(ctx co
 }
 
 func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) string {
-	ref := dm.Spec.Destination.StorageInstance
+	ref := dm.Spec.Destination.Storage
 
-	if ref.Kind == "LustreFileSystem" {
+	if ref.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
 		return ref.Name + lustrectrl.PersistentVolumeClaimSuffix
-	} else if ref.Kind == "NnfPersistentStorageInstance" {
-		return ref.Name + "TODO" // TODO: Should look this up via nnf-sos when creating persistent lustre volume
-	} else if ref.Kind == "NnfJobStorageInstance" {
+	} else if ref.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
 		return dm.Name + persistentVolumeClaimSuffix
 	}
 

@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"os"
+	"reflect"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -88,10 +89,11 @@ var _ = Describe("Data Movement Controller", func() {
 				Namespace: storageKey.Namespace,
 			},
 			Spec: nnfv1alpha1.NnfAccessSpec{
-				Target:       "all",
-				DesiredState: "mounted",
+				Target:        "all",
+				DesiredState:  "mounted",
+				TeardownState: "data_out",
 				StorageReference: corev1.ObjectReference{
-					Kind:      "NnfStorage",
+					Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
 					Name:      storage.Name,
 					Namespace: storage.Namespace,
 				},
@@ -160,18 +162,20 @@ var _ = Describe("Data Movement Controller", func() {
 			Spec: nnfv1alpha1.NnfDataMovementSpec{
 				Source: nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 					Access: &corev1.ObjectReference{
-						Kind:      "NnfAccess",
+						Kind:      reflect.TypeOf(nnfv1alpha1.NnfAccess{}).Name(),
 						Name:      access.Name,
 						Namespace: access.Namespace,
 					},
 				},
 				Destination: nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 					Access: &corev1.ObjectReference{
-						Kind:      "NnfAccess",
+						Kind:      reflect.TypeOf(nnfv1alpha1.NnfAccess{}).Name(),
 						Name:      access.Name,
 						Namespace: access.Namespace,
 					},
 				},
+				UserId:  uint32(os.Getuid()),
+				GroupId: uint32(os.Getgid()),
 			},
 		}
 	})
@@ -215,20 +219,19 @@ var _ = Describe("Data Movement Controller", func() {
 				}
 
 				storage.Spec = nnfv1alpha1.NnfStorageSpec{
+					FileSystemType: "lustre",
 					AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
 						// Non OST definitions should be ignored
 						{
-							Name:           "test-nnf-storage-mdt",
-							FileSystemType: "lustre",
+							Name: "test-nnf-storage-mdt",
 							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
 								TargetType: "MDT",
 							},
 							Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
 						},
 						{
-							Name:           "test-nnf-storage",
-							Capacity:       0,
-							FileSystemType: "lustre",
+							Name:     "test-nnf-storage",
+							Capacity: 0,
 							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
 								TargetType: "OST",
 							},
@@ -257,50 +260,24 @@ var _ = Describe("Data Movement Controller", func() {
 				Expect(k8sClient.Delete(context.TODO(), lustre)).To(Succeed())
 			})
 
-			Context("When destination is Job Storage Instance type", func() {
-				var (
-					jsi *nnfv1alpha1.NnfJobStorageInstance
-				)
-
-				BeforeEach(func() {
-					jsi = &nnfv1alpha1.NnfJobStorageInstance{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "job-storage-instance-test",
-							Namespace: corev1.NamespaceDefault,
-						},
-						Spec: nnfv1alpha1.NnfJobStorageInstanceSpec{
-							Name:   "job-storage-instance-test",
-							FsType: "lustre",
-						},
-					}
-
-					Expect(k8sClient.Create(context.TODO(), jsi)).To(Succeed())
-					Eventually(func() error {
-						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(jsi), jsi)
-					}).Should(Succeed())
-
-				})
-
-				AfterEach(func() {
-					Expect(k8sClient.Delete(context.TODO(), jsi)).To(Succeed())
-				})
+			Context("When destination is Nnf Storage type", func() {
 
 				BeforeEach(func() {
 
 					storage.Status.MgsNode = "172.0.0.1@tcp"
 
 					dm.Spec.Source.Path = "example.file"
-					dm.Spec.Source.StorageInstance = &corev1.ObjectReference{
-						Kind:      "LustreFileSystem",
+					dm.Spec.Source.Storage = &corev1.ObjectReference{
+						Kind:      reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name(),
 						Name:      lustre.Name,
 						Namespace: lustre.Namespace,
 					}
 
 					dm.Spec.Destination.Path = "/"
-					dm.Spec.Destination.StorageInstance = &corev1.ObjectReference{
-						Kind:      "NnfJobStorageInstance",
-						Name:      jsi.Name,
-						Namespace: jsi.Namespace,
+					dm.Spec.Destination.Storage = &corev1.ObjectReference{
+						Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
+						Name:      storage.Name,
+						Namespace: storage.Namespace,
 					}
 
 				})
@@ -504,11 +481,11 @@ var _ = Describe("Data Movement Controller", func() {
 
 		BeforeEach(func() {
 			storage.Spec = nnfv1alpha1.NnfStorageSpec{
+				FileSystemType: "xfs",
 				AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
 					{
-						Name:           "test-nnf-storage-xfs",
-						FileSystemType: "xfs",
-						Capacity:       0,
+						Name:     "test-nnf-storage-xfs",
+						Capacity: 0,
 						Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{
 							{
 								Name:  nodeKeys[0].Name,
@@ -587,46 +564,20 @@ var _ = Describe("Data Movement Controller", func() {
 			})
 
 			Context("When destination is Job Storage Instance type", func() {
-				var (
-					jsi *nnfv1alpha1.NnfJobStorageInstance
-				)
-
-				BeforeEach(func() {
-					jsi = &nnfv1alpha1.NnfJobStorageInstance{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "job-storage-instance-test",
-							Namespace: corev1.NamespaceDefault,
-						},
-						Spec: nnfv1alpha1.NnfJobStorageInstanceSpec{
-							Name:   "job-storage-instance-test",
-							FsType: "xfs",
-						},
-					}
-
-					Expect(k8sClient.Create(context.TODO(), jsi)).To(Succeed())
-					Eventually(func() error {
-						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(jsi), jsi)
-					}).Should(Succeed())
-
-				})
-
-				AfterEach(func() {
-					Expect(k8sClient.Delete(context.TODO(), jsi)).To(Succeed())
-				})
 
 				BeforeEach(func() {
 					dm.Spec.Source.Path = "/" // Doesn't matter, using overrides
-					dm.Spec.Source.StorageInstance = &corev1.ObjectReference{
-						Kind:      "LustreFileSystem",
+					dm.Spec.Source.Storage = &corev1.ObjectReference{
+						Kind:      reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name(),
 						Name:      lustre.Name,
 						Namespace: lustre.Namespace,
 					}
 
 					dm.Spec.Destination.Path = "/" // Doesn't matter, using overrides
-					dm.Spec.Destination.StorageInstance = &corev1.ObjectReference{
-						Kind:      "NnfJobStorageInstance",
-						Name:      jsi.Name,
-						Namespace: jsi.Namespace,
+					dm.Spec.Destination.Storage = &corev1.ObjectReference{
+						Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
+						Name:      storage.Name,
+						Namespace: storage.Namespace,
 					}
 				})
 

@@ -40,12 +40,12 @@ func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *nnfv1a
 	// that make up the storage for data movement. We currently support data movement from Lustre (global or persistence) to/from
 	// the NNF Nodes describe by a single NnfAccess.
 
-	sourceFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.StorageInstance)
+	sourceFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.Storage)
 	if err != nil {
 		return nil, err
 	}
 
-	destinationFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.StorageInstance)
+	destinationFileSystemType, err := r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -80,13 +80,14 @@ func (r *DataMovementReconciler) getStorageNodes(ctx context.Context, dm *nnfv1a
 	// The NnfStorage specification is a list of Allocation Sets; with each set containing a number of Nodes <Name, Count> pair that
 	// describes the Rabbit and the number of allocations to perform on that node. Since this is an Rsync job, the expected number
 	// of Allocation Sets is one, and it should be of xfs/gfs2 type.
-	for _, allocationSet := range storage.Spec.AllocationSets {
-		if allocationSet.FileSystemType == "xfs" || allocationSet.FileSystemType == "gfs2" {
-			return allocationSet.Nodes, nil
+	fileSystemType := storage.Spec.FileSystemType
+	if fileSystemType == "xfs" || fileSystemType == "gfs2" {
+		if len(storage.Spec.AllocationSets) == 1 {
+			return storage.Spec.AllocationSets[0].Nodes, nil
 		}
 	}
 
-	return nil, fmt.Errorf("Invalid NnfStorage: Must have xfs/gfs2 allocation set")
+	return nil, fmt.Errorf("Invalid NnfStorage: Must have xfs/gfs2 allocation set. Must have allocation specification")
 }
 
 func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, nodes []nnfv1alpha1.NnfStorageAllocationNodes) (*ctrl.Result, error) {
@@ -171,17 +172,17 @@ func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSp
 		return path
 	}
 
-	if spec.StorageInstance == nil {
+	if spec.Storage == nil {
 		return spec.Path
 	}
-	switch spec.StorageInstance.Kind {
+	switch spec.Storage.Kind {
 	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
 		return spec.Path
-	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name(), reflect.TypeOf(nnfv1alpha1.NnfPersistentStorageInstance{}).Name():
+	case reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name():
 		return prefixPath + fmt.Sprintf("/compute-%d", index) + spec.Path
 	}
 
-	panic(fmt.Sprintf("Unsupported Storage Instance %s", spec.StorageInstance.Kind))
+	panic(fmt.Sprintf("Unsupported Storage Instance %s", spec.Storage.Kind))
 }
 
 func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {

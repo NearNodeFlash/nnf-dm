@@ -243,7 +243,7 @@ func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) e
 	}
 
 	// If destination is just "path" this must be a lustre file system
-	if dm.Spec.Source.StorageInstance == nil && dm.Spec.Destination.StorageInstance == nil {
+	if dm.Spec.Source.Storage == nil && dm.Spec.Destination.Storage == nil {
 		return fmt.Errorf("one of source or destination must be a storage instance")
 	}
 
@@ -264,10 +264,10 @@ func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1a
 	//      Source is JobStorageInstance.fsType == lustre or
 	//      Source is PersistentStorageInstance.fsType == lustre
 	fsType := ""
-	if dm.Spec.Source.StorageInstance != nil && dm.Spec.Source.StorageInstance.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
-		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.StorageInstance)
-	} else if dm.Spec.Destination.StorageInstance != nil && dm.Spec.Destination.StorageInstance.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
-		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.StorageInstance)
+	if dm.Spec.Source.Storage != nil && dm.Spec.Source.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.Storage)
+	} else if dm.Spec.Destination.Storage != nil && dm.Spec.Destination.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.Storage)
 	}
 
 	return fsType == "lustre", err
@@ -288,27 +288,22 @@ func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string
 }
 
 func (r *DataMovementReconciler) getStorageInstanceFileSystemType(ctx context.Context, object *corev1.ObjectReference) (string, error) {
+
 	switch object.Kind {
-	case reflect.TypeOf(nnfv1alpha1.NnfJobStorageInstance{}).Name():
+	case reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name():
 
-		jobStorageInstance := &nnfv1alpha1.NnfJobStorageInstance{}
-		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, jobStorageInstance); err != nil {
+		storage := &nnfv1alpha1.NnfStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, storage); err != nil {
 			return "", err
 		}
 
-		return jobStorageInstance.Spec.FsType, nil
+		return storage.Spec.FileSystemType, nil
 
-	case reflect.TypeOf(nnfv1alpha1.NnfPersistentStorageInstance{}).Name():
-
-		persistentStorageInstance := &nnfv1alpha1.NnfPersistentStorageInstance{}
-		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, persistentStorageInstance); err != nil {
-			return "", err
-		}
-
-		return persistentStorageInstance.Spec.FsType, nil
+	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
+		return "lustre", nil
 	}
 
-	return "lustre", nil
+	panic(fmt.Sprintf("Unsupported storage type '%s'", object.Kind))
 }
 
 func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
