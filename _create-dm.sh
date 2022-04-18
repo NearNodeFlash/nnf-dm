@@ -41,8 +41,8 @@ EOF
     destination:
       path: /file.out
       storageInstance:
-        kind: NnfJobStorageInstance
-        name: nnfjobstorageinstance-sample-lustre
+        kind: NnfStorage
+        name: nnfstorage-sample
         namespace: default
       access:
         kind: NnfAccess
@@ -75,6 +75,8 @@ EOF
     name: datamovement-sample-xfs
     namespace: nnf-dm-system
   spec:
+    userId: 65532
+    groupId: 0
     source:
       path: file.in
       storageInstance:
@@ -84,8 +86,8 @@ EOF
     destination:
       path: file.out
       storageInstance:
-        kind: NnfJobStorageInstance
-        name: nnfjobstorageinstance-sample
+        kind: NnfStorage
+        name: nnfstorage-sample
         namespace: default
       access:
         kind: NnfAccess

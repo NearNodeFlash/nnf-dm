@@ -15,7 +15,7 @@ require (
 	github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220406202940-035cce64a49c
 	github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a
 	github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556e0
-	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220411154410-47fbddec40e2
+	github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220414140633-6c003238aed9
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 	google.golang.org/grpc v1.43.0

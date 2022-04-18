@@ -20,5 +20,3 @@ images:
 - name: controller
   newName: arti.dev.cray.com/rabsw-docker-master-local/cray-dp-nnf-dm
   newTag: 0.0.1
-
-

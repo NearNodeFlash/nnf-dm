@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.17 as builder
+FROM golang:1.17-alpine as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -25,11 +25,14 @@ FROM builder as testing
 
 WORKDIR /workspace
 
+RUN apk add rsync curl tar
+
 # These two steps follow the Kubebuilder envtest playbook https://book.kubebuilder.io/reference/envtest.html
-ARG K8S_VERSION=1.21.2
+ARG K8S_VERSION=1.23.3
 RUN curl -sSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/${K8S_VERSION}/$(go env GOOS)/$(go env GOARCH)" \
     && mkdir /usr/local/kubebuilder \
     && tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
+
 
 COPY config/ config/
 COPY initiateContainerTest.sh .

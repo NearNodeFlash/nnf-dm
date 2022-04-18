@@ -55,8 +55,6 @@ type DataMovementReconciler struct {
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfaccesses,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfjobstorageinstances,verbs=get;list;watch
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfpersistentstorageinstances,verbs=get;list;watch
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;pathc;delete
@@ -106,9 +104,11 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		controllerutil.RemoveFinalizer(dm, finalizer)
 		if err := r.Update(ctx, dm); err != nil {
+			log.Error(err, "Failed to update after removing finalizer")
 			return ctrl.Result{}, err
 		}
 
+		log.V(2).Info("Successfully removed finalizer")
 		return ctrl.Result{}, nil
 	}
 
@@ -203,6 +203,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return *result, nil
 		}
 
+		// Continue monitoring the resource, if specified, by preventing the data movement resource from finishing
+		// early while the client application is running and generating data movement requests. This is to protect
+		// the use case where this resource thinks it handled all the requests but in reality the client application
+		// continues to execute with the potential to generate more requests.
+		if dm.Spec.Monitor == true {
+			return ctrl.Result{}, nil
+		}
+
 		switch status {
 		case nnfv1alpha1.DataMovementConditionTypeRunning:
 			// Still running, nothing to do here
@@ -232,13 +240,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) error {
-	// Validation
 
-	// If source is just "path" this must be a lustre file system
-	if len(dm.Spec.Source.Path) == 0 {
+	// Permit empty data movement resources; this results in a data movement resource
+	// that monitors existing rsync resources
+	if dm.Spec.Source == nil && dm.Spec.Destination == nil {
+		return nil
+	}
+
+	if dm.Spec.Source == nil || len(dm.Spec.Source.Path) == 0 {
 		return fmt.Errorf("source path must be defined")
 	}
-	if len(dm.Spec.Destination.Path) == 0 {
+	if dm.Spec.Destination == nil || len(dm.Spec.Destination.Path) == 0 {
 		return fmt.Errorf("destination path must be defined")
 	}
 
@@ -255,6 +267,10 @@ func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) e
 }
 
 func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (isLustre bool, err error) {
+	if dm.Spec.Source == nil || dm.Spec.Destination == nil {
+		return false, nil
+	}
+
 	// Data Movement is a Lustre2Lustre copy if...
 	//   COPY_IN and Source is LustreFileSystem and
 	//      Destination is JobStorageInstance.fsType == lustre or

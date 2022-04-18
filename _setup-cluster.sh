@@ -13,7 +13,6 @@ CMD=$1
 # Install the prerequisite CRDs
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfjobstorageinstances.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
 kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
@@ -42,6 +41,7 @@ cat <<-EOF | kubectl apply -f -
     name: nnfaccess-sample
   spec:
     desiredState: mounted
+    teardownState: data_out
     target: all
     mountPathPrefix: "/nnf/tmp"
     storageReference:
@@ -79,10 +79,10 @@ EOF
   metadata:
     name: nnfstorage-sample
   spec:
+    fileSystemType: lustre
     allocationSets:
     - name: mgt
       capacity: 1048576
-      fileSystemType: lustre
       fileSystemName: sample
       targetType: MGT
       backFs: zfs
@@ -91,7 +91,6 @@ EOF
         count: 1
     - name: mdt
       capacity: 1048576
-      fileSystemType: lustre
       fileSystemName: sample
       targetType: MDT
       backFs: zfs
@@ -100,7 +99,6 @@ EOF
         count: 1
     - name: ost
       capacity: 1048576
-      fileSystemType: lustre
       fileSystemName: sample
       targetType: OST
       backFs: zfs
@@ -116,20 +114,6 @@ EOF
 fi
 
 if [[ "$CMD" == xfs ]]; then
-  echo "$(tput bold)Installing sample XFS NnfJobStorageInstance $(tput sgr 0)"
-  cat <<-EOF | kubectl apply -f -
-  apiVersion: nnf.cray.hpe.com/v1alpha1
-  kind: NnfJobStorageInstance
-  metadata:
-    name: nnfjobstorageinstance-sample
-  spec:
-    name: my-job-storage
-    fsType: xfs
-    servers:
-      kind: NnfStorage
-      name: nnfstorage-sample
-      namespace: default
-EOF
 
   echo "$(tput bold)Installing kind-worker Namespaces $(tput sgr 0)"
   cat <<-EOF | kubectl apply -f -
@@ -146,10 +130,10 @@ EOF
   metadata:
     name: nnfstorage-sample
   spec:
+    fileSystemType: xfs
     allocationSets:
     - name: xfs
       capacity: 1048576
-      fileSystemType: xfs
       fileSystemName: sample
       nodes:
       - name: kind-worker
@@ -169,7 +153,7 @@ fi
 
 if [[ "$CMD" == xfs ]]; then
   echo "$(tput bold)Patching rsync template to disable Lustre File Systems $(tput sgr 0)"
-  echo "This will allow the permit the rsync nodes to start - which is otherwise prevented"
+  echo "This will allow the rsync nodes to start - which is otherwise prevented"
   echo "since the Lustre CSI is not loaded"
   kubectl get rsynctemplate/nnf-dm-rsynctemplate -n nnf-dm-system -o json | jq '.spec += {"disableLustreFileSystems": true}' | kubectl apply -f -
 fi

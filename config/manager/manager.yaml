@@ -88,4 +88,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          securityContext:
+            capabilities:
+              add: ["SETUID", "SETGID"]
       serviceAccountName: controller-manager

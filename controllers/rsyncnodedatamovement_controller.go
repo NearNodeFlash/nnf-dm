@@ -67,6 +67,11 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Prevent gratuitous wakeups for an rsync resource that is already finished.
+	if rsyncNode.Status.State == nnfv1alpha1.DataMovementConditionTypeFinished {
+		return ctrl.Result{}, nil
+	}
+
 	if !rsyncNode.Status.StartTime.IsZero() && rsyncNode.Status.EndTime.IsZero() {
 
 		// The rsync operation may have completed but we failed to record the completion status
@@ -76,6 +81,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 		if found {
 			if err := r.Status().Update(ctx, &completedRsyncNode); err != nil {
+				log.Error(err, "failed to update completed rsync node")
 				return ctrl.Result{}, err
 			}
 
@@ -91,6 +97,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	rsyncNode.Status.StartTime = metav1.Now()
 	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 	if err := r.Status().Update(ctx, rsyncNode); err != nil {
+		log.Error(err, "failed to set rsync node as running")
 		return ctrl.Result{}, err
 	}
 
@@ -108,6 +115,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
 		rsyncNode.Status.Message = err.Error()
 		if err := r.Status().Update(ctx, rsyncNode); err != nil {
+			log.Error(err, "failed to set rsync node as invalid")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil

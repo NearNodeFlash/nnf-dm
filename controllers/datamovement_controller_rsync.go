@@ -26,6 +26,10 @@ const (
 
 func (r *DataMovementReconciler) initializeRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 
+	if dm.Spec.Source == nil && dm.Spec.Destination == nil {
+		return nil, nil
+	}
+
 	nodes, err := r.getStorageNodes(ctx, dm)
 	if err != nil {
 		return nil, err
@@ -167,7 +171,7 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 	return nil, nil
 }
 
-func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSpecSourceDestination, config *corev1.ConfigMap, prefixPath string, index int, override string) string {
+func (r *DataMovementReconciler) getRsyncPath(spec *nnfv1alpha1.NnfDataMovementSpecSourceDestination, config *corev1.ConfigMap, prefixPath string, index int, override string) string {
 	if path, found := config.Data[override]; found {
 		return path
 	}
@@ -186,7 +190,6 @@ func (r *DataMovementReconciler) getRsyncPath(spec nnfv1alpha1.NnfDataMovementSp
 }
 
 func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {
-	log := log.FromContext(ctx)
 
 	// Create a map by node name so the status' can be refreshed
 	statusMap := map[string]*nnfv1alpha1.NnfDataMovementNodeStatus{}
@@ -210,8 +213,16 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 
 		status, found := statusMap[node.Namespace]
 		if !found {
-			log.Info("Node not found", "node", node.Namespace)
-			continue
+			dm.Status.NodeStatus = append(dm.Status.NodeStatus,
+				nnfv1alpha1.NnfDataMovementNodeStatus{
+					Count:    0,
+					Complete: 0,
+					Running:  0,
+					Messages: make([]string, 0),
+				})
+
+			statusMap[node.Namespace] = &dm.Status.NodeStatus[len(dm.Status.NodeStatus)-1]
+			status = &dm.Status.NodeStatus[len(dm.Status.NodeStatus)-1]
 		}
 
 		switch node.Status.State {
@@ -234,7 +245,9 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 	currentMessage := ""
 	for _, status := range dm.Status.NodeStatus {
 
-		if status.Complete < status.Count && currentStatus != nnfv1alpha1.DataMovementConditionReasonFailed {
+		// Set the state to running if not currently in a failed state. This ensures we report a
+		// worse case failed condition above any in progress state.
+		if status.Running > 0 && currentStatus != nnfv1alpha1.DataMovementConditionReasonFailed {
 			currentStatus = nnfv1alpha1.DataMovementConditionTypeRunning
 		}
 
