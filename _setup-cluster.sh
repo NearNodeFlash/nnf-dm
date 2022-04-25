@@ -70,20 +70,6 @@ EOF
 
 
 if [[ "$CMD" == lustre ]]; then
-  echo "$(tput bold)Installing sample Lustre NnfJobStorageInstance $(tput sgr 0)"
-  cat <<-EOF | kubectl apply -f -
-  apiVersion: nnf.cray.hpe.com/v1alpha1
-  kind: NnfJobStorageInstance
-  metadata:
-    name: nnfjobstorageinstance-sample-lustre
-  spec:
-    name: my-job-storage
-    fsType: lustre
-    servers:
-      kind: NnfStorage
-      name: nnfstorage-sample
-      namespace: default
-EOF
 
   # For NNFStorage we need to program the mgsNode value which is under the status section; making it unprogrammable by default.
   # Edit the CRD definition to remove the status section as a subresource.

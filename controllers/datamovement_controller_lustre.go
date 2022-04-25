@@ -318,6 +318,9 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		log.V(1).Info("Command override", "command", command)
 	}
 
+	userId := int64(dm.Spec.UserId)
+	groupId := int64(dm.Spec.GroupId)
+
 	launcher := &kubeflowv1.ReplicaSpec{
 		Template: corev1.PodTemplateSpec{
 			Spec: corev1.PodSpec{
@@ -326,11 +329,16 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 						Image:   image,
 						Name:    dm.Name,
 						Command: command,
+						SecurityContext: &corev1.SecurityContext{
+							RunAsUser:  &userId,
+							RunAsGroup: &groupId,
+						},
 					},
 				},
 			},
 		},
 	}
+
 
 	replicas := workerCount
 	worker := &kubeflowv1.ReplicaSpec{
@@ -387,6 +395,10 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 								MountPath: "/mnt/dest",
 							},
 						},
+						SecurityContext: &corev1.SecurityContext{
+							RunAsUser:  &userId,
+							RunAsGroup: &groupId,
+						},
 					},
 				},
 				Volumes: []corev1.Volume{
@@ -403,6 +415,17 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		},
 	}
 
+	sshAuthMountPath := "" // Implies default /root/.ssh
+
+	if userId != 0 || groupId != 0 {
+		// This is stolen from https://github.com/kubeflow/mpi-operator/blob/master/examples/v2beta1/pi/pi.yaml which
+		// contains an example of using non-root user
+		worker.Template.Spec.Containers[0].Command = []string{"/usr/sbin/sshd"}
+		worker.Template.Spec.Containers[0].Args = []string{"-De", "-f", "/home/mpiuser/.sshd_config"}
+
+		sshAuthMountPath = "/home/mpiuser/.ssh"
+	}
+
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + mpiJobSuffix,
@@ -413,6 +436,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 				mpiv2beta1.MPIReplicaTypeLauncher: launcher,
 				mpiv2beta1.MPIReplicaTypeWorker:   worker,
 			},
+			SSHAuthMountPath: sshAuthMountPath,
 		},
 	}
 

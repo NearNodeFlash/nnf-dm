@@ -48,6 +48,8 @@ EOF
     name: datamovement-sample-lustre-4
     namespace: nnf-dm-system
   spec:
+    userId: 0
+    groupId: 0
     source:
       path: /file.in
       storageInstance:
