@@ -339,7 +339,6 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		},
 	}
 
-
 	replicas := workerCount
 	worker := &kubeflowv1.ReplicaSpec{
 		Replicas: &replicas,

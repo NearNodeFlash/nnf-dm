@@ -103,8 +103,8 @@ var _ = Describe("Rsync Node Data Movement Controller", func() {
 		Expect(k8sClient.Create(context.TODO(), rsync)).To(Succeed())
 
 		By("Ensuring the rsync job completes with success")
-		Eventually(func() dmv1alpha1.RsyncNodeDataMovementStatus {
-			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
+		Eventually(func(g Gomega) dmv1alpha1.RsyncNodeDataMovementStatus {
+			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 			return rsync.Status
 		}).Should(MatchFields(IgnoreExtras, Fields{
 			"State":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
