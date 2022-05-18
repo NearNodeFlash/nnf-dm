@@ -24,7 +24,7 @@ if [[ "$CMD" == "deploy-dp" ]]; then
 
     # Install the prerequisite CRDs
     if [[ -z $(kubectl get crds | grep lustrefilesystems.cray.hpe.com) ]]; then
-        kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
+        kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
     fi
 
     if [[ -z $(kubectl get crds | grep mpijobs.kubeflow.org) ]]; then

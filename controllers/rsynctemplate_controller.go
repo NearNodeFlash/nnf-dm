@@ -35,9 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile" // Required for Watching
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
+	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 
-	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 )
 
 const (

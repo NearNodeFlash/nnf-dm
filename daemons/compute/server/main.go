@@ -32,10 +32,10 @@ import (
 	"github.com/takama/daemon"
 	"google.golang.org/grpc"
 
-	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 
-	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/server/auth"
-	server "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/server/servers"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
+	server "github.com/NearNodeFlash/nnf-dm/daemons/compute/server/servers"
 )
 
 const (

@@ -36,15 +36,15 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
-	_ "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases"
+	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	_ "github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases"
 
-	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
-	_ "github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases"
+	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	_ "github.com/NearNodeFlash/nnf-sos/config/crd/bases"
 
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
-	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
+	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,8 +80,8 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "vendor", "github.hpe.com", "hpe", "hpc-rabsw-lustre-fs-operator", "config", "crd", "bases"),
-			filepath.Join("..", "vendor", "github.hpe.com", "hpe", "hpc-rabsw-nnf-sos", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "hpc-rabsw-lustre-fs-operator", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "hpc-rabsw-nnf-sos", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "bases"),
 			filepath.Join("..", "config", "mpi")},
 		ErrorIfCRDPathMissing: true,

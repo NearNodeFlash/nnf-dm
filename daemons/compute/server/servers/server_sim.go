@@ -23,8 +23,8 @@ import (
 	"context"
 	"fmt"
 
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 	"github.com/google/uuid"
-	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
 )
 
 // Simulated server implements a simple Data Mover Server that accepts and completes all data movemement requests.

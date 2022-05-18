@@ -23,7 +23,7 @@ import (
 	"flag"
 	"os"
 
-	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 )
 
 type ServerOptions struct {

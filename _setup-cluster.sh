@@ -30,10 +30,10 @@ CMD=$1
 
 # Install the prerequisite CRDs
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
 kubectl apply -f config/mpi/mpi-operator.yaml
 
 # Install the sample resources
