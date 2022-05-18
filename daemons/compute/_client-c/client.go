@@ -32,7 +32,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.hpe.com/hpe/hpc-rabsw-nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 )
 
 var (

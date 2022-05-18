@@ -39,11 +39,11 @@ import (
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
-	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
+	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
-	lustrecsi "github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service"
-	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
-	lustrectrl "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers"
+	lustrecsi "github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service"
+	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	lustrectrl "github.com/NearNodeFlash/lustre-fs-operator/controllers"
 )
 
 const (

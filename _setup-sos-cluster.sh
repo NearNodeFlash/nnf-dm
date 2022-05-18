@@ -22,7 +22,7 @@
 
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f config/mpi/mpi-operator.yaml
-kubectl apply -f vendor/github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
 
 echo "$(tput bold)Installing sample LustreFileSystem $(tput sgr 0)"
 cat <<-EOF | kubectl apply -f -

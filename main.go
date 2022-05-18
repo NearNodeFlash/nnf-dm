@@ -35,12 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
-	lusv1alpha1 "github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1"
-	nnfv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1"
 
-	dmv1alpha1 "github.hpe.com/hpe/hpc-rabsw-nnf-dm/api/v1alpha1"
-	"github.hpe.com/hpe/hpc-rabsw-nnf-dm/controllers"
+	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-dm/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

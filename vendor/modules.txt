@@ -13,6 +13,24 @@ github.com/Azure/go-autorest/autorest/date
 github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 github.com/Azure/go-autorest/tracing
+# github.com/HewlettPackard/dws v0.0.0-20220516154556-7138ec9b96ba
+## explicit
+github.com/HewlettPackard/dws/api/v1alpha1
+github.com/HewlettPackard/dws/utils/dwdparse
+# github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220516192757-17ac28565db5
+## explicit
+github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service
+# github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220517205036-02c092067a4c
+## explicit
+github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
+github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
+github.com/NearNodeFlash/lustre-fs-operator/controllers
+# github.com/NearNodeFlash/nnf-ec v0.0.0-20220518125038-17176c02ce3f
+github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220518142843-c31693162047
+## explicit
+github.com/NearNodeFlash/nnf-sos/api/v1alpha1
+github.com/NearNodeFlash/nnf-sos/config/crd/bases
 # github.com/PuerkitoBio/purell v1.1.1
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
@@ -34,7 +52,7 @@ github.com/evanphx/json-patch
 github.com/form3tech-oss/jwt-go
 # github.com/fsnotify/fsnotify v1.5.1
 github.com/fsnotify/fsnotify
-# github.com/go-logr/logr v1.2.2
+# github.com/go-logr/logr v1.2.3
 github.com/go-logr/logr
 # github.com/go-logr/zapr v1.2.0
 github.com/go-logr/zapr
@@ -102,7 +120,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2
 github.com/modern-go/reflect2
-# github.com/onsi/ginkgo/v2 v2.1.4-0.20220408152105-ce3d3731402b
+# github.com/onsi/ginkgo/v2 v2.1.4
 ## explicit
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -150,24 +168,6 @@ github.com/spf13/pflag
 # github.com/takama/daemon v1.0.0
 ## explicit
 github.com/takama/daemon
-# github.hpe.com/hpe/hpc-dpm-dws-operator v0.0.0-20220406202940-035cce64a49c
-## explicit
-github.hpe.com/hpe/hpc-dpm-dws-operator/api/v1alpha1
-github.hpe.com/hpe/hpc-dpm-dws-operator/utils/dwdparse
-# github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver v0.0.0-20220217210743-a86c23a50c7a
-## explicit
-github.hpe.com/hpe/hpc-rabsw-lustre-csi-driver/pkg/lustre-driver/service
-# github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator v0.0.0-20220223185010-6113a12556e0
-## explicit
-github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/api/v1alpha1
-github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/config/crd/bases
-github.hpe.com/hpe/hpc-rabsw-lustre-fs-operator/controllers
-# github.hpe.com/hpe/hpc-rabsw-nnf-ec v1.0.6-0.20220406170231-ff47353bf26e
-github.hpe.com/hpe/hpc-rabsw-nnf-ec/pkg/rfsf/pkg/models
-# github.hpe.com/hpe/hpc-rabsw-nnf-sos v0.0.0-20220414140633-6c003238aed9
-## explicit
-github.hpe.com/hpe/hpc-rabsw-nnf-sos/api/v1alpha1
-github.hpe.com/hpe/hpc-rabsw-nnf-sos/config/crd/bases
 # go.uber.org/atomic v1.9.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
@@ -346,7 +346,7 @@ gopkg.in/inf.v0
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
-# k8s.io/api v0.23.5
+# k8s.io/api v0.23.6
 ## explicit
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -403,7 +403,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.23.5
+# k8s.io/apimachinery v0.23.6
 ## explicit
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -450,7 +450,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.23.5
+# k8s.io/client-go v0.23.6
 ## explicit
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
