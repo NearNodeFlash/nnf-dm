@@ -55,7 +55,7 @@ COPY initiateContainerTest.sh .
 ENTRYPOINT [ "sh", "initiateContainerTest.sh" ]
 
 ###############################################################################
-FROM arti.dev.cray.com/baseos-docker-master-local/alpine:latest
+FROM alpine:latest
 
 RUN apk add rsync
 
