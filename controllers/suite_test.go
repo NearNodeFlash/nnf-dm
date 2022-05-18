@@ -80,8 +80,8 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "hpc-rabsw-lustre-fs-operator", "config", "crd", "bases"),
-			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "hpc-rabsw-nnf-sos", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "lustre-fs-operator", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "nnf-sos", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "bases"),
 			filepath.Join("..", "config", "mpi")},
 		ErrorIfCRDPathMissing: true,

@@ -278,6 +278,11 @@ var _ = Describe("Data Movement Controller", func() {
 			})
 
 			BeforeEach(func() {
+
+				mgsNids := []string{
+					"172.0.0.1@tcp",
+				}
+
 				lustre = &lusv1alpha1.LustreFileSystem{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "lustre-test",
@@ -285,7 +290,7 @@ var _ = Describe("Data Movement Controller", func() {
 					},
 					Spec: lusv1alpha1.LustreFileSystemSpec{
 						Name:      "lustre",
-						MgsNid:    "172.0.0.1@tcp",
+						MgsNids:   mgsNids,
 						MountRoot: "/lus/test",
 					},
 				}
@@ -571,6 +576,11 @@ var _ = Describe("Data Movement Controller", func() {
 			)
 
 			BeforeEach(func() {
+
+				mgsNids := []string{
+					"172.0.0.1@tcp",
+				}
+
 				lustre = &lusv1alpha1.LustreFileSystem{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "lustre-test",
@@ -578,7 +588,7 @@ var _ = Describe("Data Movement Controller", func() {
 					},
 					Spec: lusv1alpha1.LustreFileSystemSpec{
 						Name:      "lustre",
-						MgsNid:    "172.0.0.1@tcp",
+						MgsNids:   mgsNids,
 						MountRoot: "/lus/test",
 					},
 				}
