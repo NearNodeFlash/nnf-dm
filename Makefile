@@ -51,7 +51,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
-IMAGE_TAG_BASE ?= arti.dev.cray.com/rabsw-docker-master-local/cray-dp-nnf-dm
+IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/cray-dp-nnf-dm
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
