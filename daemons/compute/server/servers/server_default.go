@@ -195,6 +195,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	}
 
 	stateMap := map[string]pb.RsyncDataMovementStatusResponse_State{
+		"": pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
 		nnfv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
 		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
 		nnfv1alpha1.DataMovementConditionTypeFinished: pb.RsyncDataMovementStatusResponse_COMPLETED,
@@ -210,6 +211,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	}
 
 	statusMap := map[string]pb.RsyncDataMovementStatusResponse_Status{
+		"": pb.RsyncDataMovementStatusResponse_UNKNOWN_STATUS,
 		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.RsyncDataMovementStatusResponse_FAILED,
 		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.RsyncDataMovementStatusResponse_SUCCESS,
 		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.RsyncDataMovementStatusResponse_INVALID,

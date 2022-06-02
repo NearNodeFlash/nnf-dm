@@ -22,8 +22,6 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
-      securityContext:
-        runAsNonRoot: true
       nodeSelector:
         cray.nnf.manager: "true"
       containers:
@@ -67,8 +65,8 @@ spec:
   selector:
     matchLabels:
       cray.nnf.node: "true"
-  hostPath: "/nnf"
-  mountPath: "/mnt/nnf"
+  hostPath: "/mnt"
+  mountPath: "/mnt"
   template:
     spec:
       tolerations:

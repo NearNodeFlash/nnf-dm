@@ -99,6 +99,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	// this job (like a compute node), differentiating from a pending request and a received request.
 	rsyncNode.Status.StartTime = metav1.Now()
 	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
+	rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
 	if err := r.Status().Update(ctx, rsyncNode); err != nil {
 		log.Error(err, "failed to set rsync node as running")
 		return ctrl.Result{}, err
@@ -234,8 +235,8 @@ func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsy
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
-			if computeMountInfo.Device.DeviceReference == mount.Device.DeviceReference {
-				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, mount.MountPath), nil
+			if *computeMountInfo.Device.DeviceReference == *mount.Device.DeviceReference {
+				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, computeMountInfo.MountPath), nil
 			}
 		}
 	}

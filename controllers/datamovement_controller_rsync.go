@@ -202,7 +202,7 @@ func (r *DataMovementReconciler) getRsyncPath(spec *nnfv1alpha1.NnfDataMovementS
 	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
 		return spec.Path
 	case reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name():
-		return prefixPath + fmt.Sprintf("/compute-%d", index) + spec.Path
+		return prefixPath + fmt.Sprintf("/%d", index) + spec.Path
 	}
 
 	panic(fmt.Sprintf("Unsupported Storage Instance %s", spec.Storage.Kind))

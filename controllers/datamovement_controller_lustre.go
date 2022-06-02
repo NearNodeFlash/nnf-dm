@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
@@ -44,6 +45,12 @@ import (
 	lustrecsi "github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service"
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	lustrectrl "github.com/NearNodeFlash/lustre-fs-operator/controllers"
+)
+
+const (
+	MPIJobOwnerNameLabel = "dm.cray.hpe.com/owner.name"
+
+	MPIJobOwnerNamespaceLabel = "dm.cray.hpe.com/owner.namespace"
 )
 
 const (
@@ -102,40 +109,34 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nn
 func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, int32, error) {
 	log := log.FromContext(ctx).WithName("label")
 
-	access, err := r.getNnfAccess(ctx, dm)
-	if err != nil {
+	var storageRef *corev1.ObjectReference
+	if dm.Spec.Source.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Source.Storage
+	} else if dm.Spec.Destination.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Destination.Storage
+	} else {
+		return nil, -1, fmt.Errorf("Neither source or destination is of NNF Storage type")
+	}
+
+	storage := &nnfv1alpha1.NnfStorage{}
+	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 		return nil, -1, err
 	}
 
-	// List of target node names that are to perform lustre data movement
-	targetNodeNames := make([]string, 0)
-
-	switch access.Spec.StorageReference.Kind {
-	case "NnfStorage":
-		storageRef := access.Spec.StorageReference
-		storage := &nnfv1alpha1.NnfStorage{}
-		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
-			return nil, -1, err
+	targetAllocationSetIndex := -1
+	for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
+		if allocationSet.TargetType == "OST" {
+			targetAllocationSetIndex = allocationSetIndex
 		}
+	}
 
-		targetAllocationSetIndex := -1
-		for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
-			if allocationSet.TargetType == "OST" {
-				targetAllocationSetIndex = allocationSetIndex
-			}
-		}
+	if targetAllocationSetIndex == -1 {
+		return nil, -1, fmt.Errorf("OST allocation set not found")
+	}
 
-		if targetAllocationSetIndex == -1 {
-			return nil, -1, fmt.Errorf("OST allocation set not found")
-		}
-
-		for _, storageNode := range storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes {
-			targetNodeNames = append(targetNodeNames, storageNode.Name)
-		}
-
-		break
-	default:
-		panic(fmt.Sprintf("Unsupported storage type: %s", access.Spec.StorageReference.Kind))
+	targetNodeNames := make([]string, 0) // List of target node names that are to perform lustre data movement
+	for _, storageNode := range storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes {
+		targetNodeNames = append(targetNodeNames, storageNode.Name)
 	}
 
 	// Retrieve all the NNF Nodes in the cluster - these nodes will be matched against the requested
@@ -198,30 +199,78 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 		}
 	}
 
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: dm.Name + persistentVolumeSuffix,
+		},
+	}
+
+	if err := r.Delete(ctx, pv); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dm.Name + persistentVolumeClaimSuffix,
+			Namespace: "nnf-dm-system",
+		},
+	}
+
+	if err := r.Delete(ctx, pvc); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+	}
+
+	job := &mpiv2beta1.MPIJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dm.Name + mpiJobSuffix,
+			Namespace: "nnf-dm-system",
+		},
+	}
+
+	if err := r.Delete(ctx, job); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
 func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
 	log := log.FromContext(ctx).WithName("pv")
 
-	access, err := r.getNnfAccess(ctx, dm)
-	if err != nil {
-		return err
-	}
-
-	if access.Spec.StorageReference.Kind != "NnfStorage" {
-		panic("Create Persistent Volume requires NNF Storage type")
+	var storageRef *corev1.ObjectReference
+	if dm.Spec.Source.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Source.Storage
+	} else if dm.Spec.Destination.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Destination.Storage
+	} else {
+		return fmt.Errorf("Neither source or destination is of NNF Storage type")
 	}
 
 	storage := &nnfv1alpha1.NnfStorage{}
-	if err := r.Get(ctx, types.NamespacedName{Name: access.Spec.StorageReference.Name, Namespace: access.Spec.StorageReference.Namespace}, storage); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 		return err
+	}
+
+	fsName := ""
+	for _, allocationSet := range storage.Spec.AllocationSets {
+		if allocationSet.TargetType == "MDT" {
+			fsName = allocationSet.FileSystemName
+		}
+	}
+
+	if len(fsName) == 0 {
+		return fmt.Errorf("File System Name not found in NNF Storage spec")
 	}
 
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      dm.Name + persistentVolumeSuffix,
-			Namespace: dm.Namespace,
+			Name: dm.Name + persistentVolumeSuffix,
 		},
 	}
 
@@ -239,13 +288,14 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 				CSI: &corev1.CSIPersistentVolumeSource{
 					Driver:       lustrecsi.Name,
 					FSType:       "lustre",
-					VolumeHandle: storage.Status.MgsNode,
+					VolumeHandle: storage.Status.MgsNode + ":/" + fsName,
 				},
 			},
-			VolumeMode: &volumeMode,
+			VolumeMode:       &volumeMode,
+			StorageClassName: "nnf-lustre-fs",
 		}
 
-		return ctrl.SetControllerReference(dm, pv, r.Scheme)
+		return nil
 	})
 
 	if err != nil {
@@ -264,10 +314,11 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + persistentVolumeClaimSuffix,
-			Namespace: dm.Namespace,
+			Namespace: "nnf-dm-system",
 		},
 	}
 
+	storageClassName := "nnf-lustre-fs"
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		pvc.Spec = corev1.PersistentVolumeClaimSpec{
 			VolumeName: dm.Name + persistentVolumeSuffix,
@@ -279,9 +330,10 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 					corev1.ResourceStorage: resource.MustParse("1"),
 				},
 			},
+			StorageClassName: &storageClassName,
 		}
 
-		return ctrl.SetControllerReference(dm, pvc, r.Scheme)
+		return nil
 	})
 
 	if err != nil {
@@ -308,7 +360,33 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		image = img
 	}
 
-	command := []string{"mpirun", "--allow-run-as-root", "dcp", "/mnt/src" + dm.Spec.Source.Path, "/mnt/dest" + dm.Spec.Destination.Path}
+	sourceMount := "/mnt/src"
+	sourcePath := sourceMount + dm.Spec.Source.Path
+	if dm.Spec.Source.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+
+		lustre := &lusv1alpha1.LustreFileSystem{}
+		if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Source.Storage.Name, Namespace: dm.Spec.Source.Storage.Namespace}, lustre); err != nil {
+			return err
+		}
+
+		sourceMount = lustre.Spec.MountRoot
+		sourcePath = dm.Spec.Source.Path
+	}
+
+	destinationMount := "/mnt/dest"
+	destinationPath := destinationMount + dm.Spec.Destination.Path
+	if dm.Spec.Destination.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
+
+		lustre := &lusv1alpha1.LustreFileSystem{}
+		if err := r.Get(ctx, types.NamespacedName{Name: dm.Spec.Destination.Storage.Name, Namespace: dm.Spec.Destination.Storage.Namespace}, lustre); err != nil {
+			return err
+		}
+
+		destinationMount = lustre.Spec.MountRoot
+		destinationPath = dm.Spec.Destination.Path
+	}
+
+	command := []string{"mpirun", "--allow-run-as-root", "dcp", sourcePath, destinationPath}
 	if cmd, found := config.Data[configCommand]; found {
 		if strings.HasPrefix(cmd, "/bin/bash -c") {
 			command = []string{"/bin/bash", "-c", strings.TrimPrefix(cmd, "/bin/bash -c")}
@@ -382,16 +460,16 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 				},
 				Containers: []corev1.Container{
 					{
-						Image: config.Data[configImage],
+						Image: image,
 						Name:  dm.Name,
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "source",
-								MountPath: "/mnt/src",
+								MountPath: sourceMount,
 							},
 							{
 								Name:      "destination",
-								MountPath: "/mnt/dest",
+								MountPath: destinationMount,
 							},
 						},
 						SecurityContext: &corev1.SecurityContext{
@@ -428,7 +506,11 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + mpiJobSuffix,
-			Namespace: dm.Namespace,
+			Namespace: "nnf-dm-system",
+			Labels: map[string]string{
+				MPIJobOwnerNameLabel:      dm.Name,
+				MPIJobOwnerNamespaceLabel: dm.Namespace,
+			},
 		},
 		Spec: mpiv2beta1.MPIJobSpec{
 			MPIReplicaSpecs: map[mpiv2beta1.MPIReplicaType]*kubeflowv1.ReplicaSpec{
@@ -439,7 +521,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		},
 	}
 
-	ctrl.SetControllerReference(dm, job, r.Scheme)
+	//ctrl.SetControllerReference(dm, job, r.Scheme)
 
 	log.V(2).Info("Creating mpi job", "name", client.ObjectKeyFromObject(job).String())
 	return r.Create(ctx, job)
@@ -486,33 +568,12 @@ func (r *DataMovementReconciler) getLustreDestinationPersistentVolumeClaimName(c
 	panic("Unsupported Lustre Destination PVC: " + ref.Kind)
 }
 
-// Returns the NnfAccess for the given data movement. The precedence is given to the Source specification if both source and destination
-// are present. Lustre 2 lustre does not currently support both, so it should be only one is present - this is validated in validateSpec()
-func (r *DataMovementReconciler) getNnfAccess(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*nnfv1alpha1.NnfAccess, error) {
-
-	accessReference := &corev1.ObjectReference{}
-	if dm.Spec.Source.Access != nil {
-		accessReference = dm.Spec.Source.Access
-	} else if dm.Spec.Destination.Access != nil {
-		accessReference = dm.Spec.Destination.Access
-	} else {
-		return nil, fmt.Errorf("No NNF Access defined")
-	}
-
-	access := &nnfv1alpha1.NnfAccess{}
-	if err := r.Get(ctx, types.NamespacedName{Name: accessReference.Name, Namespace: accessReference.Namespace}, access); err != nil {
-		return nil, err
-	}
-
-	return access, nil
-}
-
 func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error) {
 
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + mpiJobSuffix,
-			Namespace: dm.Namespace,
+			Namespace: "nnf-dm-system",
 		},
 	}
 
@@ -530,4 +591,27 @@ func (r *DataMovementReconciler) monitorLustreJob(ctx context.Context, dm *nnfv1
 
 	// Consider the job still running
 	return &ctrl.Result{}, nnfv1alpha1.DataMovementConditionTypeRunning, "Running", nil
+}
+
+func mpijobEnqueueRequestMapFunc(o client.Object) []reconcile.Request {
+	labels := o.GetLabels()
+
+	ownerName, exists := labels[MPIJobOwnerNameLabel]
+	if exists == false {
+		return []reconcile.Request{}
+	}
+
+	ownerNamespace, exists := labels[MPIJobOwnerNamespaceLabel]
+	if exists == false {
+		return []reconcile.Request{}
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      ownerName,
+				Namespace: ownerNamespace,
+			},
+		},
+	}
 }
