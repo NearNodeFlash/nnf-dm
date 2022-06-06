@@ -80,8 +80,8 @@ if [[ "$CMD" == xfs ]]; then
     name: data-movement-config
     namespace: nnf-dm-system
   data:
-    sourcePath: "/mnt/nnf/file.in"
-    destinationPath: "/mnt/nnf/file.out"
+    sourcePath: "/mnt/file.in"
+    destinationPath: "/mnt/file.out"
 EOF
 
 

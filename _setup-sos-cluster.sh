@@ -30,9 +30,11 @@ apiVersion: cray.hpe.com/v1alpha1
 kind: LustreFileSystem
 metadata:
   name: lustrefilesystem-sample-maui
+  namespace: nnf-dm-system
 spec:
   name: maui
-  mgsNid: 172.0.0.1@tcp
+  mgsNids:
+  - 172.0.0.1@tcp
   mountRoot: /lus/maui
 EOF
 
@@ -45,8 +47,8 @@ cat <<-EOF | kubectl create -f -
     name: data-movement-config
     namespace: nnf-dm-system
   data:
-    sourcePath: "/mnt/nnf/file.in"
-    destinationPath: "/mnt/nnf/file.out"
+    sourcePath: "/mnt/file.in"
+    destinationPath: "/mnt/file.out"
 EOF
 
 echo "$(tput bold)Running make deploy to install data movement $(tput sgr 0)"
