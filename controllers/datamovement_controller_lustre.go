@@ -259,7 +259,7 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 
 	fsName := ""
 	for _, allocationSet := range storage.Spec.AllocationSets {
-		if allocationSet.TargetType == "MDT" {
+		if allocationSet.TargetType == "MDT" || allocationSet.TargetType == "MGTMDT" {
 			fsName = allocationSet.FileSystemName
 		}
 	}
