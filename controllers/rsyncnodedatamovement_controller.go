@@ -127,7 +127,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	destination := rsyncNode.Spec.Destination
-	log.V(1).Info("Executing rsync command", "source", source, "destination", destination)
+	log.Info("Executing rsync command", "source", source, "destination", destination)
 
 	arguments = append(arguments, "--recursive")
 	arguments = append(arguments, source)
@@ -148,12 +148,12 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
+			log.Info("Rsync failure", "error", string(exitErr.Stderr))
 		} else {
-			log.V(1).Info("Rsync failure", "error", err)
+			log.Info("Rsync failure", "error", err)
 		}
 	} else {
-		log.V(1).Info("rsync completed", "output", string(out))
+		log.Info("rsync completed", "output", string(out))
 	}
 
 	// Record the completion status.
@@ -177,7 +177,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // Return the source path given the rsync node data movement request. This takes a compute-local path (the initiator) and returns
-// the the rabbit-relative path. If no initiator is provided then the source path is assumed to already be local to the rabbit.
+// the rabbit-relative path. If no initiator is provided then the source path is assumed to already be local to the rabbit.
 func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsync *dmv1alpha1.RsyncNodeDataMovement) (string, error) {
 	if len(rsync.Spec.Initiator) == 0 {
 		return rsync.Spec.Source, nil

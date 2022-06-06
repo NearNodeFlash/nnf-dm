@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile" // Required for Watching
@@ -69,7 +70,7 @@ type RsyncTemplateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
 	rsyncTemplate := &dmv1alpha1.RsyncTemplate{}
 	if err := r.Get(ctx, req.NamespacedName, rsyncTemplate); err != nil {
@@ -80,6 +81,13 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	enableLustreFileSystems := rsyncTemplate.Spec.DisableLustreFileSystems == nil || *(rsyncTemplate.Spec.DisableLustreFileSystems) == false
+
+	filesystems := &lusv1alpha1.LustreFileSystemList{}
+	if enableLustreFileSystems {
+		if err := r.List(ctx, filesystems); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	ds := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -92,14 +100,6 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		if err := ctrl.SetControllerReference(rsyncTemplate, ds, r.Scheme); err != nil {
 			return err
-		}
-
-		filesystems := &lusv1alpha1.LustreFileSystemList{}
-
-		if enableLustreFileSystems {
-			if err := r.List(ctx, filesystems); err != nil {
-				return err
-			}
 		}
 
 		t := &rsyncTemplate.Spec.Template
@@ -124,9 +124,18 @@ func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return nil
 	}
 
-	_, err := ctrl.CreateOrUpdate(ctx, r.Client, ds, mutateFn)
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, ds, mutateFn)
 	if err != nil {
-		return ctrl.Result{}, nil
+		log.Error(err, "failed to create or update daemonset", "name", ds.Name, "namespace", ds.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	if result == controllerutil.OperationResultCreated {
+		log.Info("Created DaemonSet", "name", ds.Name, "namespace", ds.Namespace, "enableLustreFS", enableLustreFileSystems, "filesystems found", len(filesystems.Items))
+	} else if result == controllerutil.OperationResultNone {
+		// no change
+	} else {
+		log.Info("Updated DaemonSet", "name", ds.Name, "namespace", ds.Namespace, "enableLustreFS", enableLustreFileSystems, "filesystems found", len(filesystems.Items))
 	}
 
 	return ctrl.Result{}, nil
