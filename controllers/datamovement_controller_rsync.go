@@ -245,10 +245,10 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 		}
 
 		switch node.Status.State {
-		case nnfv1alpha1.DataMovementConditionTypeRunning:
-			status.Running++
 		case nnfv1alpha1.DataMovementConditionTypeFinished:
 			status.Complete++
+		default:
+			status.Running++
 		}
 
 		if len(node.Status.Message) != 0 {
