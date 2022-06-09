@@ -68,6 +68,8 @@ const (
 	configDestinationPath   = "destinationPath"   // DestinationPath is the path of the destination file or directory
 	configSourceVolume      = "sourceVolume"      // SourceVolume is the corev1.VolumeSource used as the source volume mount. Defaults to a CSI volume interpreted from the Spec.Source
 	configDestinationVolume = "destinationVolume" // DestinationVolume is the corev1.VolumeSource used as the destination volume mount. Defaults to a CSI volume interpreted from the Spec.Destination
+
+	mpiArguments = "mpi-arguments" // Additional arguments to pass to the mpirun command
 )
 
 func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
@@ -386,7 +388,13 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		destinationPath = dm.Spec.Destination.Path
 	}
 
-	command := []string{"mpirun", "--allow-run-as-root", "dcp", sourcePath, destinationPath}
+	command := []string{"mpirun", "--allow-run-as-root"}
+	if arguments, found := config.Data[mpiArguments]; found {
+		command = append(command, strings.Split(arguments, " ")...)
+	}
+
+	command = append(command, "dcp", sourcePath, destinationPath)
+	
 	if cmd, found := config.Data[configCommand]; found {
 		if strings.HasPrefix(cmd, "/bin/bash -c") {
 			command = []string{"/bin/bash", "-c", strings.TrimPrefix(cmd, "/bin/bash -c")}
