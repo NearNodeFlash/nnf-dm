@@ -84,6 +84,9 @@ type RsyncNodeDataMovementStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.status",description="Current status of the data movement operation"
+//+kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".status.state",description="Current state of the data movement operation"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // RsyncNodeDataMovement is the Schema for the rsyncnodedatamovements API
 type RsyncNodeDataMovement struct {

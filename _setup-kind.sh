@@ -41,6 +41,9 @@ done
 
 kubectl taint nodes $(kubectl get nodes --no-headers -o custom-columns=:metadata.name | grep -v control-plane | paste -d" " -s -) cray.nnf.node=true:NoSchedule
 
+certver="v1.7.0"
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/"$certver"/cert-manager.yaml
+
 echo "$(tput bold)DONE!$(tput sgr 0)"
 echo "You should now ensure any necessary images are loaded in kind"
 echo "and then run _setup-cluster.sh [lustre, xfs] to setup data-movement."

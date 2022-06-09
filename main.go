@@ -27,14 +27,18 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
@@ -56,6 +60,7 @@ func init() {
 	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(mpiv2beta1.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
@@ -71,24 +76,28 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&controller, "controller", "node", "The controller type to run {node, system}.")
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
+
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+	zaplogger := zapcr.New(zapcr.Encoder(encoder), zapcr.UseDevMode(true))
+
+	ctrl.SetLogger(zaplogger)
 
 	dmCtrl := newDataMovementController(controller)
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+
+	options := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "a60dd315.cray.hpe.com",
-		Namespace:              dmCtrl.GetNamespace(),
-	})
+	}
+
+	dmCtrl.SetNamespaces(&options)
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -120,6 +129,7 @@ func main() {
 type dataMovementControllerInterface interface {
 	GetType() string
 	GetNamespace() string
+	SetNamespaces(*ctrl.Options)
 	SetupReconcilers(manager.Manager) error
 }
 
@@ -146,6 +156,22 @@ type nodeLocalController struct{}
 func (*nodeLocalController) GetType() string      { return NodeLocalController }
 func (*nodeLocalController) GetNamespace() string { return os.Getenv("NNF_NODE_NAME") }
 
+func (*nodeLocalController) SetNamespaces(options *ctrl.Options) {
+	switch os.Getenv("NNF_NODE_NAME") {
+	case "rabbit-node-0":
+		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-0", "compute-node-1"})
+		return
+	case "rabbit-node-1":
+		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-2", "compute-node-3"})
+		return
+	case "rabbit-node-2":
+		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-4", "compute-node-5"})
+		return
+	}
+
+	options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME")})
+}
+
 func (*nodeLocalController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.RsyncNodeDataMovementReconciler{
 		Client: mgr.GetClient(),
@@ -162,6 +188,10 @@ type systemController struct{}
 
 func (*systemController) GetType() string      { return SystemController }
 func (*systemController) GetNamespace() string { return "" }
+
+func (*systemController) SetNamespaces(options *ctrl.Options) {
+
+}
 
 func (*systemController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{

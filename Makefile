@@ -137,6 +137,8 @@ kind-push: ## Push docker image to kind
 	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
 	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image ${IMG}
+	${DOCKER} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+	kind load docker-image --nodes `kubectl get node -l cray.nnf.manager=true --no-headers -o custom-columns=":metadata.name" | paste -d, -s -` gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
 
 ##@ Deployment
 

@@ -45,9 +45,11 @@ apiVersion: cray.hpe.com/v1alpha1
 kind: LustreFileSystem
 metadata:
   name: lustrefilesystem-sample-maui
+  namespace: nnf-dm-system
 spec:
   name: maui
-  mgsNid: 172.0.0.1@tcp
+  mgsNids:
+  - 172.0.0.1@tcp
   mountRoot: /lus/maui
 EOF
 
@@ -61,7 +63,7 @@ cat <<-EOF | kubectl apply -f -
     desiredState: mounted
     teardownState: data_out
     target: all
-    mountPathPrefix: "/nnf/tmp"
+    mountPathPrefix: "/mnt"
     storageReference:
       kind: NnfStorage
       name: nnfstorage-sample
@@ -111,8 +113,6 @@ if [[ "$CMD" == lustre ]]; then
         count: 1
       - name: kind-worker2
         count: 1
-  status:
-    mgsNode: "127.0.0.1@tcp"
 EOF
 
 fi

@@ -16,7 +16,19 @@ spec:
     singular: rsyncnodedatamovement
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Current status of the data movement operation
+      jsonPath: .status.status
+      name: STATUS
+      type: string
+    - description: Current state of the data movement operation
+      jsonPath: .status.state
+      name: STATE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: RsyncNodeDataMovement is the Schema for the rsyncnodedatamovements

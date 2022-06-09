@@ -7,10 +7,10 @@ nodes:
 - role: worker
   extraMounts:
   - hostPath: /tmp/nnf
-    containerPath: /nnf
+    containerPath: /mnt
     propagation: None
 - role: worker
   extraMounts:
   - hostPath: /tmp/nnf
-    containerPath: /nnf
+    containerPath: /mnt
     propagation: None

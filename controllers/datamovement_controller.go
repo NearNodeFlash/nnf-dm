@@ -60,6 +60,7 @@ type DataMovementReconciler struct {
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;pathc;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -85,7 +86,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Check if the object is being deleted. Deletion is coordinated around the sub-resources
 	// created or modified as part of data movement.
 	if !dm.GetDeletionTimestamp().IsZero() {
-		log.V(2).Info("Starting delete operation")
+		log.Info("Starting delete operation")
 
 		if !controllerutil.ContainsFinalizer(dm, finalizer) {
 			return ctrl.Result{}, nil
@@ -95,10 +96,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		teardownFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
 			false: r.teardownRsyncJob,
 			true:  r.teardownLustreJob,
-		}
+		}[isLustre2Lustre]
 
-		result, err := teardownFn[isLustre2Lustre](ctx, dm)
-		log.V(2).Info("Teardown", "Result", result, "Error", err)
+		result, err := teardownFn(ctx, dm)
+		log.Info("Teardown", "Result", result, "Error", err)
 		if err != nil {
 			return ctrl.Result{}, err
 		} else if !result.IsZero() {
@@ -111,7 +112,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 
-		log.V(2).Info("Successfully removed finalizer")
+		log.Info("Successfully deleted data movement resource")
 		return ctrl.Result{}, nil
 	}
 
@@ -199,6 +200,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}[isLustre2Lustre]
 
 		result, status, message, err := monitorFn(ctx, dm)
+		log.Info("Monitor job", "status", status, "message", message)
+
 		if err != nil {
 			log.Error(err, "Failed to monitor")
 			return ctrl.Result{}, err
@@ -260,10 +263,6 @@ func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) e
 	// If destination is just "path" this must be a lustre file system
 	if dm.Spec.Source.Storage == nil && dm.Spec.Destination.Storage == nil {
 		return fmt.Errorf("one of source or destination must be a storage instance")
-	}
-
-	if dm.Spec.Source.Access == nil && dm.Spec.Destination.Access == nil {
-		return fmt.Errorf("at least one of source or destination must have an access")
 	}
 
 	return nil
@@ -344,6 +343,10 @@ func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&mpiv2beta1.MPIJob{}).
 		Owns(&corev1.PersistentVolume{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(
+			&source.Kind{Type: &mpiv2beta1.MPIJob{}},
+			handler.EnqueueRequestsFromMapFunc(mpijobEnqueueRequestMapFunc),
+		).
 		Watches(
 			&source.Kind{Type: &dmv1alpha1.RsyncNodeDataMovement{}},
 			handler.EnqueueRequestsFromMapFunc(rsyncNodeDataMovementEnqueueRequestMapFunc),

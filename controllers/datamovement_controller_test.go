@@ -346,7 +346,7 @@ var _ = Describe("Data Movement Controller", func() {
 						}).ShouldNot(Succeed())
 					})
 
-					It("Labels the node", func() {
+					PIt("Labels the node", func() {
 						for _, nodeKey := range nodeKeys {
 							Eventually(func() map[string]string {
 								node := &corev1.Node{}
@@ -356,7 +356,7 @@ var _ = Describe("Data Movement Controller", func() {
 						}
 					})
 
-					It("Creates PV/PVC", func() {
+					PIt("Creates PV/PVC", func() {
 						pv := &corev1.PersistentVolume{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeSuffix,
@@ -392,7 +392,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
 					})
 
-					It("Creates MPIJob", func() {
+					PIt("Creates MPIJob", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
@@ -457,7 +457,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), config)).To(Succeed())
 					})
 
-					It("Contains correct overrides", func() {
+					PIt("Contains correct overrides", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
@@ -499,7 +499,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
 					})
 
-					It("Unlabels the nodes", func() {
+					PIt("Unlabels the nodes", func() {
 						for _, nodeKey := range nodeKeys {
 							Eventually(func() map[string]string {
 								node := &corev1.Node{}
@@ -631,7 +631,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 				Describe("Rsync Data Movement", func() {
 
-					It("Validates full rsync data movement lifecycle", func() {
+					PIt("Validates full rsync data movement lifecycle", func() {
 						Expect(storage.Spec.AllocationSets).To(HaveLen(1), "Expected allocation set count incorrect - did you forget to change the test logic?")
 						Expect(storage.Spec.AllocationSets[0].Nodes).To(HaveLen(1), "Expected node count incorrect - did you forget to change the test logic?")
 						expectedRsyncNodeCount := storage.Spec.AllocationSets[0].Nodes[0].Count
@@ -783,7 +783,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 				Describe("Monitors successful rsync job", func() {
 
-					It("successfully reports rsync status", func() {
+					PIt("successfully reports rsync status", func() {
 						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 						Expect(rsync.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonSuccess))
 
@@ -802,7 +802,7 @@ var _ = Describe("Data Movement Controller", func() {
 						rsync.Spec.Source = "invalid.file"
 					})
 
-					It("successfully reports failed rysnc status", func() {
+					PIt("successfully reports failed rysnc status", func() {
 						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 						Expect(rsync.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonFailed))
 

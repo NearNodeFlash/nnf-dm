@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
@@ -99,6 +100,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	// this job (like a compute node), differentiating from a pending request and a received request.
 	rsyncNode.Status.StartTime = metav1.Now()
 	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
+	rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
 	if err := r.Status().Update(ctx, rsyncNode); err != nil {
 		log.Error(err, "failed to set rsync node as running")
 		return ctrl.Result{}, err
@@ -125,7 +127,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	destination := rsyncNode.Spec.Destination
-	log.V(1).Info("Executing rsync command", "source", source, "destination", destination)
+	log.Info("Executing rsync command", "source", source, "destination", destination)
 
 	arguments = append(arguments, "--recursive")
 	arguments = append(arguments, source)
@@ -146,12 +148,12 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			log.V(1).Info("Rsync failure", "error", string(exitErr.Stderr))
+			log.Info("Rsync failure", "error", string(exitErr.Stderr))
 		} else {
-			log.V(1).Info("Rsync failure", "error", err)
+			log.Info("Rsync failure", "error", err)
 		}
 	} else {
-		log.V(1).Info("rsync completed", "output", string(out))
+		log.Info("rsync completed", "output", string(out))
 	}
 
 	// Record the completion status.
@@ -175,7 +177,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // Return the source path given the rsync node data movement request. This takes a compute-local path (the initiator) and returns
-// the the rabbit-relative path. If no initiator is provided then the source path is assumed to already be local to the rabbit.
+// the rabbit-relative path. If no initiator is provided then the source path is assumed to already be local to the rabbit.
 func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsync *dmv1alpha1.RsyncNodeDataMovement) (string, error) {
 	if len(rsync.Spec.Initiator) == 0 {
 		return rsync.Spec.Source, nil
@@ -234,8 +236,8 @@ func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsy
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
-			if computeMountInfo.Device.DeviceReference == mount.Device.DeviceReference {
-				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, mount.MountPath), nil
+			if *computeMountInfo.Device.DeviceReference == *mount.Device.DeviceReference {
+				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, computeMountInfo.MountPath), nil
 			}
 		}
 	}
@@ -263,5 +265,6 @@ func (r *RsyncNodeDataMovementReconciler) deleteCompletion(name string) {
 func (r *RsyncNodeDataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dmv1alpha1.RsyncNodeDataMovement{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 128}).
 		Complete(r)
 }
