@@ -47,8 +47,6 @@ int main(int argc, char **argv) {
     // implementation assumes environmental variables are defined below. If these
     // environmental variables are not defined, you might need to expand on the Create
     // functionality so they can be user supplied values.
-    // - Initiator          (NODE_NAME)             Defines the name of the initiating compute node
-    // - Target             (NNF_NODE_NAME)         Defines the name of the target rabbit node
     // - Workflow           (DW_WORKFLOW_NAME)      Defines the name of the owning workflow
     // - Workflow Namespace (DW_WORKFLOW_NAMESPACE) Defines the namespace of the owning workflow
     struct Create_return createResponse;
@@ -66,16 +64,16 @@ int main(int argc, char **argv) {
     }
 
     switch (statusResponse.r0) {
-        case DATAMOVEMENT__RSYNC_DATA_MOVEMENT_STATUS_RESPONSE__STATE__PENDING:
+        case DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__PENDING:
             printf("Request Pending\n");
             break;
-        case DATAMOVEMENT__RSYNC_DATA_MOVEMENT_STATUS_RESPONSE__STATE__STARTING:
+        case DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__STARTING:
             printf("Request Starting\n");
             break;
-        case DATAMOVEMENT__RSYNC_DATA_MOVEMENT_STATUS_RESPONSE__STATE__RUNNING:
+        case DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__RUNNING:
             printf("Request Running\n");
             break;
-        case DATAMOVEMENT__RSYNC_DATA_MOVEMENT_STATUS_RESPONSE__STATE__COMPLETED:
+        case DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__COMPLETED:
             printf("Request Completed\n");
             break;
         default:
@@ -93,10 +91,6 @@ int main(int argc, char **argv) {
     }
 
     Free(createResponse.r0);
-
-
-
-
 
     CloseConnection(conn.r0);
 }

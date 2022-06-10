@@ -33,11 +33,7 @@ import (
 
 func main() {
 
-	hostname, err := os.Hostname()
-	if err != nil || len(hostname) == 0 {
-		hostname = os.Getenv("NODE_NAME")
-	}
-	nodename := flag.String("nodename", hostname, "name of this node")
+
 	workflow := flag.String("workflow", os.Getenv("DW_WORKFLOW_NAME"), "parent workflow name")
 	namespace := flag.String("namespace", os.Getenv("DW_WORKFLOW_NAMESPACE"), "parent workflow namespace")
 	source := flag.String("source", "", "source file or directory")
@@ -48,10 +44,6 @@ func main() {
 
 	flag.Parse()
 
-	if len(*nodename) == 0 {
-		log.Printf("node name is required")
-		os.Exit(1)
-	}
 	if len(*workflow) == 0 {
 		log.Printf("workflow name required")
 		os.Exit(1)
@@ -73,22 +65,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	c := pb.NewRsyncDataMoverClient(conn)
+	c := pb.NewDataMoverClient(conn)
 
-	uid, err := createRequest(ctx, c, *nodename, *workflow, *namespace, *source, *destination, *dryrun)
+	uid, status, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
 	if err != nil {
 		log.Fatalf("could not create data movement request: %v", err)
 	}
-	log.Printf("Data movement request created: %s", uid)
+
+	if status == pb.DataMovementCreateResponse_CREATED {
+		log.Printf("Data movement request created: %s", uid)
+	} else {
+		log.Fatal("Create request failed")
+	}
 
 	for {
 		state, status, err := getStatus(ctx, c, uid)
-		if status == pb.RsyncDataMovementStatusResponse_FAILED {
+		if status == pb.DataMovementStatusResponse_FAILED {
 			log.Fatalf("Data movement failed: %v", err)
 		}
 
 		log.Printf("Data movement %s", state.String())
-		if state == pb.RsyncDataMovementStatusResponse_COMPLETED {
+		if state == pb.DataMovementStatusResponse_COMPLETED {
 			break
 		}
 
@@ -110,10 +107,9 @@ func main() {
 	}
 }
 
-func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, nodename, workflow, namespace, source, destination string, dryrun bool) (string, error) {
+func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (string, pb.DataMovementCreateResponse_Status, error) {
 
-	rsp, err := client.Create(ctx, &pb.RsyncDataMovementCreateRequest{
-		Initiator:   nodename,
+	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow:    workflow,
 		Namespace:   namespace,
 		Source:      source,
@@ -122,31 +118,31 @@ func createRequest(ctx context.Context, client pb.RsyncDataMoverClient, nodename
 	})
 
 	if err != nil {
-		return "", err
+		return "", pb.DataMovementCreateResponse_FAILED, err
 	}
 
-	return rsp.GetUid(), nil
+	return rsp.GetUid(), rsp.GetStatus(), nil
 }
 
-func getStatus(ctx context.Context, client pb.RsyncDataMoverClient, uid string) (pb.RsyncDataMovementStatusResponse_State, pb.RsyncDataMovementStatusResponse_Status, error) {
-	rsp, err := client.Status(ctx, &pb.RsyncDataMovementStatusRequest{
+func getStatus(ctx context.Context, client pb.DataMoverClient, uid string) (pb.DataMovementStatusResponse_State, pb.DataMovementStatusResponse_Status, error) {
+	rsp, err := client.Status(ctx, &pb.DataMovementStatusRequest{
 		Uid: uid,
 	})
 
 	if err != nil {
-		return pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE, pb.RsyncDataMovementStatusResponse_FAILED, err
+		return pb.DataMovementStatusResponse_UNKNOWN_STATE, pb.DataMovementStatusResponse_FAILED, err
 	}
 
 	return rsp.GetState(), rsp.GetStatus(), nil
 }
 
-func deleteRequest(ctx context.Context, client pb.RsyncDataMoverClient, uid string) (pb.RsyncDataMovementDeleteResponse_Status, error) {
-	rsp, err := client.Delete(ctx, &pb.RsyncDataMovementDeleteRequest{
+func deleteRequest(ctx context.Context, client pb.DataMoverClient, uid string) (pb.DataMovementDeleteResponse_Status, error) {
+	rsp, err := client.Delete(ctx, &pb.DataMovementDeleteRequest{
 		Uid: uid,
 	})
 
 	if err != nil {
-		return pb.RsyncDataMovementDeleteResponse_UNKNOWN, err
+		return pb.DataMovementDeleteResponse_UNKNOWN, err
 	}
 
 	return rsp.GetStatus(), nil

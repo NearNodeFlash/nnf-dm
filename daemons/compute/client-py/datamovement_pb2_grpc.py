@@ -2,11 +2,11 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import rsyncdatamovement_pb2 as rsyncdatamovement__pb2
+import datamovement_pb2 as datamovement__pb2
 
 
-class RsyncDataMoverStub(object):
-    """RsyncDataMover service definition describes the API for perform data movement
+class DataMoverStub(object):
+    """DataMover service definition describes the API for perform data movement
     for NNF storage. 
     """
 
@@ -17,24 +17,24 @@ class RsyncDataMoverStub(object):
             channel: A grpc.Channel.
         """
         self.Create = channel.unary_unary(
-                '/datamovement.RsyncDataMover/Create',
-                request_serializer=rsyncdatamovement__pb2.RsyncDataMovementCreateRequest.SerializeToString,
-                response_deserializer=rsyncdatamovement__pb2.RsyncDataMovementCreateResponse.FromString,
+                '/datamovement.DataMover/Create',
+                request_serializer=datamovement__pb2.DataMovementCreateRequest.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementCreateResponse.FromString,
                 )
         self.Status = channel.unary_unary(
-                '/datamovement.RsyncDataMover/Status',
-                request_serializer=rsyncdatamovement__pb2.RsyncDataMovementStatusRequest.SerializeToString,
-                response_deserializer=rsyncdatamovement__pb2.RsyncDataMovementStatusResponse.FromString,
+                '/datamovement.DataMover/Status',
+                request_serializer=datamovement__pb2.DataMovementStatusRequest.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementStatusResponse.FromString,
                 )
         self.Delete = channel.unary_unary(
-                '/datamovement.RsyncDataMover/Delete',
-                request_serializer=rsyncdatamovement__pb2.RsyncDataMovementDeleteRequest.SerializeToString,
-                response_deserializer=rsyncdatamovement__pb2.RsyncDataMovementDeleteResponse.FromString,
+                '/datamovement.DataMover/Delete',
+                request_serializer=datamovement__pb2.DataMovementDeleteRequest.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementDeleteResponse.FromString,
                 )
 
 
-class RsyncDataMoverServicer(object):
-    """RsyncDataMover service definition describes the API for perform data movement
+class DataMoverServicer(object):
+    """DataMover service definition describes the API for perform data movement
     for NNF storage. 
     """
 
@@ -63,32 +63,32 @@ class RsyncDataMoverServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_RsyncDataMoverServicer_to_server(servicer, server):
+def add_DataMoverServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Create': grpc.unary_unary_rpc_method_handler(
                     servicer.Create,
-                    request_deserializer=rsyncdatamovement__pb2.RsyncDataMovementCreateRequest.FromString,
-                    response_serializer=rsyncdatamovement__pb2.RsyncDataMovementCreateResponse.SerializeToString,
+                    request_deserializer=datamovement__pb2.DataMovementCreateRequest.FromString,
+                    response_serializer=datamovement__pb2.DataMovementCreateResponse.SerializeToString,
             ),
             'Status': grpc.unary_unary_rpc_method_handler(
                     servicer.Status,
-                    request_deserializer=rsyncdatamovement__pb2.RsyncDataMovementStatusRequest.FromString,
-                    response_serializer=rsyncdatamovement__pb2.RsyncDataMovementStatusResponse.SerializeToString,
+                    request_deserializer=datamovement__pb2.DataMovementStatusRequest.FromString,
+                    response_serializer=datamovement__pb2.DataMovementStatusResponse.SerializeToString,
             ),
             'Delete': grpc.unary_unary_rpc_method_handler(
                     servicer.Delete,
-                    request_deserializer=rsyncdatamovement__pb2.RsyncDataMovementDeleteRequest.FromString,
-                    response_serializer=rsyncdatamovement__pb2.RsyncDataMovementDeleteResponse.SerializeToString,
+                    request_deserializer=datamovement__pb2.DataMovementDeleteRequest.FromString,
+                    response_serializer=datamovement__pb2.DataMovementDeleteResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'datamovement.RsyncDataMover', rpc_method_handlers)
+            'datamovement.DataMover', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class RsyncDataMover(object):
-    """RsyncDataMover service definition describes the API for perform data movement
+class DataMover(object):
+    """DataMover service definition describes the API for perform data movement
     for NNF storage. 
     """
 
@@ -103,9 +103,9 @@ class RsyncDataMover(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/datamovement.RsyncDataMover/Create',
-            rsyncdatamovement__pb2.RsyncDataMovementCreateRequest.SerializeToString,
-            rsyncdatamovement__pb2.RsyncDataMovementCreateResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Create',
+            datamovement__pb2.DataMovementCreateRequest.SerializeToString,
+            datamovement__pb2.DataMovementCreateResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -120,9 +120,9 @@ class RsyncDataMover(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/datamovement.RsyncDataMover/Status',
-            rsyncdatamovement__pb2.RsyncDataMovementStatusRequest.SerializeToString,
-            rsyncdatamovement__pb2.RsyncDataMovementStatusResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Status',
+            datamovement__pb2.DataMovementStatusRequest.SerializeToString,
+            datamovement__pb2.DataMovementStatusResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -137,8 +137,8 @@ class RsyncDataMover(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/datamovement.RsyncDataMover/Delete',
-            rsyncdatamovement__pb2.RsyncDataMovementDeleteRequest.SerializeToString,
-            rsyncdatamovement__pb2.RsyncDataMovementDeleteResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Delete',
+            datamovement__pb2.DataMovementDeleteRequest.SerializeToString,
+            datamovement__pb2.DataMovementDeleteResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

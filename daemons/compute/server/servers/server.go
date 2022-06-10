@@ -59,7 +59,7 @@ func GetOptions() (*ServerOptions, error) {
 	return &opts, nil
 }
 
-func Create(opts *ServerOptions) (pb.RsyncDataMoverServer, error) {
+func Create(opts *ServerOptions) (pb.DataMoverServer, error) {
 	if opts.simulated {
 		return CreateSimulatedServer(opts)
 	}

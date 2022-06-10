@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	client pb.RsyncDataMoverClient
+	client pb.DataMoverClient
 )
 
 //export OpenConnection
@@ -46,7 +46,7 @@ func OpenConnection(socketAddr *C.char) (conn uintptr, rc int32) {
 		return 0, -1
 	}
 
-	client = pb.NewRsyncDataMoverClient(connection)
+	client = pb.NewDataMoverClient(connection)
 	if client == nil {
 		return 0, int32(syscall.ENOMEM)
 	}
@@ -73,11 +73,9 @@ func Create(source, destination *C.char) (uid *C.char, rc int32) {
 		return nil, int32(syscall.EBADR)
 	}
 
-	rsp, err := client.Create(context.TODO(), &pb.RsyncDataMovementCreateRequest{
+	rsp, err := client.Create(context.TODO(), &pb.DataMovementCreateRequest{
 		Source:      C.GoString(source),
 		Destination: C.GoString(destination),
-		Initiator:   os.Getenv("NODE_NAME"),
-		Target:      os.Getenv("NNF_NODE_NAME"),
 		Workflow:    os.Getenv("DW_WORKFLOW_NAME"),
 		Namespace:   os.Getenv("DW_WORKFLOW_NAMESPACE"),
 	})
@@ -95,7 +93,7 @@ func Status(uid *C.char) (state int32, status int32, rc int32) {
 		return -1, -1, int32(syscall.EBADR)
 	}
 
-	rsp, err := client.Status(context.TODO(), &pb.RsyncDataMovementStatusRequest{
+	rsp, err := client.Status(context.TODO(), &pb.DataMovementStatusRequest{
 		Uid: C.GoString(uid),
 	})
 
@@ -112,7 +110,7 @@ func Delete(uid *C.char) (status int32, rc int32) {
 		return -1, int32(syscall.EBADR)
 	}
 
-	rsp, err := client.Delete(context.TODO(), &pb.RsyncDataMovementDeleteRequest{
+	rsp, err := client.Delete(context.TODO(), &pb.DataMovementDeleteRequest{
 		Uid: C.GoString(uid),
 	})
 
