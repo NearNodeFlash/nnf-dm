@@ -9,28 +9,26 @@ option java_outer_classname = "DataMovementProto";
 
 package datamovement;
 
-// RsyncDataMover service definition describes the API for perform data movement
+// DataMover service definition describes the API for perform data movement
 // for NNF storage. 
-service RsyncDataMover {
+service DataMover {
     // Create sends a new data movement request identified by source and destination fields. It returns
     // a response containing a unique identifier which can be used to query the status of the request.
-    rpc Create (RsyncDataMovementCreateRequest) returns (RsyncDataMovementCreateResponse) {}
+    rpc Create (DataMovementCreateRequest) returns (DataMovementCreateResponse) {}
 
     // Status requests the status of a previously submitted data movement request. It accepts a unique
     // identifier that identifies the request and returns a status message.
-    rpc Status (RsyncDataMovementStatusRequest) returns (RsyncDataMovementStatusResponse) {}
+    rpc Status (DataMovementStatusRequest) returns (DataMovementStatusResponse) {}
 
     // Delete will attempt to delete a completed data movement request. It accepts a unique identifer
     // that identifies the request and returns the status of the delete operation.
-    rpc Delete (RsyncDataMovementDeleteRequest) returns (RsyncDataMovementDeleteResponse) {}
+    rpc Delete (DataMovementDeleteRequest) returns (DataMovementDeleteResponse) {}
 }
 
 // The data movemement create request message containing the source and destination files or directories. The
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
-message RsyncDataMovementCreateRequest {
-    string initiator = 1;
-    string target = 2;
+message DataMovementCreateRequest {
     string workflow = 3;
     string namespace = 4;
     string source = 5;
@@ -41,20 +39,28 @@ message RsyncDataMovementCreateRequest {
 // The data movement create response message contains a unique identifier amont all data movement requests for
 // the lifetime of the active job. The UID can be used to query for status of the request using the
 // data movememnt status request message.
-message RsyncDataMovementCreateResponse {
+message DataMovementCreateResponse {
     string uid = 1;
+
+    enum Status {
+        CREATED = 0;
+        FAILED = 1;
+    }
+    Status status = 2;
+    string message = 3;
 }
 
 // The data movement status request message permits users to query the status of a previously issued
 // data movement request by specifying the request's unique identifier.
-message RsyncDataMovementStatusRequest {
+message DataMovementStatusRequest {
     string uid = 1;
+    int64 timeout = 2;
 }
 
 // The data movement status response message defines the current status of a data movement request. The
 // state field describes the current state of the request. The message field contains ancillary information
 // describing the data movement request. 
-message RsyncDataMovementStatusResponse {
+message DataMovementStatusResponse {
     enum State {
         PENDING = 0;
         STARTING = 1;
@@ -77,12 +83,12 @@ message RsyncDataMovementStatusResponse {
 
 // The data movement delete request permits users to delete a completed data movement request (any request with a 
 // status of COMPLETED) by specifying the request's unique identifier.
-message RsyncDataMovementDeleteRequest {
+message DataMovementDeleteRequest {
     string uid = 1;
 }
 
 // The data movement delete response returns the status of the delete operation.
-message RsyncDataMovementDeleteResponse {
+message DataMovementDeleteResponse {
     enum Status {
         INVALID = 0;
         NOT_FOUND = 1;

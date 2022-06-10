@@ -16,24 +16,24 @@
 # limitations under the License.
 
 import grpc
-import rsyncdatamovement_pb2
-import rsyncdatamovement_pb2_grpc
+import datamovement_pb2
+import datamovement_pb2_grpc
 
 if __name__ == '__main__':
     with grpc.insecure_channel('unix:///var/run/nnf-dm.sock') as channel:
-        stub = rsyncdatamovement_pb2_grpc.RsyncDataMoverStub(channel)
+        stub = datamovement_pb2_grpc.DataMoverStub(channel)
 
         # Create
-        create_request = rsyncdatamovement_pb2.RsyncDataMovementCreateRequest()
+        create_request = datamovement_pb2.DataMovementCreateRequest()
         create_response = stub.Create(create_request)
         print(create_response)
 
         # Status
-        status_request = rsyncdatamovement_pb2.RsyncDataMovementStatusRequest(uid=create_response.uid)
+        status_request = datamovement_pb2.DataMovementStatusRequest(uid=create_response.uid)
         status_response = stub.Status(status_request)
         print(status_response)
 
         # Delete
-        delete_request = rsyncdatamovement_pb2.RsyncDataMovementDeleteRequest(uid=create_response.uid)
+        delete_request = datamovement_pb2.DataMovementDeleteRequest(uid=create_response.uid)
         delete_response = stub.Delete(delete_request)
         print(delete_response)

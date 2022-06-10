@@ -58,7 +58,7 @@ func init() {
 }
 
 type defaultServer struct {
-	pb.UnimplementedRsyncDataMoverServer
+	pb.UnimplementedDataMoverServer
 
 	client    client.Client
 	name      string
@@ -116,23 +116,14 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 		return nil, err
 	}
 
-	// TODO: We need to create the NNFDataMovement CR on the associated rabbit namespace
-
 	return &defaultServer{client: client, name: opts.name, namespace: opts.nodeName}, nil
 }
 
-func (s *defaultServer) Create(ctx context.Context, req *pb.RsyncDataMovementCreateRequest) (*pb.RsyncDataMovementCreateResponse, error) {
+func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 
 	userId, groupId, err := auth.GetAuthInfo(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(req.GetInitiator()) == 0 {
-		req.Initiator = s.name
-	}
-	if len(req.GetTarget()) == 0 {
-		req.Target = s.namespace
 	}
 
 Retry:
@@ -143,7 +134,7 @@ Retry:
 	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
-			Namespace: req.GetTarget(),
+			Namespace: s.namespace,
 			Labels: map[string]string{
 				dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          req.Workflow,
 				dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: req.Namespace,
@@ -153,7 +144,7 @@ Retry:
 			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
-			Initiator:   req.GetInitiator(),
+			Initiator:   s.name,
 			Source:      req.GetSource(),
 			Destination: req.GetDestination(),
 			UserId:      userId,
@@ -170,17 +161,17 @@ Retry:
 		return nil, err
 	}
 
-	return &pb.RsyncDataMovementCreateResponse{Uid: name.String()}, nil
+	return &pb.DataMovementCreateResponse{Uid: name.String()}, nil
 }
 
-func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementStatusRequest) (*pb.RsyncDataMovementStatusResponse, error) {
+func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
 
 	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
 		if errors.IsNotFound(err) {
-			return &pb.RsyncDataMovementStatusResponse{
-				State:  pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
-				Status: pb.RsyncDataMovementStatusResponse_NOT_FOUND,
+			return &pb.DataMovementStatusResponse{
+				State:  pb.DataMovementStatusResponse_UNKNOWN_STATE,
+				Status: pb.DataMovementStatusResponse_NOT_FOUND,
 			}, nil
 		}
 
@@ -188,54 +179,54 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.RsyncDataMovementSta
 	}
 
 	if rsync.Status.StartTime.IsZero() {
-		return &pb.RsyncDataMovementStatusResponse{
-			State:  pb.RsyncDataMovementStatusResponse_PENDING,
-			Status: pb.RsyncDataMovementStatusResponse_SUCCESS,
+		return &pb.DataMovementStatusResponse{
+			State:  pb.DataMovementStatusResponse_PENDING,
+			Status: pb.DataMovementStatusResponse_SUCCESS,
 		}, nil
 	}
 
-	stateMap := map[string]pb.RsyncDataMovementStatusResponse_State{
-		"": pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
-		nnfv1alpha1.DataMovementConditionTypeStarting: pb.RsyncDataMovementStatusResponse_STARTING,
-		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.RsyncDataMovementStatusResponse_RUNNING,
-		nnfv1alpha1.DataMovementConditionTypeFinished: pb.RsyncDataMovementStatusResponse_COMPLETED,
+	stateMap := map[string]pb.DataMovementStatusResponse_State{
+		"": pb.DataMovementStatusResponse_UNKNOWN_STATE,
+		nnfv1alpha1.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
+		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
+		nnfv1alpha1.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
 	}
 
 	state, ok := stateMap[rsync.Status.State]
 	if !ok {
-		return &pb.RsyncDataMovementStatusResponse{
-				State:   pb.RsyncDataMovementStatusResponse_UNKNOWN_STATE,
-				Status:  pb.RsyncDataMovementStatusResponse_FAILED,
+		return &pb.DataMovementStatusResponse{
+				State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
+				Status:  pb.DataMovementStatusResponse_FAILED,
 				Message: fmt.Sprintf("State %s unknown", rsync.Status.State)},
 			fmt.Errorf("failed to decode returned state")
 	}
 
-	statusMap := map[string]pb.RsyncDataMovementStatusResponse_Status{
-		"": pb.RsyncDataMovementStatusResponse_UNKNOWN_STATUS,
-		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.RsyncDataMovementStatusResponse_FAILED,
-		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.RsyncDataMovementStatusResponse_SUCCESS,
-		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.RsyncDataMovementStatusResponse_INVALID,
+	statusMap := map[string]pb.DataMovementStatusResponse_Status{
+		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
+		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.DataMovementStatusResponse_FAILED,
+		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.DataMovementStatusResponse_INVALID,
 	}
 
 	status, ok := statusMap[rsync.Status.Status]
 	if !ok {
-		return &pb.RsyncDataMovementStatusResponse{
+		return &pb.DataMovementStatusResponse{
 				State:   state,
-				Status:  pb.RsyncDataMovementStatusResponse_UNKNOWN_STATUS,
+				Status:  pb.DataMovementStatusResponse_UNKNOWN_STATUS,
 				Message: fmt.Sprintf("Status %s unknown", rsync.Status.Status)},
 			fmt.Errorf("failed to decode returned status")
 	}
 
-	return &pb.RsyncDataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
+	return &pb.DataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
 }
 
-func (s *defaultServer) Delete(ctx context.Context, req *pb.RsyncDataMovementDeleteRequest) (*pb.RsyncDataMovementDeleteResponse, error) {
+func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {
 
 	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
 		if errors.IsNotFound(err) {
-			return &pb.RsyncDataMovementDeleteResponse{
-				Status: pb.RsyncDataMovementDeleteResponse_NOT_FOUND,
+			return &pb.DataMovementDeleteResponse{
+				Status: pb.DataMovementDeleteResponse_NOT_FOUND,
 			}, nil
 		}
 
@@ -243,22 +234,22 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.RsyncDataMovementDel
 	}
 
 	if rsync.Status.State != nnfv1alpha1.DataMovementConditionTypeFinished {
-		return &pb.RsyncDataMovementDeleteResponse{
-			Status: pb.RsyncDataMovementDeleteResponse_ACTIVE,
+		return &pb.DataMovementDeleteResponse{
+			Status: pb.DataMovementDeleteResponse_ACTIVE,
 		}, nil
 	}
 
 	if err := s.client.Delete(ctx, rsync); err != nil {
 		if errors.IsNotFound(err) {
-			return &pb.RsyncDataMovementDeleteResponse{
-				Status: pb.RsyncDataMovementDeleteResponse_NOT_FOUND,
+			return &pb.DataMovementDeleteResponse{
+				Status: pb.DataMovementDeleteResponse_NOT_FOUND,
 			}, nil
 		}
 
 		return nil, err
 	}
 
-	return &pb.RsyncDataMovementDeleteResponse{
-		Status: pb.RsyncDataMovementDeleteResponse_DELETED,
+	return &pb.DataMovementDeleteResponse{
+		Status: pb.DataMovementDeleteResponse_DELETED,
 	}, nil
 }

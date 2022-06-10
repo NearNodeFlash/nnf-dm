@@ -94,7 +94,7 @@ func (service *Service) Manage() (string, error) {
 	}
 
 	grpcServer := grpc.NewServer(grpc.Creds(&auth.ServerAuthCredentials{}))
-	pb.RegisterRsyncDataMoverServer(grpcServer, server)
+	pb.RegisterDataMoverServer(grpcServer, server)
 
 	go service.Run(grpcServer, listener)
 

@@ -14,84 +14,87 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17rsyncdatamovement.proto\x12\x0c\x64\x61tamovement\"\x9d\x01\n\x1eRsyncDataMovementCreateRequest\x12\x11\n\tinitiator\x18\x01 \x01(\t\x12\x0e\n\x06target\x18\x02 \x01(\t\x12\x10\n\x08workflow\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x0e\n\x06source\x18\x05 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x06 \x01(\t\x12\x0e\n\x06\x64ryrun\x18\x07 \x01(\x08\".\n\x1fRsyncDataMovementCreateResponse\x12\x0b\n\x03uid\x18\x01 \x01(\t\"-\n\x1eRsyncDataMovementStatusRequest\x12\x0b\n\x03uid\x18\x01 \x01(\t\"\xe2\x02\n\x1fRsyncDataMovementStatusResponse\x12\x42\n\x05state\x18\x01 \x01(\x0e\x32\x33.datamovement.RsyncDataMovementStatusResponse.State\x12\x44\n\x06status\x18\x02 \x01(\x0e\x32\x34.datamovement.RsyncDataMovementStatusResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\"Q\n\x05State\x12\x0b\n\x07PENDING\x10\x00\x12\x0c\n\x08STARTING\x10\x01\x12\x0b\n\x07RUNNING\x10\x02\x12\r\n\tCOMPLETED\x10\x03\x12\x11\n\rUNKNOWN_STATE\x10\x04\"Q\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\x12\n\x0eUNKNOWN_STATUS\x10\x04\"-\n\x1eRsyncDataMovementDeleteRequest\x12\x0b\n\x03uid\x18\x01 \x01(\t\"\xb3\x01\n\x1fRsyncDataMovementDeleteResponse\x12\x44\n\x06status\x18\x01 \x01(\x0e\x32\x34.datamovement.RsyncDataMovementDeleteResponse.Status\"J\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07\x44\x45LETED\x10\x02\x12\n\n\x06\x41\x43TIVE\x10\x03\x12\x0b\n\x07UNKNOWN\x10\x04\x32\xcb\x02\n\x0eRsyncDataMover\x12g\n\x06\x43reate\x12,.datamovement.RsyncDataMovementCreateRequest\x1a-.datamovement.RsyncDataMovementCreateResponse\"\x00\x12g\n\x06Status\x12,.datamovement.RsyncDataMovementStatusRequest\x1a-.datamovement.RsyncDataMovementStatusResponse\"\x00\x12g\n\x06\x44\x65lete\x12,.datamovement.RsyncDataMovementDeleteRequest\x1a-.datamovement.RsyncDataMovementDeleteResponse\"\x00\x42W\n\x1d\x63om.hpe.cray.nnf.datamovementB\x11\x44\x61taMovementProtoP\x01Z!nnf.cray.hpe.com/datamovement/apib\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17rsyncdatamovement.proto\x12\x0c\x64\x61tamovement\"u\n\x19\x44\x61taMovementCreateRequest\x12\x10\n\x08workflow\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x0e\n\x06source\x18\x05 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x06 \x01(\t\x12\x0e\n\x06\x64ryrun\x18\x07 \x01(\x08\"\x9e\x01\n\x1a\x44\x61taMovementCreateResponse\x12\x0b\n\x03uid\x18\x01 \x01(\t\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementCreateResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\"!\n\x06Status\x12\x0b\n\x07\x43REATED\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\"9\n\x19\x44\x61taMovementStatusRequest\x12\x0b\n\x03uid\x18\x01 \x01(\t\x12\x0f\n\x07timeout\x18\x02 \x01(\x03\"\xd3\x02\n\x1a\x44\x61taMovementStatusResponse\x12=\n\x05state\x18\x01 \x01(\x0e\x32..datamovement.DataMovementStatusResponse.State\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementStatusResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\"Q\n\x05State\x12\x0b\n\x07PENDING\x10\x00\x12\x0c\n\x08STARTING\x10\x01\x12\x0b\n\x07RUNNING\x10\x02\x12\r\n\tCOMPLETED\x10\x03\x12\x11\n\rUNKNOWN_STATE\x10\x04\"Q\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\x12\n\x0eUNKNOWN_STATUS\x10\x04\"(\n\x19\x44\x61taMovementDeleteRequest\x12\x0b\n\x03uid\x18\x01 \x01(\t\"\xa9\x01\n\x1a\x44\x61taMovementDeleteResponse\x12?\n\x06status\x18\x01 \x01(\x0e\x32/.datamovement.DataMovementDeleteResponse.Status\"J\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07\x44\x45LETED\x10\x02\x12\n\n\x06\x41\x43TIVE\x10\x03\x12\x0b\n\x07UNKNOWN\x10\x04\x32\xa8\x02\n\tDataMover\x12]\n\x06\x43reate\x12\'.datamovement.DataMovementCreateRequest\x1a(.datamovement.DataMovementCreateResponse\"\x00\x12]\n\x06Status\x12\'.datamovement.DataMovementStatusRequest\x1a(.datamovement.DataMovementStatusResponse\"\x00\x12]\n\x06\x44\x65lete\x12\'.datamovement.DataMovementDeleteRequest\x1a(.datamovement.DataMovementDeleteResponse\"\x00\x42W\n\x1d\x63om.hpe.cray.nnf.datamovementB\x11\x44\x61taMovementProtoP\x01Z!nnf.cray.hpe.com/datamovement/apib\x06proto3')
 
 
 
-_RSYNCDATAMOVEMENTCREATEREQUEST = DESCRIPTOR.message_types_by_name['RsyncDataMovementCreateRequest']
-_RSYNCDATAMOVEMENTCREATERESPONSE = DESCRIPTOR.message_types_by_name['RsyncDataMovementCreateResponse']
-_RSYNCDATAMOVEMENTSTATUSREQUEST = DESCRIPTOR.message_types_by_name['RsyncDataMovementStatusRequest']
-_RSYNCDATAMOVEMENTSTATUSRESPONSE = DESCRIPTOR.message_types_by_name['RsyncDataMovementStatusResponse']
-_RSYNCDATAMOVEMENTDELETEREQUEST = DESCRIPTOR.message_types_by_name['RsyncDataMovementDeleteRequest']
-_RSYNCDATAMOVEMENTDELETERESPONSE = DESCRIPTOR.message_types_by_name['RsyncDataMovementDeleteResponse']
-_RSYNCDATAMOVEMENTSTATUSRESPONSE_STATE = _RSYNCDATAMOVEMENTSTATUSRESPONSE.enum_types_by_name['State']
-_RSYNCDATAMOVEMENTSTATUSRESPONSE_STATUS = _RSYNCDATAMOVEMENTSTATUSRESPONSE.enum_types_by_name['Status']
-_RSYNCDATAMOVEMENTDELETERESPONSE_STATUS = _RSYNCDATAMOVEMENTDELETERESPONSE.enum_types_by_name['Status']
-RsyncDataMovementCreateRequest = _reflection.GeneratedProtocolMessageType('RsyncDataMovementCreateRequest', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTCREATEREQUEST,
+_DATAMOVEMENTCREATEREQUEST = DESCRIPTOR.message_types_by_name['DataMovementCreateRequest']
+_DATAMOVEMENTCREATERESPONSE = DESCRIPTOR.message_types_by_name['DataMovementCreateResponse']
+_DATAMOVEMENTSTATUSREQUEST = DESCRIPTOR.message_types_by_name['DataMovementStatusRequest']
+_DATAMOVEMENTSTATUSRESPONSE = DESCRIPTOR.message_types_by_name['DataMovementStatusResponse']
+_DATAMOVEMENTDELETEREQUEST = DESCRIPTOR.message_types_by_name['DataMovementDeleteRequest']
+_DATAMOVEMENTDELETERESPONSE = DESCRIPTOR.message_types_by_name['DataMovementDeleteResponse']
+_DATAMOVEMENTCREATERESPONSE_STATUS = _DATAMOVEMENTCREATERESPONSE.enum_types_by_name['Status']
+_DATAMOVEMENTSTATUSRESPONSE_STATE = _DATAMOVEMENTSTATUSRESPONSE.enum_types_by_name['State']
+_DATAMOVEMENTSTATUSRESPONSE_STATUS = _DATAMOVEMENTSTATUSRESPONSE.enum_types_by_name['Status']
+_DATAMOVEMENTDELETERESPONSE_STATUS = _DATAMOVEMENTDELETERESPONSE.enum_types_by_name['Status']
+DataMovementCreateRequest = _reflection.GeneratedProtocolMessageType('DataMovementCreateRequest', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTCREATEREQUEST,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementCreateRequest)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementCreateRequest)
   })
-_sym_db.RegisterMessage(RsyncDataMovementCreateRequest)
+_sym_db.RegisterMessage(DataMovementCreateRequest)
 
-RsyncDataMovementCreateResponse = _reflection.GeneratedProtocolMessageType('RsyncDataMovementCreateResponse', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTCREATERESPONSE,
+DataMovementCreateResponse = _reflection.GeneratedProtocolMessageType('DataMovementCreateResponse', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTCREATERESPONSE,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementCreateResponse)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementCreateResponse)
   })
-_sym_db.RegisterMessage(RsyncDataMovementCreateResponse)
+_sym_db.RegisterMessage(DataMovementCreateResponse)
 
-RsyncDataMovementStatusRequest = _reflection.GeneratedProtocolMessageType('RsyncDataMovementStatusRequest', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTSTATUSREQUEST,
+DataMovementStatusRequest = _reflection.GeneratedProtocolMessageType('DataMovementStatusRequest', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTSTATUSREQUEST,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementStatusRequest)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementStatusRequest)
   })
-_sym_db.RegisterMessage(RsyncDataMovementStatusRequest)
+_sym_db.RegisterMessage(DataMovementStatusRequest)
 
-RsyncDataMovementStatusResponse = _reflection.GeneratedProtocolMessageType('RsyncDataMovementStatusResponse', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTSTATUSRESPONSE,
+DataMovementStatusResponse = _reflection.GeneratedProtocolMessageType('DataMovementStatusResponse', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTSTATUSRESPONSE,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementStatusResponse)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementStatusResponse)
   })
-_sym_db.RegisterMessage(RsyncDataMovementStatusResponse)
+_sym_db.RegisterMessage(DataMovementStatusResponse)
 
-RsyncDataMovementDeleteRequest = _reflection.GeneratedProtocolMessageType('RsyncDataMovementDeleteRequest', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTDELETEREQUEST,
+DataMovementDeleteRequest = _reflection.GeneratedProtocolMessageType('DataMovementDeleteRequest', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTDELETEREQUEST,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementDeleteRequest)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementDeleteRequest)
   })
-_sym_db.RegisterMessage(RsyncDataMovementDeleteRequest)
+_sym_db.RegisterMessage(DataMovementDeleteRequest)
 
-RsyncDataMovementDeleteResponse = _reflection.GeneratedProtocolMessageType('RsyncDataMovementDeleteResponse', (_message.Message,), {
-  'DESCRIPTOR' : _RSYNCDATAMOVEMENTDELETERESPONSE,
+DataMovementDeleteResponse = _reflection.GeneratedProtocolMessageType('DataMovementDeleteResponse', (_message.Message,), {
+  'DESCRIPTOR' : _DATAMOVEMENTDELETERESPONSE,
   '__module__' : 'rsyncdatamovement_pb2'
-  # @@protoc_insertion_point(class_scope:datamovement.RsyncDataMovementDeleteResponse)
+  # @@protoc_insertion_point(class_scope:datamovement.DataMovementDeleteResponse)
   })
-_sym_db.RegisterMessage(RsyncDataMovementDeleteResponse)
+_sym_db.RegisterMessage(DataMovementDeleteResponse)
 
-_RSYNCDATAMOVER = DESCRIPTOR.services_by_name['RsyncDataMover']
+_DATAMOVER = DESCRIPTOR.services_by_name['DataMover']
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   DESCRIPTOR._serialized_options = b'\n\035com.hpe.cray.nnf.datamovementB\021DataMovementProtoP\001Z!nnf.cray.hpe.com/datamovement/api'
-  _RSYNCDATAMOVEMENTCREATEREQUEST._serialized_start=42
-  _RSYNCDATAMOVEMENTCREATEREQUEST._serialized_end=199
-  _RSYNCDATAMOVEMENTCREATERESPONSE._serialized_start=201
-  _RSYNCDATAMOVEMENTCREATERESPONSE._serialized_end=247
-  _RSYNCDATAMOVEMENTSTATUSREQUEST._serialized_start=249
-  _RSYNCDATAMOVEMENTSTATUSREQUEST._serialized_end=294
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE._serialized_start=297
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE._serialized_end=651
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE_STATE._serialized_start=487
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE_STATE._serialized_end=568
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_start=570
-  _RSYNCDATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_end=651
-  _RSYNCDATAMOVEMENTDELETEREQUEST._serialized_start=653
-  _RSYNCDATAMOVEMENTDELETEREQUEST._serialized_end=698
-  _RSYNCDATAMOVEMENTDELETERESPONSE._serialized_start=701
-  _RSYNCDATAMOVEMENTDELETERESPONSE._serialized_end=880
-  _RSYNCDATAMOVEMENTDELETERESPONSE_STATUS._serialized_start=806
-  _RSYNCDATAMOVEMENTDELETERESPONSE_STATUS._serialized_end=880
-  _RSYNCDATAMOVER._serialized_start=883
-  _RSYNCDATAMOVER._serialized_end=1214
+  _DATAMOVEMENTCREATEREQUEST._serialized_start=41
+  _DATAMOVEMENTCREATEREQUEST._serialized_end=158
+  _DATAMOVEMENTCREATERESPONSE._serialized_start=161
+  _DATAMOVEMENTCREATERESPONSE._serialized_end=319
+  _DATAMOVEMENTCREATERESPONSE_STATUS._serialized_start=286
+  _DATAMOVEMENTCREATERESPONSE_STATUS._serialized_end=319
+  _DATAMOVEMENTSTATUSREQUEST._serialized_start=321
+  _DATAMOVEMENTSTATUSREQUEST._serialized_end=378
+  _DATAMOVEMENTSTATUSRESPONSE._serialized_start=381
+  _DATAMOVEMENTSTATUSRESPONSE._serialized_end=720
+  _DATAMOVEMENTSTATUSRESPONSE_STATE._serialized_start=556
+  _DATAMOVEMENTSTATUSRESPONSE_STATE._serialized_end=637
+  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_start=639
+  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_end=720
+  _DATAMOVEMENTDELETEREQUEST._serialized_start=722
+  _DATAMOVEMENTDELETEREQUEST._serialized_end=762
+  _DATAMOVEMENTDELETERESPONSE._serialized_start=765
+  _DATAMOVEMENTDELETERESPONSE._serialized_end=934
+  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_start=860
+  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_end=934
+  _DATAMOVER._serialized_start=937
+  _DATAMOVER._serialized_end=1233
 # @@protoc_insertion_point(module_scope)
