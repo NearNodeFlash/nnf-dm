@@ -134,7 +134,7 @@ func main() {
 		return daemon.SystemDaemon
 	}
 
-	d, err := daemon.New(name, description, kindFn())
+	d, err := daemon.New(name, description, kindFn(), "network-online.target")
 	if err != nil {
 		errlog.Println("Error: ", err)
 		os.Exit(1)
