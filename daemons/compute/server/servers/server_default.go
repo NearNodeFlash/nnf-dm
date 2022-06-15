@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"strings"
 
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
@@ -52,7 +54,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
+	utilruntime.Must(dwsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -126,6 +128,14 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		return nil, err
 	}
 
+	source, err := s.findRabbitRelativeSource(ctx, req)
+	if err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
+	}
+
 Retry:
 	// Create an ID - We could optionally perform a Get here and ensure that the UUID is not present, but the
 	// chances of a random UUID colliding on a single NNF Node is close to zero.
@@ -145,7 +155,7 @@ Retry:
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 			Initiator:   s.name,
-			Source:      req.GetSource(),
+			Source:      source,
 			Destination: req.GetDestination(),
 			UserId:      userId,
 			GroupId:     groupId,
@@ -158,10 +168,16 @@ Retry:
 			goto Retry
 		}
 
-		return nil, err
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
 	}
 
-	return &pb.DataMovementCreateResponse{Uid: name.String()}, nil
+	return &pb.DataMovementCreateResponse{
+		Uid:    name.String(),
+		Status: pb.DataMovementCreateResponse_CREATED,
+	}, nil
 }
 
 func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
@@ -252,4 +268,79 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 	return &pb.DataMovementDeleteResponse{
 		Status: pb.DataMovementDeleteResponse_DELETED,
 	}, nil
+}
+
+func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, req *pb.DataMovementCreateRequest) (string, error) {
+
+	computeMountInfo, err := s.findComputeMountInfo(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
+	// to this value resulting in the full path on the Rabbit.
+
+	listOptions := []client.ListOption{
+		client.InNamespace(s.namespace),
+		client.MatchingLabels(map[string]string{
+			dwsv1alpha1.WorkflowNameLabel:      req.Workflow,
+			dwsv1alpha1.WorkflowNamespaceLabel: req.Namespace,
+		}),
+	}
+
+	clientMounts := &dwsv1alpha1.ClientMountList{}
+	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
+		return "", err
+	}
+
+	if len(clientMounts.Items) == 0 {
+		return "", fmt.Errorf("No client mounts found on node '%s'", s.namespace)
+	}
+
+	for _, clientMount := range clientMounts.Items {
+		for _, mount := range clientMount.Spec.Mounts {
+			if *computeMountInfo.Device.DeviceReference == *mount.Device.DeviceReference {
+				return mount.MountPath + strings.TrimPrefix(req.Source, computeMountInfo.MountPath), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("Initiator '%s' not found in list of client mounts residing on '%s'", s.name, s.namespace)
+}
+
+// Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
+// prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
+// are left with the relative path.
+func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha1.ClientMountInfo, error) {
+
+	listOptions := []client.ListOption{
+		client.InNamespace(s.name),
+		client.MatchingLabels(map[string]string{
+			dwsv1alpha1.WorkflowNameLabel:      req.Workflow,
+			dwsv1alpha1.WorkflowNamespaceLabel: req.Namespace,
+		}),
+	}
+
+	clientMounts := &dwsv1alpha1.ClientMountList{}
+	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
+		return nil, err
+	}
+
+	if len(clientMounts.Items) == 0 {
+		return nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
+	}
+
+	for _, clientMount := range clientMounts.Items {
+		for _, mount := range clientMount.Spec.Mounts {
+			if strings.HasPrefix(req.GetSource(), mount.MountPath) {
+				if mount.Device.DeviceReference == nil {
+					return nil, fmt.Errorf("Source path '%s' does not have device reference", req.GetSource())
+				}
+
+				return &mount, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
 }

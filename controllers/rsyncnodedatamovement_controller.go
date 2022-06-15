@@ -106,15 +106,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	arguments := []string{}
-	if rsyncNode.Spec.DryRun {
-		arguments = append(arguments, "--dry-run")
-	}
-
-	// Find the source path for this request. This could be a translation from the compute-local
-	// path (if initiator is a compute node); otherwise it is the rabbit-local path.
-	source, err := r.getSourcePath(ctx, rsyncNode)
-	if err != nil {
+	if err := r.verifySourcePath(rsyncNode); err != nil {
 		rsyncNode.Status.EndTime = metav1.Now()
 		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
@@ -126,6 +118,12 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
+	arguments := []string{}
+	if rsyncNode.Spec.DryRun {
+		arguments = append(arguments, "--dry-run")
+	}
+
+	source := rsyncNode.Spec.Source
 	destination := rsyncNode.Spec.Destination
 	log.Info("Executing rsync command", "source", source, "destination", destination)
 
@@ -176,73 +174,29 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{}, nil
 }
 
-// Return the source path given the rsync node data movement request. This takes a compute-local path (the initiator) and returns
-// the rabbit-relative path. If no initiator is provided then the source path is assumed to already be local to the rabbit.
-func (r *RsyncNodeDataMovementReconciler) getSourcePath(ctx context.Context, rsync *dmv1alpha1.RsyncNodeDataMovement) (string, error) {
-	if len(rsync.Spec.Initiator) == 0 {
-		return rsync.Spec.Source, nil
+func (r *RsyncNodeDataMovementReconciler) verifySourcePath(ctx context.Context, rsyncNode *dmv1alpha1.RsyncNodeDataMovement) error {
+	listOptions := []client.ListOption{
+		client.InNamespace(rsyncNode.GetNamespace()),
+		client.MatchingLabels(map[string]string{
+			dwsv1alpha1.WorkflowNameLabel: rsyncNode.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
+			dwsv1alpha1.WorkflowNamespaceLabel: rsyncNode.Labels[dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement],
+		}),
 	}
-
-	// Look up the client mounts on the initiator to find the compute relative mount path. The "spec.Source" must be
-	// prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
-	// are left with the relative path.
 
 	clientMounts := &dwsv1alpha1.ClientMountList{}
-	listOptions := []client.ListOption{
-		client.InNamespace(rsync.Spec.Initiator),
-		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel:      rsync.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
-			dwsv1alpha1.WorkflowNamespaceLabel: rsync.Labels[dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement],
-		}),
-	}
-
 	if err := r.List(ctx, clientMounts, listOptions...); err != nil {
-		return "", err
-	}
-
-	computeMountInfo := dwsv1alpha1.ClientMountInfo{}
-
-	for _, clientMount := range clientMounts.Items {
-		for _, mount := range clientMount.Spec.Mounts {
-			if strings.HasPrefix(rsync.Spec.Source, mount.MountPath) {
-				if mount.Device.DeviceReference == nil {
-					return "", fmt.Errorf("Source '%s' does not have NnfNodeStorage reference in client mount", rsync.Spec.Source)
-				}
-
-				computeMountInfo = mount
-				break
-			}
-		}
-	}
-
-	if computeMountInfo == (dwsv1alpha1.ClientMountInfo{}) {
-		return "", fmt.Errorf("Source '%s' not found in list of client mounts", rsync.Spec.Source)
-	}
-
-	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
-	// to this value resulting in the full path on the Rabbit.
-
-	listOptions = []client.ListOption{
-		client.InNamespace(rsync.GetNamespace()),
-		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel:      rsync.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
-			dwsv1alpha1.WorkflowNamespaceLabel: rsync.Labels[dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement],
-		}),
-	}
-
-	if err := r.List(ctx, clientMounts, listOptions...); err != nil {
-		return "", err
+		return err
 	}
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
-			if *computeMountInfo.Device.DeviceReference == *mount.Device.DeviceReference {
-				return mount.MountPath + strings.TrimPrefix(rsync.Spec.Source, computeMountInfo.MountPath), nil
+			if strings.HasPrefix(rsyncNode.Spec.Source, mount.MountPath) {
+				return nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("Initiator '%s' not found in list of client mounts", rsync.Spec.Initiator)
+	return fmt.Errorf("Source path '%s' not found in list of client mounts", rsyncNode.Spec.Source)
 }
 
 func (r *RsyncNodeDataMovementReconciler) recordCompletion(rsyncNode dmv1alpha1.RsyncNodeDataMovement) {

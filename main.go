@@ -33,7 +33,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -93,9 +92,8 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "a60dd315.cray.hpe.com",
+		Namespace:              dmCtrl.GetNamespace(),
 	}
-
-	dmCtrl.SetNamespaces(&options)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
@@ -129,7 +127,6 @@ func main() {
 type dataMovementControllerInterface interface {
 	GetType() string
 	GetNamespace() string
-	SetNamespaces(*ctrl.Options)
 	SetupReconcilers(manager.Manager) error
 }
 
@@ -156,22 +153,6 @@ type nodeLocalController struct{}
 func (*nodeLocalController) GetType() string      { return NodeLocalController }
 func (*nodeLocalController) GetNamespace() string { return os.Getenv("NNF_NODE_NAME") }
 
-func (*nodeLocalController) SetNamespaces(options *ctrl.Options) {
-	switch os.Getenv("NNF_NODE_NAME") {
-	case "rabbit-node-0":
-		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-0", "compute-node-1"})
-		return
-	case "rabbit-node-1":
-		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-2", "compute-node-3"})
-		return
-	case "rabbit-node-2":
-		options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME"), "compute-node-4", "compute-node-5"})
-		return
-	}
-
-	options.NewCache = cache.MultiNamespacedCacheBuilder([]string{os.Getenv("NNF_NODE_NAME")})
-}
-
 func (*nodeLocalController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.RsyncNodeDataMovementReconciler{
 		Client: mgr.GetClient(),
@@ -188,10 +169,6 @@ type systemController struct{}
 
 func (*systemController) GetType() string      { return SystemController }
 func (*systemController) GetNamespace() string { return "" }
-
-func (*systemController) SetNamespaces(options *ctrl.Options) {
-
-}
 
 func (*systemController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{
