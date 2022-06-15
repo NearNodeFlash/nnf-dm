@@ -178,7 +178,7 @@ func (r *RsyncNodeDataMovementReconciler) verifySourcePath(ctx context.Context, 
 	listOptions := []client.ListOption{
 		client.InNamespace(rsyncNode.GetNamespace()),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel: rsyncNode.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
+			dwsv1alpha1.WorkflowNameLabel:      rsyncNode.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
 			dwsv1alpha1.WorkflowNamespaceLabel: rsyncNode.Labels[dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement],
 		}),
 	}

@@ -394,7 +394,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 	}
 
 	command = append(command, "dcp", sourcePath, destinationPath)
-	
+
 	if cmd, found := config.Data[configCommand]; found {
 		if strings.HasPrefix(cmd, "/bin/bash -c") {
 			command = []string{"/bin/bash", "-c", strings.TrimPrefix(cmd, "/bin/bash -c")}

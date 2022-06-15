@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
@@ -39,6 +40,7 @@ import (
 var _ = Describe("Rsync Node Data Movement Controller", func() {
 
 	var rsync *dmv1alpha1.RsyncNodeDataMovement = nil
+	var clientMount *dwsv1alpha1.ClientMount = nil
 
 	BeforeEach(func() {
 		rsync = &dmv1alpha1.RsyncNodeDataMovement{
@@ -70,6 +72,45 @@ var _ = Describe("Rsync Node Data Movement Controller", func() {
 	})
 
 	BeforeEach(func() {
+		clientMount = &dwsv1alpha1.ClientMount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rsync-node-client-mount-test",
+				Namespace: corev1.NamespaceDefault,
+				Labels: map[string]string{
+					dwsv1alpha1.WorkflowNameLabel:      "",
+					dwsv1alpha1.WorkflowNamespaceLabel: "",
+				},
+			},
+			Spec: dwsv1alpha1.ClientMountSpec{
+				DesiredState: dwsv1alpha1.ClientMountStateMounted,
+				Mounts: []dwsv1alpha1.ClientMountInfo{
+					{
+						TargetType: "directory",
+						Type:       "none",
+						MountPath:  "",
+						Device: dwsv1alpha1.ClientMountDevice{
+							Type: "reference",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(context.TODO(), clientMount)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		Eventually(func() error {
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(clientMount), clientMount)).To(Succeed())
+			return k8sClient.Delete(context.TODO(), clientMount)
+		}).Should(Succeed())
+
+		Eventually(func() error {
+			return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(clientMount), clientMount)
+		}).ShouldNot(Succeed())
+	})
+
+	BeforeEach(func() {
 		_, err := os.Create("file.in")
 		Expect(err).To(BeNil())
 
@@ -95,7 +136,7 @@ var _ = Describe("Rsync Node Data Movement Controller", func() {
 		Expect(os.RemoveAll("directory.out")).To(Succeed())
 	})
 
-	PDescribeTable("Test various copy operations", func(source string, destination string, file bool) {
+	DescribeTable("Test various copy operations", func(source string, destination string, file bool) {
 		rsync.Spec.Source = source
 		rsync.Spec.Destination = destination
 

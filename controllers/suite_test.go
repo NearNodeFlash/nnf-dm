@@ -45,6 +45,8 @@ import (
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	_ "github.com/HewlettPackard/dws/config/crd/bases"
+
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -83,6 +85,7 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "lustre-fs-operator", "config", "crd", "bases"),
 			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "nnf-sos", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "HewlettPackard", "dws", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "bases"),
 			filepath.Join("..", "config", "mpi")},
 		ErrorIfCRDPathMissing: true,
