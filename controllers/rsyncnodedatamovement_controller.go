@@ -106,7 +106,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	if err := r.verifySourcePath(rsyncNode); err != nil {
+	if err := r.verifySourcePath(ctx, rsyncNode); err != nil {
 		rsyncNode.Status.EndTime = metav1.Now()
 		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
