@@ -95,7 +95,7 @@ var _ = Describe("Rsync Node Data Movement Controller", func() {
 		Expect(os.RemoveAll("directory.out")).To(Succeed())
 	})
 
-	DescribeTable("Test various copy operations", func(source string, destination string, file bool) {
+	PDescribeTable("Test various copy operations", func(source string, destination string, file bool) {
 		rsync.Spec.Source = source
 		rsync.Spec.Destination = destination
 
