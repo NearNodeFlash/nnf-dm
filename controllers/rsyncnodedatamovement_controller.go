@@ -106,18 +106,6 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	if err := r.verifySourcePath(ctx, rsyncNode); err != nil {
-		rsyncNode.Status.EndTime = metav1.Now()
-		rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-		rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
-		rsyncNode.Status.Message = err.Error()
-		if err := r.Status().Update(ctx, rsyncNode); err != nil {
-			log.Error(err, "failed to set rsync node as invalid")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-
 	arguments := []string{}
 	if rsyncNode.Spec.DryRun {
 		arguments = append(arguments, "--dry-run")
