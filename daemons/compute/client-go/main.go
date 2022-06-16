@@ -33,7 +33,6 @@ import (
 
 func main() {
 
-
 	workflow := flag.String("workflow", os.Getenv("DW_WORKFLOW_NAME"), "parent workflow name")
 	namespace := flag.String("namespace", os.Getenv("DW_WORKFLOW_NAMESPACE"), "parent workflow namespace")
 	source := flag.String("source", "", "source file or directory")
