@@ -21,10 +21,8 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -35,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
@@ -160,31 +157,6 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *RsyncNodeDataMovementReconciler) verifySourcePath(ctx context.Context, rsyncNode *dmv1alpha1.RsyncNodeDataMovement) error {
-	listOptions := []client.ListOption{
-		client.InNamespace(rsyncNode.GetNamespace()),
-		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel: rsyncNode.Labels[dmv1alpha1.OwnerLabelRsyncNodeDataMovement],
-			dwsv1alpha1.WorkflowNamespaceLabel: rsyncNode.Labels[dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement],
-		}),
-	}
-
-	clientMounts := &dwsv1alpha1.ClientMountList{}
-	if err := r.List(ctx, clientMounts, listOptions...); err != nil {
-		return err
-	}
-
-	for _, clientMount := range clientMounts.Items {
-		for _, mount := range clientMount.Spec.Mounts {
-			if strings.HasPrefix(rsyncNode.Spec.Source, mount.MountPath) {
-				return nil
-			}
-		}
-	}
-
-	return fmt.Errorf("Source path '%s' not found in list of client mounts", rsyncNode.Spec.Source)
 }
 
 func (r *RsyncNodeDataMovementReconciler) recordCompletion(rsyncNode dmv1alpha1.RsyncNodeDataMovement) {
