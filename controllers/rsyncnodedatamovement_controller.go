@@ -112,7 +112,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	destination := rsyncNode.Spec.Destination
 	log.Info("Executing rsync command", "source", source, "destination", destination)
 
-	arguments = append(arguments, "--recursive")
+	arguments = append(arguments, "--archive")
 	arguments = append(arguments, source)
 	arguments = append(arguments, destination)
 
