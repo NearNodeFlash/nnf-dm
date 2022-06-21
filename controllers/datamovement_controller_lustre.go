@@ -480,10 +480,6 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 								MountPath: destinationMount,
 							},
 						},
-						SecurityContext: &corev1.SecurityContext{
-							RunAsUser:  &userId,
-							RunAsGroup: &groupId,
-						},
 					},
 				},
 				Volumes: []corev1.Volume{
