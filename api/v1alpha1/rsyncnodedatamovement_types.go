@@ -24,14 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	OwnerLabelRsyncNodeDataMovement          = "dm.cray.hpe.com/owner"
-	OwnerNamespaceLabelRsyncNodeDataMovement = "dm.cray.hpe.com/owner.namespace"
-)
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // RsyncNodeDataMovementSpec defines the desired state of RsyncNodeDataMovement
 type RsyncNodeDataMovementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster

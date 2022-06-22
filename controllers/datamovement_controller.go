@@ -103,7 +103,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Teardown", "Result", result, "Error", err)
 		if err != nil {
 			return ctrl.Result{}, err
-		} else if !result.IsZero() {
+		} else if result != nil {
 			return *result, nil
 		}
 
