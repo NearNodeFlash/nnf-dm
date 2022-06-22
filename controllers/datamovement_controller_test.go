@@ -372,7 +372,7 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(pv.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
 
 						Expect(*pv.Spec.CSI).To(MatchFields(IgnoreExtras, Fields{
-							"Driver":       Equal("lustre-csi.nnf.cray.hpe.com"),
+							"Driver":       Equal("lustre-csi.hpe.com"),
 							"FSType":       Equal("lustre"),
 							"VolumeHandle": Equal(storage.Status.MgsNode),
 						}))
