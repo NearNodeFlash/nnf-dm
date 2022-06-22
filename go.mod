@@ -6,7 +6,7 @@ go 1.16
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20220516154556-7138ec9b96ba
+	github.com/HewlettPackard/dws v0.0.0-20220621142357-8e32b62eca41
 	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220516192757-17ac28565db5
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220517205036-02c092067a4c
 	github.com/NearNodeFlash/nnf-sos v0.0.0-20220518142843-c31693162047

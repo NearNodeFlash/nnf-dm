@@ -21,6 +21,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -104,6 +105,16 @@ type RsyncNodeDataMovementList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RsyncNodeDataMovement `json:"items"`
+}
+
+func (r *RsyncNodeDataMovementList) GetObjectList() []client.Object {
+	objectList := []client.Object{}
+
+	for i := range r.Items {
+		objectList = append(objectList, &r.Items[i])
+	}
+
+	return objectList
 }
 
 func init() {

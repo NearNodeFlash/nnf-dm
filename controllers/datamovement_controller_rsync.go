@@ -30,10 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -158,15 +157,6 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-%d", dm.Name, i),
 					Namespace: node.Name,
-					Labels: map[string]string{
-						dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          dm.Name,
-						dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: dm.Namespace,
-					},
-					Annotations: map[string]string{
-						// Annotation is used to watch Rsync Nodes and reconcile the Data Movement resource
-						// when they change. This is namespace scoped.
-						dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name + "/" + dm.Namespace,
-					},
 				},
 				Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 					Source:      r.getRsyncPath(dm.Spec.Source, config, sourceAccess.Spec.MountPathPrefix, i, configSourcePath),
@@ -175,6 +165,9 @@ func (r *DataMovementReconciler) startNodeDataMovers(ctx context.Context, dm *nn
 					GroupId:     dm.Spec.GroupId,
 				},
 			}
+
+			dwsv1alpha1.InheritParentLabels(rsyncNode, dm)
+			dwsv1alpha1.AddOwnerLabels(rsyncNode, dm)
 
 			if err := r.Create(ctx, rsyncNode); err != nil {
 				if !errors.IsAlreadyExists(err) {
@@ -221,7 +214,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 
 	// Fetch all the rsync node data movements that are labeled with data movement resource.
 	nodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-	if err := r.List(ctx, nodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+	if err := r.List(ctx, nodes, dwsv1alpha1.MatchingOwner(dm)); err != nil {
 		return nil, "", "", err
 	}
 
@@ -291,38 +284,16 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 
 func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx)
+	log.V(1).Info("Deleting all nodes")
 
-	rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
-	if err := r.List(ctx, rsyncNodes, client.MatchingLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name}); err != nil {
+	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&dmv1alpha1.RsyncNodeDataMovementList{}}, dm)
+	if err != nil {
 		return nil, err
 	}
 
-	log.V(1).Info("Deleting all nodes", "count", len(rsyncNodes.Items))
-	for _, node := range rsyncNodes.Items {
-		if err := r.Delete(ctx, &node); err != nil {
-			if !errors.IsNotFound(err) {
-				log.V(1).Info("Deleting", "node", node.Namespace, "error", err.Error())
-				return nil, err
-			}
-		}
+	if deleteStatus == dwsv1alpha1.DeleteRetry {
+		return &ctrl.Result{}, nil
 	}
 
 	return nil, nil
-}
-
-func rsyncNodeDataMovementEnqueueRequestMapFunc(o client.Object) []reconcile.Request {
-
-	if owner, found := o.GetAnnotations()[dmv1alpha1.OwnerLabelRsyncNodeDataMovement]; found {
-		components := strings.Split(owner, "/")
-		if len(components) == 2 {
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Name:      components[0],
-					Namespace: components[1],
-				},
-			}}
-		}
-	}
-
-	return []reconcile.Request{}
 }
