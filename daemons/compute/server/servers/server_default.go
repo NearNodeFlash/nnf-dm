@@ -145,13 +145,6 @@ Retry:
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
 			Namespace: s.namespace,
-			Labels: map[string]string{
-				dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          req.Workflow,
-				dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: req.Namespace,
-			},
-			Annotations: map[string]string{
-				dmv1alpha1.OwnerLabelRsyncNodeDataMovement: req.Workflow + "/" + req.Namespace,
-			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 			Initiator:   s.name,
@@ -162,6 +155,18 @@ Retry:
 			DryRun:      req.GetDryrun(),
 		},
 	}
+
+	// We don't have the actual NnfDataMovement parent available, but we know the name
+	// and the namespace because they will match the workflow's name and namespace. Create
+	// a fake parent here to use for the AddOwnerLabels call.
+	parent := &nnfv1alpha1.NnfDataMovement{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Workflow,
+			Namespace: req.Namespace,
+		},
+	}
+
+	dwsv1alpha1.AddOwnerLabels(dm, parent)
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		if errors.IsAlreadyExists(err) {

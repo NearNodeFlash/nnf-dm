@@ -38,6 +38,7 @@ import (
 
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -639,13 +640,12 @@ var _ = Describe("Data Movement Controller", func() {
 						rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
 
 						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement})).To(Succeed())
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(HaveLen(expectedRsyncNodeCount), "expected number of rsync nodes")
 
 						for _, item := range rsyncNodes.Items {
-							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(dmv1alpha1.OwnerLabelRsyncNodeDataMovement, dm.Name))
-							Expect(item.ObjectMeta.Annotations).To(HaveKeyWithValue(dmv1alpha1.OwnerLabelRsyncNodeDataMovement, dm.Name+"/"+dm.Namespace))
+							Expect(item.ObjectMeta.Labels).To(HaveKeyWithValue(dwsv1alpha1.OwnerNameLabel, dm.Name))
 
 							// TODO: Expect the correct Source and Destination paths. Source should be the lustre volume
 						}
@@ -683,7 +683,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 						// Validate the Rsync Nodes delete
 						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, client.HasLabels{dmv1alpha1.OwnerLabelRsyncNodeDataMovement})).To(Succeed())
+							Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(BeEmpty(), "expected zero rsync nodes on delete")
 					})
@@ -719,13 +719,6 @@ var _ = Describe("Data Movement Controller", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-rsync-job",
 							Namespace: nodeKeys[0].Name,
-							Labels: map[string]string{
-								dmv1alpha1.OwnerLabelRsyncNodeDataMovement:          dm.Name,
-								dmv1alpha1.OwnerNamespaceLabelRsyncNodeDataMovement: dm.Namespace,
-							},
-							Annotations: map[string]string{
-								dmv1alpha1.OwnerLabelRsyncNodeDataMovement: dm.Name + "/" + dm.Namespace,
-							},
 						},
 						Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 							Source:      "test.in",
@@ -734,6 +727,7 @@ var _ = Describe("Data Movement Controller", func() {
 							GroupId:     uint32(os.Getgid()),
 						},
 					}
+					dwsv1alpha1.AddOwnerLabels(rsync, dm)
 				})
 
 				JustBeforeEach(func() {

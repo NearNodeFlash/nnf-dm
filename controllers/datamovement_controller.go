@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -102,7 +103,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Teardown", "Result", result, "Error", err)
 		if err != nil {
 			return ctrl.Result{}, err
-		} else if !result.IsZero() {
+		} else if result != nil {
 			return *result, nil
 		}
 
@@ -349,7 +350,7 @@ func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Watches(
 			&source.Kind{Type: &dmv1alpha1.RsyncNodeDataMovement{}},
-			handler.EnqueueRequestsFromMapFunc(rsyncNodeDataMovementEnqueueRequestMapFunc),
+			handler.EnqueueRequestsFromMapFunc(dwsv1alpha1.OwnerLabelMapFunc),
 		).
 		Complete(r)
 }
