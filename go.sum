@@ -101,12 +101,13 @@ github.com/Azure/go-autorest/tracing v0.6.0/go.mod h1:+vhtPC754Xsa23ID7GlGsrdKBp
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
-github.com/HewlettPackard/dws v0.0.0-20220516154556-7138ec9b96ba h1:FEVKihX3+6TiMYGpu7F3L6mQ4eq1ikhJE5vSsuDJJIk=
 github.com/HewlettPackard/dws v0.0.0-20220516154556-7138ec9b96ba/go.mod h1:oFwoQezHuwBJvqiokOI7HoYv877euFrD+m8QdHVw7w0=
 github.com/HewlettPackard/dws v0.0.0-20220621142357-8e32b62eca41 h1:tZYYnNBu94sVlobTL7DzOCbk41ixHaRIoK1FhExpNfk=
 github.com/HewlettPackard/dws v0.0.0-20220621142357-8e32b62eca41/go.mod h1:ENSzxviBNafkA5X+c1XUNIV9J1d2lVt4+r9AbidihNI=
 github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220516192757-17ac28565db5 h1:t+W1/ma3U4s8Ct4UVfUO+ZHVuytflXuQ7qJJwBre5kE=
 github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220516192757-17ac28565db5/go.mod h1:Wwr96QYACIixBjBXpST9yMS81WxMu/tF/zc/5OW21Dk=
+github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95 h1:5neutLfJ4zWKHLeYw+a1EfW2veMC3sI50RNvgfeax9Q=
+github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95/go.mod h1:Wwr96QYACIixBjBXpST9yMS81WxMu/tF/zc/5OW21Dk=
 github.com/HewlettPackard/structex v1.0.2/go.mod h1:3frC4RY/cPsP/4+N8rkxsNAGlQwHV+zDC7qvrN+N+rE=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Masterminds/squirrel v1.5.0/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
@@ -115,6 +116,8 @@ github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb0
 github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220517205036-02c092067a4c h1:+m9OtyIa9vlkLE1jI0lTkAhlVQSOlIM4V4GgkJ0HZpA=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220517205036-02c092067a4c/go.mod h1:VeS+yILAhE2pDE9iIHwsco3UdAVsMLlQdg6L1aTLPOg=
+github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220623194136-08b4e1a6e302 h1:oA73DSra6MfngzpxpkFoZ6vL1pM9neSgutRbtNuHZTg=
+github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220623194136-08b4e1a6e302/go.mod h1:Ae1E/j2hmUaHW7pQAOesc57pyYmBlgBgI2C6xtwPutg=
 github.com/NearNodeFlash/nnf-ec v0.0.0-20220518125038-17176c02ce3f h1:z4yEuREovwyu7ijqu6MpkhIwOEyWkxnwl+bXwiCPZPQ=
 github.com/NearNodeFlash/nnf-ec v0.0.0-20220518125038-17176c02ce3f/go.mod h1:WGhuERMbd1gdgfdf3LcX9ZHEIlNBWdXRMpFikRgfJ+g=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20220518142843-c31693162047 h1:JdAEydfRU2RYM/iH+e717WmtClKe4Znk/988M2NR5w8=
@@ -133,6 +136,7 @@ github.com/VividCortex/gohistogram v1.0.0/go.mod h1:Pf5mBqqDxYaXu3hDrrU+w6nw50o/
 github.com/VividCortex/mysqlerr v1.0.0/go.mod h1:xERx8E4tBhLvpjzdUyQiSfUxeMcATEQrflDAfXsqcAE=
 github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5/go.mod h1:SkGFH1ia65gfNATL8TAiHDNxPzPdmEL5uirI2Uyuz6c=
 github.com/agnivade/levenshtein v1.0.1/go.mod h1:CURSv5d9Uaml+FovSIICkLbAUZ9S4RqaHDIsdSBg7lM=
+github.com/akutz/gosync v0.1.0 h1:naxPT/aDYDh79PMwM3XmencmNQeYmpNFSZy4ZE9zIW0=
 github.com/akutz/gosync v0.1.0/go.mod h1:I8I4aiqJI1nqaeYOOB1WS+CgRJVVPqhct9Y4njywM84=
 github.com/akutz/memconn v0.1.0/go.mod h1:Jo8rI7m0NieZyLI5e2CDlRdRqRRB4S7Xp77ukDjH+Fw=
 github.com/alecthomas/kong v0.2.17/go.mod h1:ka3VZ8GZNPXv9Ov+j4YNLkI8mTuhXyr/0ktSlqIydQQ=
@@ -210,6 +214,7 @@ github.com/container-storage-interface/spec v1.5.0/go.mod h1:8K96oQNkJ7pFcC2R9Z1
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/bbolt v1.3.3/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
+github.com/coreos/etcd v3.3.13+incompatible h1:8F3hqu9fGYLBifCmRCJsicFqDx/D68Rt3q1JMazcgBQ=
 github.com/coreos/etcd v3.3.13+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
 github.com/coreos/go-oidc v2.1.0+incompatible/go.mod h1:CgnwVTmzoESiwO9qyAFEMiHoZ1nMCKZlZ9V6mm3/LKc=
@@ -777,6 +782,7 @@ github.com/prometheus/procfs v0.6.0/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/protocolbuffers/txtpbfmt v0.0.0-20210910155415-af4447816e4d/go.mod h1:KbKfKPy2I6ecOIGA9apfheFv14+P3RSmmQvshofQyMY=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
+github.com/rexray/gocsi v1.2.2 h1:h9F/eSizORihN+XT+mxhq7ClZ3cYo1L9RvasN6dKz8U=
 github.com/rexray/gocsi v1.2.2/go.mod h1:X9oJHHpIVGmfKdK8e+JuCXafggk7HxL9mWQOgrsoHpo=
 github.com/robfig/cron v1.2.0/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
@@ -806,6 +812,7 @@ github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPx
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrfsX/uA88=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
+github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d/go.mod h1:OnSkiWE9lh6wB0YB77sQom3nweQdgAjqCqsofrRNTgc=
 github.com/smartystreets/assertions v1.2.0/go.mod h1:tcbTF8ujkAEcZ8TElKY+i30BzYlVhC/LOxJk7iOWnoo=

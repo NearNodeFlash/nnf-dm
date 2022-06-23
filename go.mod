@@ -7,8 +7,8 @@ replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4
 
 require (
 	github.com/HewlettPackard/dws v0.0.0-20220621142357-8e32b62eca41
-	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220516192757-17ac28565db5
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220517205036-02c092067a4c
+	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220623194136-08b4e1a6e302
 	github.com/NearNodeFlash/nnf-sos v0.0.0-20220518142843-c31693162047
 	github.com/google/uuid v1.3.0
 	github.com/kubeflow/common v0.4.1
