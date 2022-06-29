@@ -126,6 +126,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 			},
 		}
 	}
+	log.Info("Rsync credential", "uid", rsyncNode.Spec.UserId, "gid", rsyncNode.Spec.GroupId)
 
 	out, err := cmd.Output()
 
@@ -133,7 +134,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			log.Info("Rsync failure", "error", string(exitErr.Stderr))
 		} else {
-			log.Info("Rsync failure", "error", err)
+			log.Info("Rsync failure", "error", err, "output", string(out))
 		}
 	} else {
 		log.Info("rsync completed", "output", string(out))

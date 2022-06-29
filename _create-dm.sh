@@ -34,7 +34,7 @@ if [[ "$CMD" == lustre ]]; then
     name: data-movement-config
     namespace: nnf-dm-system
   data:
-    image: arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1
+    image: ghcr.io/nearnodeflash/nnf-mfu:latest
     sourceVolume:      '{ "hostPath": { "path": "/nnf", "type": "Directory" } }'
     destinationVolume: '{ "hostPath": { "path": "/nnf", "type": "Directory" } }'
 EOF
