@@ -46,6 +46,11 @@ import (
 
 const (
 	testNumberOfNodes = 2
+	orchestratedMGS   = "172.0.0.1@tcp"
+	globalMGS         = "172.0.0.2@tcp"
+
+	// For our tests, when we orchestate with an external MGS, we'll use the global filesystem's MGS.
+	externalMGS = globalMGS
 )
 
 var _ = Describe("Data Movement Controller", func() {
@@ -57,6 +62,8 @@ var _ = Describe("Data Movement Controller", func() {
 		access            *nnfv1alpha1.NnfAccess
 		dm                *nnfv1alpha1.NnfDataMovement
 		setup             sync.Once
+		lustre            *lusv1alpha1.LustreFileSystem
+		fsName            string
 	)
 
 	BeforeEach(func() {
@@ -231,70 +238,188 @@ var _ = Describe("Data Movement Controller", func() {
 		}).Should(Succeed(), "create the data movement resource")
 	})
 
+	createGlobalLustre := func() {
+		mgsNids := []string{
+			globalMGS,
+		}
+
+		lustre = &lusv1alpha1.LustreFileSystem{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "lustre-test",
+				Namespace: corev1.NamespaceDefault,
+			},
+			Spec: lusv1alpha1.LustreFileSystemSpec{
+				Name:      "lustre",
+				MgsNids:   mgsNids,
+				MountRoot: "/lus/test",
+			},
+		}
+		Expect(k8sClient.Create(context.TODO(), lustre)).To(Succeed())
+	}
+
+	// Add source and dest info to NnfDataMovement.
+	populateSourceAndDest := func() {
+		dm.Spec.Source.Path = "example.file"
+		dm.Spec.Source.Storage = &corev1.ObjectReference{
+			Kind:      reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name(),
+			Name:      lustre.Name,
+			Namespace: lustre.Namespace,
+		}
+
+		dm.Spec.Destination.Path = "/"
+		dm.Spec.Destination.Storage = &corev1.ObjectReference{
+			Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
+			Name:      storage.Name,
+			Namespace: storage.Namespace,
+		}
+	}
+
 	Describe("Perform various Lustre to Lustre tests", func() {
 
-		Context("When source is Lustre File System type", func() {
-			var (
-				lustre *lusv1alpha1.LustreFileSystem
-				fsName string
-			)
+		verifyNodeLabels := func() {
+			for _, nodeKey := range nodeKeys {
+				Eventually(func(g Gomega) map[string]string {
+					node := &corev1.Node{}
+					g.Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+					return node.Labels
+				}).Should(HaveKeyWithValue(dmKey.Name, "true"))
+			}
+		}
 
-			BeforeEach(func() {
-				By("Add AllocationSets to NnfStorage")
-				// These are the nodes that should be targeted for the
-				nodes := make([]nnfv1alpha1.NnfStorageAllocationNodes, len(nodeKeys))
-				for nodeKeyIdx, nodeKey := range nodeKeys {
-					nodes[nodeKeyIdx] = nnfv1alpha1.NnfStorageAllocationNodes{
-						Name:  nodeKey.Name,
-						Count: 1,
-					}
+		verifyPVandPVC := func(expectedMGS string) {
+			pv := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      dmKey.Name + persistentVolumeSuffix,
+					Namespace: dmKey.Namespace,
+				},
+			}
+
+			Eventually(func() error {
+				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
+			}).Should(Succeed())
+
+			Expect(*pv.Spec.CSI).To(MatchFields(IgnoreExtras, Fields{
+				"Driver":       Equal("lustre-csi.hpe.com"),
+				"FSType":       Equal("lustre"),
+				"VolumeHandle": Equal(expectedMGS + ":/" + fsName),
+			}))
+
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      dmKey.Name + persistentVolumeClaimSuffix,
+					Namespace: "nnf-dm-system",
+				},
+			}
+
+			Eventually(func() error {
+				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
+			}).Should(Succeed())
+
+			Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
+		}
+
+		verifyMPIJob := func() {
+			mpi := &mpiv2beta1.MPIJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      dmKey.Name + mpiJobSuffix,
+					Namespace: "nnf-dm-system",
+				},
+			}
+
+			Eventually(func() error {
+				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
+			}).Should(Succeed(), "retrieve the mpi job")
+
+			By("Checking the worker specification")
+			worker := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker]
+			Expect(*(worker.Replicas)).To(Equal(int32(testNumberOfNodes)))
+
+			workerSpec := worker.Template.Spec
+			source := corev1.PersistentVolumeClaimVolumeSource{ClaimName: lustre.Name + "-pvc"}
+			destination := corev1.PersistentVolumeClaimVolumeSource{ClaimName: dm.Name + "-pvc"}
+
+			Expect(workerSpec.Volumes).To(ContainElements(
+				HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(source))),
+				HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(destination))),
+				//HaveField("VolumeSource.PersistentVolumeClaim.ClaimName", Equal(lustre.Name + "-pvc")), // NJR: Not sure why this isn't working, seems it can't dereference a pointer type
+			), "have correct pvcs")
+		}
+
+		// These are the nodes that should be targeted for the allocations.
+		getNodesForAllocationSets := func() []nnfv1alpha1.NnfStorageAllocationNodes {
+			nodes := make([]nnfv1alpha1.NnfStorageAllocationNodes, len(nodeKeys))
+			for nodeKeyIdx, nodeKey := range nodeKeys {
+				nodes[nodeKeyIdx] = nnfv1alpha1.NnfStorageAllocationNodes{
+					Name:  nodeKey.Name,
+					Count: 1,
 				}
+			}
+			return nodes
+		}
 
-				fsName = "lustre1"
-				storage.Spec = nnfv1alpha1.NnfStorageSpec{
-					FileSystemType: "lustre",
-					AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
-						// Non OST definitions should be ignored
-						{
-							Name: "test-nnf-storage-mdt",
-							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
-								TargetType: "MGTMDT",
-								FileSystemName: fsName,
-							},
-							Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
-						},
-						{
-							Name:     "test-nnf-storage",
-							Capacity: 0,
-							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
-								TargetType: "OST",
-								FileSystemName: fsName,
-							},
-							Nodes: nodes,
-						},
+		allocationSetsWithMGTMDT := func() []nnfv1alpha1.NnfStorageAllocationSetSpec {
+			return []nnfv1alpha1.NnfStorageAllocationSetSpec{
+				// Non OST definitions should be ignored
+				{
+					Name: "test-nnf-storage-mdt",
+					NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+						TargetType:     "MGTMDT",
+						FileSystemName: fsName,
 					},
-				}
-			})
+					Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
+				},
+				{
+					Name:     "test-nnf-storage",
+					Capacity: 0,
+					NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+						TargetType:     "OST",
+						FileSystemName: fsName,
+					},
+					Nodes: getNodesForAllocationSets(),
+				},
+			}
+		}
+
+		allocationSetsWithExternalMGT := func() []nnfv1alpha1.NnfStorageAllocationSetSpec {
+			return []nnfv1alpha1.NnfStorageAllocationSetSpec{
+				// Non OST definitions should be ignored
+				{
+					Name: "test-nnf-storage-mdt",
+					NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+						TargetType:     "MDT",
+						FileSystemName: fsName,
+						ExternalMgsNid: externalMGS,
+					},
+					Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
+				},
+				{
+					Name:     "test-nnf-storage",
+					Capacity: 0,
+					NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
+						TargetType:     "OST",
+						FileSystemName: fsName,
+						ExternalMgsNid: externalMGS,
+					},
+					Nodes: getNodesForAllocationSets(),
+				},
+			}
+		}
+
+		// Add AllocationSets to NnfStorage.
+		populateAllocationSets := func(getAllocationSets func() []nnfv1alpha1.NnfStorageAllocationSetSpec) {
+			// getAllocationSets is a func ptr, because we need to set 'fsname' for it.
+			fsName = "lustre1"
+			storage.Spec = nnfv1alpha1.NnfStorageSpec{
+				FileSystemType: "lustre",
+				AllocationSets: getAllocationSets(),
+			}
+		}
+
+		Context("When source is Lustre File System type", func() {
 
 			BeforeEach(func() {
 				By("Create the global lustre filesystem")
-
-				mgsNids := []string{
-					"172.0.0.1@tcp",
-				}
-
-				lustre = &lusv1alpha1.LustreFileSystem{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "lustre-test",
-						Namespace: corev1.NamespaceDefault,
-					},
-					Spec: lusv1alpha1.LustreFileSystemSpec{
-						Name:      "lustre",
-						MgsNids:   mgsNids,
-						MountRoot: "/lus/test",
-					},
-				}
-				Expect(k8sClient.Create(context.TODO(), lustre)).To(Succeed())
+				createGlobalLustre()
 			})
 
 			AfterEach(func() {
@@ -304,24 +429,19 @@ var _ = Describe("Data Movement Controller", func() {
 			Context("When destination is Nnf Storage type", func() {
 
 				BeforeEach(func() {
-					By("Define MgsNode in NnfStorage and add source and dest info to NnfDataMovement")
+					By("Add AllocationSets to NnfStorage")
+					populateAllocationSets(allocationSetsWithMGTMDT)
+				})
 
-					storage.Status.MgsNode = "172.0.0.1@tcp"
+				BeforeEach(func() {
+					By("Define MgsNode in NnfStorage")
 
-					dm.Spec.Source.Path = "example.file"
-					dm.Spec.Source.Storage = &corev1.ObjectReference{
-						Kind:      reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name(),
-						Name:      lustre.Name,
-						Namespace: lustre.Namespace,
-					}
+					storage.Status.MgsNode = orchestratedMGS
+				})
 
-					dm.Spec.Destination.Path = "/"
-					dm.Spec.Destination.Storage = &corev1.ObjectReference{
-						Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
-						Name:      storage.Name,
-						Namespace: storage.Namespace,
-					}
-
+				BeforeEach(func() {
+					By("Add source and dest info to NnfDataMovement")
+					populateSourceAndDest()
 				})
 
 				JustBeforeEach(func() {
@@ -349,73 +469,15 @@ var _ = Describe("Data Movement Controller", func() {
 					})
 
 					It("Labels the node", func() {
-						for _, nodeKey := range nodeKeys {
-							Eventually(func(g Gomega) map[string]string {
-								node := &corev1.Node{}
-								g.Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
-								return node.Labels
-							}).Should(HaveKeyWithValue(dmKey.Name, "true"))
-						}
+						verifyNodeLabels()
 					})
 
 					It("Creates PV/PVC", func() {
-						pv := &corev1.PersistentVolume{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      dmKey.Name + persistentVolumeSuffix,
-								Namespace: dmKey.Namespace,
-							},
-						}
-
-						Eventually(func() error {
-							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
-						}).Should(Succeed())
-
-						Expect(*pv.Spec.CSI).To(MatchFields(IgnoreExtras, Fields{
-							"Driver":       Equal("lustre-csi.hpe.com"),
-							"FSType":       Equal("lustre"),
-							"VolumeHandle": Equal(storage.Status.MgsNode+":/"+fsName),
-						}))
-
-						pvc := &corev1.PersistentVolumeClaim{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      dmKey.Name + persistentVolumeClaimSuffix,
-								Namespace: "nnf-dm-system",
-							},
-						}
-
-						Eventually(func() error {
-							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
-						}).Should(Succeed())
-
-						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
+						verifyPVandPVC(orchestratedMGS)
 					})
 
 					It("Creates MPIJob", func() {
-
-						mpi := &mpiv2beta1.MPIJob{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      dmKey.Name + mpiJobSuffix,
-								Namespace: "nnf-dm-system",
-							},
-						}
-
-						Eventually(func() error {
-							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
-						}).Should(Succeed(), "retrieve the mpi job")
-
-						By("Checking the worker specification")
-						worker := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker]
-						Expect(*(worker.Replicas)).To(Equal(int32(testNumberOfNodes)))
-
-						workerSpec := worker.Template.Spec
-						source := corev1.PersistentVolumeClaimVolumeSource{ClaimName: lustre.Name + "-pvc"}
-						destination := corev1.PersistentVolumeClaimVolumeSource{ClaimName: dm.Name + "-pvc"}
-
-						Expect(workerSpec.Volumes).To(ContainElements(
-							HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(source))),
-							HaveField("VolumeSource.PersistentVolumeClaim", PointTo(Equal(destination))),
-							//HaveField("VolumeSource.PersistentVolumeClaim.ClaimName", Equal(lustre.Name + "-pvc")), // NJR: Not sure why this isn't working, seems it can't dereference a pointer type
-						), "have correct pvcs")
+						verifyMPIJob()
 					})
 				}) // Describe("Create Data Movement resource")
 
@@ -505,7 +567,57 @@ var _ = Describe("Data Movement Controller", func() {
 						}
 					})
 				})
-			}) // Context("When destination is Job Storage Instance type")
+			}) // Context("When destination is NnfStorage Instance type")
+
+			Context("When destination is NnfStorage type using external MGS", func() {
+
+				BeforeEach(func() {
+					By("Add AllocationSets to NnfStorage")
+					populateAllocationSets(allocationSetsWithExternalMGT)
+				})
+
+				BeforeEach(func() {
+					By("Add source and dest info to NnfDataMovement")
+					populateSourceAndDest()
+				})
+
+				JustBeforeEach(func() {
+					By("Validate Condition array of NnfDataMovement")
+					Eventually(func(g Gomega) []metav1.Condition {
+						expected := &nnfv1alpha1.NnfDataMovement{}
+						g.Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						return expected.Status.Conditions
+					}).Should(ContainElements(
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
+						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeRunning),
+					), "transition to running")
+				})
+
+				Describe("Create Data Movement resource using external MGS", func() {
+					// After each life-cycle test specification, delete the Data Movement resource
+					AfterEach(func() {
+						expected := &nnfv1alpha1.NnfDataMovement{}
+						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						Expect(k8sClient.Delete(context.TODO(), expected)).To(Succeed())
+
+						Eventually(func() error {
+							return k8sClient.Get(context.TODO(), dmKey, expected)
+						}).ShouldNot(Succeed())
+					})
+
+					It("Labels the node", func() {
+						verifyNodeLabels()
+					})
+
+					It("Creates PV/PVC", func() {
+						verifyPVandPVC(externalMGS)
+					})
+
+					It("Creates MPIJob", func() {
+						verifyMPIJob()
+					})
+				}) // Describe("Create Data Movement resource using external MGS")
+			}) // Context("When destination is NnfStorage type using external MGS")
 
 			Context("When destination is Persistent File System of lustre type", func() {})
 
@@ -567,28 +679,10 @@ var _ = Describe("Data Movement Controller", func() {
 		})
 
 		Context("When source is Lustre File System type", func() {
-			var (
-				lustre *lusv1alpha1.LustreFileSystem
-			)
 
 			BeforeEach(func() {
-
-				mgsNids := []string{
-					"172.0.0.1@tcp",
-				}
-
-				lustre = &lusv1alpha1.LustreFileSystem{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "lustre-test",
-						Namespace: corev1.NamespaceDefault,
-					},
-					Spec: lusv1alpha1.LustreFileSystemSpec{
-						Name:      "lustre",
-						MgsNids:   mgsNids,
-						MountRoot: "/lus/test",
-					},
-				}
-				Expect(k8sClient.Create(context.TODO(), lustre)).To(Succeed())
+				By("Create the global lustre filesystem")
+				createGlobalLustre()
 			})
 
 			AfterEach(func() {
@@ -598,19 +692,8 @@ var _ = Describe("Data Movement Controller", func() {
 			Context("When destination is Job Storage Instance type", func() {
 
 				BeforeEach(func() {
-					dm.Spec.Source.Path = "/" // Doesn't matter, using overrides
-					dm.Spec.Source.Storage = &corev1.ObjectReference{
-						Kind:      reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name(),
-						Name:      lustre.Name,
-						Namespace: lustre.Namespace,
-					}
-
-					dm.Spec.Destination.Path = "/" // Doesn't matter, using overrides
-					dm.Spec.Destination.Storage = &corev1.ObjectReference{
-						Kind:      reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name(),
-						Name:      storage.Name,
-						Namespace: storage.Namespace,
-					}
+					// Exact paths don't matter because we're using overrides.
+					populateSourceAndDest()
 				})
 
 				// We expect data movement to enter at least a running state (possibly more)

@@ -263,7 +263,19 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 	for _, allocationSet := range storage.Spec.AllocationSets {
 		if allocationSet.TargetType == "MDT" || allocationSet.TargetType == "MGTMDT" {
 			fsName = allocationSet.FileSystemName
+			break
 		}
+	}
+
+	mgsNid := storage.Status.MgsNode
+	for _, allocationSet := range storage.Spec.AllocationSets {
+		if len(allocationSet.ExternalMgsNid) > 0 {
+			mgsNid = allocationSet.ExternalMgsNid
+			break
+		}
+	}
+	if len(mgsNid) == 0 {
+		return fmt.Errorf("MGS NID not found in NNF Storage spec")
 	}
 
 	if len(fsName) == 0 {
@@ -290,7 +302,7 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 				CSI: &corev1.CSIPersistentVolumeSource{
 					Driver:       lustrecsi.Name,
 					FSType:       "lustre",
-					VolumeHandle: storage.Status.MgsNode + ":/" + fsName,
+					VolumeHandle: mgsNid + ":/" + fsName,
 				},
 			},
 			VolumeMode:       &volumeMode,
@@ -303,8 +315,11 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 	if err != nil {
 		log.Error(err, "Failed to create persistent volume")
 		return err
-	} else if result == controllerutil.OperationResultCreated {
-		log.V(2).Info("Created persistent volume", "object", client.ObjectKeyFromObject(pv).String())
+	}
+	if result == controllerutil.OperationResultCreated {
+		log.Info("Created persistent volume", "object", client.ObjectKeyFromObject(pv).String())
+	} else if result == controllerutil.OperationResultUpdated {
+		log.Info("Updated persistent volume", "object", client.ObjectKeyFromObject(pv).String())
 	}
 
 	return nil
@@ -341,8 +356,11 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 	if err != nil {
 		log.Error(err, "Failed to create persistent volume claim")
 		return err
-	} else if result == controllerutil.OperationResultCreated {
-		log.V(2).Info("Created persistent volume claim", "object", client.ObjectKeyFromObject(pvc).String())
+	}
+	if result == controllerutil.OperationResultCreated {
+		log.Info("Created persistent volume claim", "object", client.ObjectKeyFromObject(pvc).String())
+	} else if result == controllerutil.OperationResultUpdated {
+		log.Info("Updated persistent volume claim", "object", client.ObjectKeyFromObject(pvc).String())
 	}
 
 	return nil
