@@ -101,7 +101,7 @@ struct  Datamovement__DataMovementStatusRequest
 {
   ProtobufCMessage base;
   char *uid;
-  int64_t timeout;
+  int64_t maxwaittime;
 };
 #define DATAMOVEMENT__DATA_MOVEMENT_STATUS_REQUEST__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&datamovement__data_movement_status_request__descriptor) \

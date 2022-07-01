@@ -24,8 +24,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,11 +40,16 @@ import (
 	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+
+	dm "github.com/NearNodeFlash/nnf-dm/controllers"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 
@@ -56,15 +64,20 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 type defaultServer struct {
 	pb.UnimplementedDataMoverServer
 
+	config    *rest.Config
 	client    client.Client
 	name      string
 	namespace string
+
+	cond        *sync.Cond
+	completions map[string]struct{}
 }
 
 func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
@@ -118,7 +131,116 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 		return nil, err
 	}
 
-	return &defaultServer{client: client, name: opts.name, namespace: opts.nodeName}, nil
+	return &defaultServer{
+		config:    config,
+		client:    client,
+		name:      opts.name,
+		namespace: opts.nodeName,
+		cond:      sync.NewCond(&sync.Mutex{}),
+	}, nil
+}
+
+func (s *defaultServer) StartManager() error {
+	mgr, err := ctrl.NewManager(s.config, ctrl.Options{
+		Scheme:             scheme,
+		LeaderElection:     false,
+		MetricsBindAddress: "0",
+		Namespace:          s.namespace,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := s.setupWithManager(mgr); err != nil {
+		return err
+	}
+
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Setup two managers for watching the individual data movement type resources. They behave
+// similarily, performing a reconcile only for updates to this node
+func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
+
+	p := predicate.Funcs{
+		CreateFunc: func(ce event.CreateEvent) bool { return false },
+		UpdateFunc: func(ue event.UpdateEvent) bool {
+			if initiator, _ := ue.ObjectNew.GetLabels()[dm.InitiatorLabel]; initiator == s.name {
+				return true
+			}
+			return false
+		},
+		DeleteFunc: func(de event.DeleteEvent) bool { return false },
+	}
+
+	err := ctrl.NewControllerManagedBy(mgr).
+		For(&dmv1alpha1.RsyncNodeDataMovement{}, builder.WithPredicates(p)).
+		Complete(&rsyncNodeReconciler{s})
+	if err != nil {
+		return err
+	}
+
+	err = ctrl.NewControllerManagedBy(mgr).
+		For(&nnfv1alpha1.NnfDataMovement{}, builder.WithPredicates(p)).
+		Complete(&dataMovementReconciler{s})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type rsyncNodeReconciler struct {
+	server *defaultServer
+}
+
+func (r *rsyncNodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
+	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
+	if err := r.server.client.Get(ctx, req.NamespacedName, rsync); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !rsync.DeletionTimestamp.IsZero() {
+		r.server.deleteCompletion(rsync.Name)
+		return ctrl.Result{}, nil
+	}
+
+	if !rsync.Status.EndTime.IsZero() {
+		r.server.notifyCompletion(req.Name)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+type dataMovementReconciler struct {
+	server *defaultServer
+}
+
+func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
+	dm := &nnfv1alpha1.NnfDataMovement{}
+	if err := r.server.client.Get(ctx, req.NamespacedName, dm); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !dm.DeletionTimestamp.IsZero() {
+		r.server.deleteCompletion(dm.Name)
+		return ctrl.Result{}, nil
+	}
+
+	/*
+		TODO: Add a StartTime and EndTime to the data movement resource instead of encoding them in the Conditions array
+		if !dm.Status.EndTime.IsZero() {
+			r.server.notifyCompletion(req.Name)
+		}
+	*/
+
+	return ctrl.Result{}, nil
 }
 
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
@@ -145,6 +267,9 @@ Retry:
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.String(),
 			Namespace: s.namespace,
+			Labels: map[string]string{
+				dm.InitiatorLabel: s.name,
+			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
 			Initiator:   s.name,
@@ -199,6 +324,23 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		return nil, err
 	}
 
+	if rsync.Status.EndTime.IsZero() && req.MaxWaitTime != 0 {
+
+		s.waitForCompletionOrTimeout(req)
+
+		rsync := &dmv1alpha1.RsyncNodeDataMovement{}
+		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
+			if errors.IsNotFound(err) {
+				return &pb.DataMovementStatusResponse{
+					State:  pb.DataMovementStatusResponse_UNKNOWN_STATE,
+					Status: pb.DataMovementStatusResponse_NOT_FOUND,
+				}, nil
+			}
+
+			return nil, err
+		}
+	}
+
 	if rsync.Status.StartTime.IsZero() {
 		return &pb.DataMovementStatusResponse{
 			State:  pb.DataMovementStatusResponse_PENDING,
@@ -239,6 +381,57 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 	}
 
 	return &pb.DataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
+}
+
+func (s *defaultServer) notifyCompletion(name string) {
+	s.cond.L.Lock()
+	s.completions[name] = struct{}{}
+	s.cond.L.Unlock()
+
+	s.cond.Broadcast()
+}
+
+func (s *defaultServer) deleteCompletion(name string) {
+	s.cond.L.Lock()
+	delete(s.completions, name)
+	s.cond.L.Unlock()
+}
+
+func (s *defaultServer) waitForCompletionOrTimeout(req *pb.DataMovementStatusRequest) {
+	timeout := false
+	complete := make(chan struct{}, 1)
+
+	// Start a go routine that waits for the completion of this status request or for timeout
+	go func() {
+
+		s.cond.L.Lock()
+		for true {
+			if _, found := s.completions[req.Uid]; found || timeout {
+				break
+			}
+
+			s.cond.Wait()
+		}
+
+		s.cond.L.Unlock()
+
+		complete <- struct{}{}
+	}()
+
+	var maxWaitTimeDuration time.Duration
+	if req.MaxWaitTime < 0 || time.Duration(req.MaxWaitTime) > math.MaxInt64/time.Second {
+		maxWaitTimeDuration = math.MaxInt64
+	} else {
+		maxWaitTimeDuration = time.Duration(req.MaxWaitTime) * time.Second
+	}
+
+	// Wait for completion signal or timeout
+	select {
+	case <-complete:
+	case <-time.After(maxWaitTimeDuration):
+		timeout = true
+		s.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
+	}
 }
 
 func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {

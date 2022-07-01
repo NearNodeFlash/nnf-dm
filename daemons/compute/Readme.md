@@ -95,6 +95,7 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `uid` | string | The unique identifier for the created data movememnt resource |
+| `maxWaitTime` | int64 | The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait |
 
 ### Status Responsee
 | Field | Type | Description |

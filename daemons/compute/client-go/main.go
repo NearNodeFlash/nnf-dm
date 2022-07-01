@@ -40,6 +40,7 @@ func main() {
 	dryrun := flag.Bool("dryrun", false, "perfrom dry run of operation")
 	skipDelete := flag.Bool("skip-delete", false, "skip deleting the resource after completion")
 	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
+	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
 
 	flag.Parse()
 
@@ -66,47 +67,49 @@ func main() {
 
 	c := pb.NewDataMoverClient(conn)
 
-	uid, status, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
+	log.Printf("Creating request...")
+	createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
 	if err != nil {
 		log.Fatalf("could not create data movement request: %v", err)
 	}
 
-	if status == pb.DataMovementCreateResponse_CREATED {
-		log.Printf("Data movement request created: %s", uid)
+	if createResponse.GetStatus() == pb.DataMovementCreateResponse_CREATED {
+		log.Printf("Data movement request created: %s", createResponse.GetUid())
 	} else {
-		log.Fatal("Create request failed")
+		log.Fatal("Create request failed: ", createResponse.String())
 	}
 
 	for {
-		state, status, err := getStatus(ctx, c, uid)
-		if status == pb.DataMovementStatusResponse_FAILED {
+		statusResponse, err := getStatus(ctx, c, createResponse.GetUid(), *maxWaitTime)
+		if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
 			log.Fatalf("Data movement failed: %v", err)
 		}
 
-		log.Printf("Data movement %s", state.String())
-		if state == pb.DataMovementStatusResponse_COMPLETED {
+		log.Printf("Data movement status %s", statusResponse.String())
+		if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
 			break
 		}
 
 		time.Sleep(time.Second)
 	}
-	log.Printf("Data movement completed: %s", uid)
+
+	log.Printf("Data movement completed: %s", createResponse.GetUid())
 
 	// Permit skipping the delete step for testing the NNF Data Movement Workflow. This simulates the condition where
 	// the user creates a data movement request but fails to delete the request after it is complete (i.e. software crashed
 	// and couldn't recover the data movement request). The NNF Data Movement Workflow ensures that these requests are
 	// deleted.
 	if !*skipDelete {
-		log.Printf("Deleting request: %s", uid)
-		status, err := deleteRequest(ctx, c, uid)
+		log.Printf("Deleting request: %s", createResponse.GetUid())
+		deleteResponse, err := deleteRequest(ctx, c, createResponse.GetUid())
 		if err != nil {
 			log.Fatalf("could not delete data movement request: %v", err)
 		}
-		log.Printf("Data movement request deleted: %s %s", uid, status.String())
+		log.Printf("Data movement request deleted: %s %s", createResponse.GetUid(), deleteResponse.String())
 	}
 }
 
-func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (string, pb.DataMovementCreateResponse_Status, error) {
+func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow:    workflow,
@@ -117,32 +120,33 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 	})
 
 	if err != nil {
-		return "", pb.DataMovementCreateResponse_FAILED, err
+		return nil, err
 	}
 
-	return rsp.GetUid(), rsp.GetStatus(), nil
+	return rsp, nil
 }
 
-func getStatus(ctx context.Context, client pb.DataMoverClient, uid string) (pb.DataMovementStatusResponse_State, pb.DataMovementStatusResponse_Status, error) {
+func getStatus(ctx context.Context, client pb.DataMoverClient, uid string, maxWaitTime int64) (*pb.DataMovementStatusResponse, error) {
 	rsp, err := client.Status(ctx, &pb.DataMovementStatusRequest{
-		Uid: uid,
+		Uid:         uid,
+		MaxWaitTime: maxWaitTime,
 	})
 
 	if err != nil {
-		return pb.DataMovementStatusResponse_UNKNOWN_STATE, pb.DataMovementStatusResponse_FAILED, err
+		return nil, err
 	}
 
-	return rsp.GetState(), rsp.GetStatus(), nil
+	return rsp, nil
 }
 
-func deleteRequest(ctx context.Context, client pb.DataMoverClient, uid string) (pb.DataMovementDeleteResponse_Status, error) {
+func deleteRequest(ctx context.Context, client pb.DataMoverClient, uid string) (*pb.DataMovementDeleteResponse, error) {
 	rsp, err := client.Delete(ctx, &pb.DataMovementDeleteRequest{
 		Uid: uid,
 	})
 
 	if err != nil {
-		return pb.DataMovementDeleteResponse_UNKNOWN, err
+		return nil, err
 	}
 
-	return rsp.GetStatus(), nil
+	return rsp, nil
 }

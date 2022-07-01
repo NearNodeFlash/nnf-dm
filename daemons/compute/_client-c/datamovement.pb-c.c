@@ -474,12 +474,12 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_status_request
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "timeout",
+    "maxWaitTime",
     2,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_INT64,
     0,   /* quantifier_offset */
-    offsetof(Datamovement__DataMovementStatusRequest, timeout),
+    offsetof(Datamovement__DataMovementStatusRequest, maxwaittime),
     NULL,
     NULL,
     0,             /* flags */
@@ -487,7 +487,7 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_status_request
   },
 };
 static const unsigned datamovement__data_movement_status_request__field_indices_by_name[] = {
-  1,   /* field[1] = timeout */
+  1,   /* field[1] = maxWaitTime */
   0,   /* field[0] = uid */
 };
 static const ProtobufCIntRange datamovement__data_movement_status_request__number_ranges[1 + 1] =
