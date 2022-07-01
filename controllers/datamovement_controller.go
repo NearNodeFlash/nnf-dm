@@ -163,7 +163,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	currentConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
-	log.V(1).Info("Executing", "IsLustre", isLustre2Lustre, "Condition", currentConditionType)
+	log.Info("Executing", "IsLustre2Lustre", isLustre2Lustre, "Condition", currentConditionType)
 	switch currentConditionType {
 
 	case nnfv1alpha1.DataMovementConditionTypeStarting:
@@ -276,11 +276,11 @@ func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1a
 
 	// Data Movement is a Lustre2Lustre copy if...
 	//   COPY_IN and Source is LustreFileSystem and
-	//      Destination is JobStorageInstance.fsType == lustre or
+	//      Destination is NnfStorage.fsType == lustre or
 	//      Destination is PersistentStorageInstance.fsType == lustre
 	//   or
 	//   COPY_OUT and Destination is LustreFileSystem and
-	//      Source is JobStorageInstance.fsType == lustre or
+	//      Source is NnfStorage.fsType == lustre or
 	//      Source is PersistentStorageInstance.fsType == lustre
 	fsType := ""
 	if dm.Spec.Source.Storage != nil && dm.Spec.Source.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {

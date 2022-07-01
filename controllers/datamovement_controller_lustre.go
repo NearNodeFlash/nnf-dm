@@ -86,7 +86,7 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nn
 		return result, nil
 	}
 
-	// TODO: The PV/PVC should only be needed for JobStorageInstance, otherwise the PV/PVC will already
+	// TODO: The PV/PVC should only be needed for NnfStorage, otherwise the PV/PVC will already
 	//       be created, and we only need to reference them in the MPIJob.
 
 	if err := r.createPersistentVolume(ctx, dm); err != nil {
@@ -149,7 +149,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 	}
 
 	label := dm.Name
-	log.V(2).Info("Labeling nodes", "label", label, "count", len(targetNodeNames))
+	log.Info("Labeling nodes", "label", label, "count", len(targetNodeNames))
 
 	for _, nodeName := range targetNodeNames {
 
@@ -161,7 +161,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 
 					node.Labels[label] = "true"
 
-					log.V(1).Info("Applying label to node", "node", nodeName)
+					log.Info("Applying label to node", "node", nodeName)
 					if err := r.Update(ctx, &node); err != nil {
 						if errors.IsConflict(err) {
 							return &ctrl.Result{Requeue: true}, -1, nil
@@ -177,7 +177,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 		}
 
 		if !nodeFound {
-			log.V(3).Info("Node not found. Check the spelling or status of the node.", "node", nodeName)
+			log.Info("Node not found. Check the spelling or status of the node.", "node", nodeName)
 		}
 	}
 
@@ -193,7 +193,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 		return nil, err
 	}
 
-	log.V(2).Info("Unlabelling nodes", "count", len(nodes.Items))
+	log.Info("Unlabeling nodes", "count", len(nodes.Items))
 	for _, node := range nodes.Items {
 		delete(node.Labels, label)
 		if err := r.Update(ctx, &node); err != nil {
@@ -357,7 +357,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		return err
 	}
 
-	image := "arti.dev.cray.com/rabsw-docker-master-local/mfu:0.0.1"
+	image := "ghcr.io/nearnodeflash/nnf-mfu:latest"
 	if img, found := config.Data[configImage]; found {
 		image = img
 	}
@@ -531,7 +531,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 
 	//ctrl.SetControllerReference(dm, job, r.Scheme)
 
-	log.V(2).Info("Creating mpi job", "name", client.ObjectKeyFromObject(job).String())
+	log.Info("Creating mpi job", "name", client.ObjectKeyFromObject(job).String())
 	return r.Create(ctx, job)
 }
 

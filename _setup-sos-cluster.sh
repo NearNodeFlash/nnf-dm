@@ -63,4 +63,4 @@ fi
 echo "$(tput bold)Patching rsync template to disable Lustre File Systems $(tput sgr 0)"
 echo "This will allow the permit the rsync nodes to start - which is otherwise prevented"
 echo "since the Lustre CSI is not loaded"
-kubectl get rsynctemplate/nnf-dm-rsynctemplate -n nnf-dm-system -o json | jq '.spec += {"disableLustreFileSystems": true}' | kubectl apply -f -
+kubectl patch rsynctemplate/nnf-dm-rsynctemplate -n nnf-dm-system --type merge -p '{"spec":{"disableLustreFileSystems":true}}'

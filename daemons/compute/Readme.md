@@ -68,7 +68,7 @@ Command line options are defined below; Most default to their corresponding envi
 
 
 # Data Movement Interface
-The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating, querying, and deleting data movement requests. The definitions for these can be found in [./api/rsyncdatamovement.proto](./api/rsyncdatamovement.proto) file. Consulting this file should be done in addition to the context in this section to ensure the latest API definitions are used.
+The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating, querying, and deleting data movement requests. The definitions for these can be found in [./api/datamovement.proto](./api/datamovement.proto) file. Consulting this file should be done in addition to the context in this section to ensure the latest API definitions are used.
 
 ## Creating a data movement request
 
