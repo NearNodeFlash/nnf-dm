@@ -480,10 +480,6 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 								MountPath: destinationMount,
 							},
 						},
-						SecurityContext: &corev1.SecurityContext{
-							RunAsUser:  &userId,
-							RunAsGroup: &groupId,
-						},
 					},
 				},
 				Volumes: []corev1.Volume{
@@ -511,6 +507,7 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 		sshAuthMountPath = "/home/mpiuser/.ssh"
 	}
 
+	slotsPerWorker := int32(64)
 	job := &mpiv2beta1.MPIJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Name + mpiJobSuffix,
@@ -526,10 +523,9 @@ func (r *DataMovementReconciler) createMpiJob(ctx context.Context, dm *nnfv1alph
 				mpiv2beta1.MPIReplicaTypeWorker:   worker,
 			},
 			SSHAuthMountPath: sshAuthMountPath,
+			SlotsPerWorker:   &slotsPerWorker,
 		},
 	}
-
-	//ctrl.SetControllerReference(dm, job, r.Scheme)
 
 	log.Info("Creating mpi job", "name", client.ObjectKeyFromObject(job).String())
 	return r.Create(ctx, job)
