@@ -108,8 +108,13 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./... -coverprofile cover.out
+FAILFAST ?= no
+test: #manifests generate fmt vet envtest ## Run tests.
+	if [[ "${FAILFAST}" == yes ]]; then \
+		failfast="-ginkgo.failFast"; \
+	fi; \
+	set -o errexit; \
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -v ./... -coverprofile cover.out -ginkgo.v -ginkgo.progress $$failfast
 
 container-unit-test: ## Run tests inside a container image
 	$(DOCKER) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .

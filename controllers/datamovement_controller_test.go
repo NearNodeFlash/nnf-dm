@@ -56,7 +56,6 @@ var _ = Describe("Data Movement Controller", func() {
 		storage           *nnfv1alpha1.NnfStorage
 		access            *nnfv1alpha1.NnfAccess
 		dm                *nnfv1alpha1.NnfDataMovement
-		dmOwnerRef        metav1.OwnerReference
 		setup             sync.Once
 	)
 
@@ -71,6 +70,7 @@ var _ = Describe("Data Movement Controller", func() {
 		// to my knowledge - there are no dependencies remaining. So this means
 		// that all testing that occurs after this block will have these resources
 		// present, even if undesired. Keep this in mind when writing new tests.
+		By("setup once: namespaces and nodes")
 		setup.Do(func() {
 			ns := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
@@ -113,6 +113,7 @@ var _ = Describe("Data Movement Controller", func() {
 	// Before each test ensure there is a Node with the proper label (cray.nnf.node=true), and
 	// there is NNF Storage that contains that node as its one and only allocation.
 	BeforeEach(func() {
+		By("Define NnfStorage and NnfAccess")
 
 		storageKey = types.NamespacedName{
 			Name:      "test-storage",
@@ -159,6 +160,7 @@ var _ = Describe("Data Movement Controller", func() {
 	// outside the BeforeEach() declartion so each test can modify the NNF Storage
 	// resource as needed. Same for NNF Access
 	JustBeforeEach(func() {
+		By("Create the NnfStorage and NnfAccess")
 		mgsNode := storage.Status.MgsNode
 		Expect(k8sClient.Create(context.TODO(), storage)).To(Succeed())
 		Eventually(func() error {
@@ -169,9 +171,9 @@ var _ = Describe("Data Movement Controller", func() {
 		if len(mgsNode) > 0 {
 			storage.Status.MgsNode = mgsNode
 			Expect(k8sClient.Status().Update(context.TODO(), storage)).To(Succeed())
-			Eventually(func() string {
+			Eventually(func(g Gomega) string {
 				expected := &nnfv1alpha1.NnfStorage{}
-				Expect(k8sClient.Get(context.TODO(), storageKey, expected)).To(Succeed())
+				g.Expect(k8sClient.Get(context.TODO(), storageKey, expected)).To(Succeed())
 				return expected.Status.MgsNode
 			}).Should(Equal(mgsNode), "update the nnf storage resource status")
 		}
@@ -186,6 +188,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 	// Before each test, create a skeletal template for the Data Movement resource.
 	BeforeEach(func() {
+		By("Define the NnfDataMovement")
 		dmKey = types.NamespacedName{
 			Name:      "dm-test-" + uuid.NewString()[0:6],
 			Namespace: corev1.NamespaceDefault,
@@ -221,21 +224,11 @@ var _ = Describe("Data Movement Controller", func() {
 	// outside the BeforeEach() declartion so each test can modify the Data Movement
 	// resource as needed.
 	JustBeforeEach(func() {
+		By("Create the NnfDataMovement")
 		Expect(k8sClient.Create(context.TODO(), dm)).To(Succeed())
 		Eventually(func() error {
 			return k8sClient.Get(context.TODO(), dmKey, dm)
 		}).Should(Succeed(), "create the data movement resource")
-
-		controller := true
-		blockOwnerDeletion := true
-		dmOwnerRef = metav1.OwnerReference{
-			Kind:               reflect.TypeOf(nnfv1alpha1.NnfDataMovement{}).Name(),
-			APIVersion:         nnfv1alpha1.GroupVersion.String(),
-			UID:                dm.GetUID(),
-			Name:               dm.GetName(),
-			Controller:         &controller,
-			BlockOwnerDeletion: &blockOwnerDeletion,
-		}
 	})
 
 	Describe("Perform various Lustre to Lustre tests", func() {
@@ -243,9 +236,11 @@ var _ = Describe("Data Movement Controller", func() {
 		Context("When source is Lustre File System type", func() {
 			var (
 				lustre *lusv1alpha1.LustreFileSystem
+				fsName string
 			)
 
 			BeforeEach(func() {
+				By("Add AllocationSets to NnfStorage")
 				// These are the nodes that should be targeted for the
 				nodes := make([]nnfv1alpha1.NnfStorageAllocationNodes, len(nodeKeys))
 				for nodeKeyIdx, nodeKey := range nodeKeys {
@@ -255,6 +250,7 @@ var _ = Describe("Data Movement Controller", func() {
 					}
 				}
 
+				fsName = "lustre1"
 				storage.Spec = nnfv1alpha1.NnfStorageSpec{
 					FileSystemType: "lustre",
 					AllocationSets: []nnfv1alpha1.NnfStorageAllocationSetSpec{
@@ -262,7 +258,8 @@ var _ = Describe("Data Movement Controller", func() {
 						{
 							Name: "test-nnf-storage-mdt",
 							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
-								TargetType: "MDT",
+								TargetType: "MGTMDT",
+								FileSystemName: fsName,
 							},
 							Nodes: []nnfv1alpha1.NnfStorageAllocationNodes{},
 						},
@@ -271,6 +268,7 @@ var _ = Describe("Data Movement Controller", func() {
 							Capacity: 0,
 							NnfStorageLustreSpec: nnfv1alpha1.NnfStorageLustreSpec{
 								TargetType: "OST",
+								FileSystemName: fsName,
 							},
 							Nodes: nodes,
 						},
@@ -279,6 +277,7 @@ var _ = Describe("Data Movement Controller", func() {
 			})
 
 			BeforeEach(func() {
+				By("Create the global lustre filesystem")
 
 				mgsNids := []string{
 					"172.0.0.1@tcp",
@@ -305,6 +304,7 @@ var _ = Describe("Data Movement Controller", func() {
 			Context("When destination is Nnf Storage type", func() {
 
 				BeforeEach(func() {
+					By("Define MgsNode in NnfStorage and add source and dest info to NnfDataMovement")
 
 					storage.Status.MgsNode = "172.0.0.1@tcp"
 
@@ -325,9 +325,10 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				JustBeforeEach(func() {
-					Eventually(func() []metav1.Condition {
+					By("Validate Condition array of NnfDataMovement")
+					Eventually(func(g Gomega) []metav1.Condition {
 						expected := &nnfv1alpha1.NnfDataMovement{}
-						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						g.Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}).Should(ContainElements(
 						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
@@ -347,17 +348,17 @@ var _ = Describe("Data Movement Controller", func() {
 						}).ShouldNot(Succeed())
 					})
 
-					PIt("Labels the node", func() {
+					It("Labels the node", func() {
 						for _, nodeKey := range nodeKeys {
-							Eventually(func() map[string]string {
+							Eventually(func(g Gomega) map[string]string {
 								node := &corev1.Node{}
-								Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+								g.Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
 								return node.Labels
 							}).Should(HaveKeyWithValue(dmKey.Name, "true"))
 						}
 					})
 
-					PIt("Creates PV/PVC", func() {
+					It("Creates PV/PVC", func() {
 						pv := &corev1.PersistentVolume{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeSuffix,
@@ -369,18 +370,16 @@ var _ = Describe("Data Movement Controller", func() {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pv), pv)
 						}).Should(Succeed())
 
-						Expect(pv.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
-
 						Expect(*pv.Spec.CSI).To(MatchFields(IgnoreExtras, Fields{
 							"Driver":       Equal("lustre-csi.hpe.com"),
 							"FSType":       Equal("lustre"),
-							"VolumeHandle": Equal(storage.Status.MgsNode),
+							"VolumeHandle": Equal(storage.Status.MgsNode+":/"+fsName),
 						}))
 
 						pvc := &corev1.PersistentVolumeClaim{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + persistentVolumeClaimSuffix,
-								Namespace: dmKey.Namespace,
+								Namespace: "nnf-dm-system",
 							},
 						}
 
@@ -388,25 +387,21 @@ var _ = Describe("Data Movement Controller", func() {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(pvc), pvc)
 						}).Should(Succeed())
 
-						Expect(pvc.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
-
 						Expect(pvc.Spec.VolumeName).To(Equal(pv.GetName()))
 					})
 
-					PIt("Creates MPIJob", func() {
+					It("Creates MPIJob", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + mpiJobSuffix,
-								Namespace: dmKey.Namespace,
+								Namespace: "nnf-dm-system",
 							},
 						}
 
 						Eventually(func() error {
 							return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mpi), mpi)
 						}).Should(Succeed(), "retrieve the mpi job")
-
-						Expect(mpi.ObjectMeta.OwnerReferences).To(ContainElement(dmOwnerRef))
 
 						By("Checking the worker specification")
 						worker := mpi.Spec.MPIReplicaSpecs[mpiv2beta1.MPIReplicaTypeWorker]
@@ -458,12 +453,12 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), config)).To(Succeed())
 					})
 
-					PIt("Contains correct overrides", func() {
+					It("Contains correct overrides", func() {
 
 						mpi := &mpiv2beta1.MPIJob{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      dmKey.Name + mpiJobSuffix,
-								Namespace: dmKey.Namespace,
+								Namespace: "nnf-dm-system",
 							},
 						}
 
@@ -500,11 +495,11 @@ var _ = Describe("Data Movement Controller", func() {
 						Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
 					})
 
-					PIt("Unlabels the nodes", func() {
+					It("Unlabels the nodes", func() {
 						for _, nodeKey := range nodeKeys {
-							Eventually(func() map[string]string {
+							Eventually(func(g Gomega) map[string]string {
 								node := &corev1.Node{}
-								Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
+								g.Expect(k8sClient.Get(context.TODO(), nodeKey, node)).To(Succeed())
 								return node.Labels
 							}).ShouldNot(HaveKey(dmKey.Name))
 						}
@@ -620,9 +615,9 @@ var _ = Describe("Data Movement Controller", func() {
 
 				// We expect data movement to enter at least a running state (possibly more)
 				JustBeforeEach(func() {
-					Eventually(func() []metav1.Condition {
+					Eventually(func(g Gomega) []metav1.Condition {
 						expected := &nnfv1alpha1.NnfDataMovement{}
-						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						g.Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}, "3s").Should(ContainElements(
 						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
@@ -632,15 +627,15 @@ var _ = Describe("Data Movement Controller", func() {
 
 				Describe("Rsync Data Movement", func() {
 
-					PIt("Validates full rsync data movement lifecycle", func() {
+					It("Validates full rsync data movement lifecycle", func() {
 						Expect(storage.Spec.AllocationSets).To(HaveLen(1), "Expected allocation set count incorrect - did you forget to change the test logic?")
 						Expect(storage.Spec.AllocationSets[0].Nodes).To(HaveLen(1), "Expected node count incorrect - did you forget to change the test logic?")
 						expectedRsyncNodeCount := storage.Spec.AllocationSets[0].Nodes[0].Count
 
 						rsyncNodes := &dmv1alpha1.RsyncNodeDataMovementList{}
 
-						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
+						Eventually(func(g Gomega) []dmv1alpha1.RsyncNodeDataMovement {
+							g.Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(HaveLen(expectedRsyncNodeCount), "expected number of rsync nodes")
 
@@ -652,9 +647,9 @@ var _ = Describe("Data Movement Controller", func() {
 
 						// Validate Rsync Nodes finish with success
 						for _, item := range rsyncNodes.Items {
-							Eventually(func() dmv1alpha1.RsyncNodeDataMovementStatus {
+							Eventually(func(g Gomega) dmv1alpha1.RsyncNodeDataMovementStatus {
 								expected := &dmv1alpha1.RsyncNodeDataMovement{}
-								Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, expected)).To(Succeed())
+								g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, expected)).To(Succeed())
 								return expected.Status
 							}).Should(MatchFields(IgnoreExtras, Fields{
 								"State":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
@@ -664,8 +659,8 @@ var _ = Describe("Data Movement Controller", func() {
 						}
 
 						// Validate the Data Movement finishes wtih success
-						Eventually(func() []metav1.Condition {
-							Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+						Eventually(func(g Gomega) []metav1.Condition {
+							g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 							return dm.Status.Conditions
 						}).Should(ContainElements(MatchFields(IgnoreExtras, Fields{
 							"Type":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
@@ -682,8 +677,8 @@ var _ = Describe("Data Movement Controller", func() {
 						}).ShouldNot(Succeed(), "Expect data movement to delete fully")
 
 						// Validate the Rsync Nodes delete
-						Eventually(func() []dmv1alpha1.RsyncNodeDataMovement {
-							Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
+						Eventually(func(g Gomega) []dmv1alpha1.RsyncNodeDataMovement {
+							g.Expect(k8sClient.List(context.TODO(), rsyncNodes, dwsv1alpha1.MatchingOwner(dm))).To(Succeed())
 							return rsyncNodes.Items
 						}).Should(BeEmpty(), "expected zero rsync nodes on delete")
 					})
@@ -704,9 +699,9 @@ var _ = Describe("Data Movement Controller", func() {
 				})
 
 				JustBeforeEach(func() {
-					Eventually(func() []metav1.Condition {
+					Eventually(func(g Gomega) []metav1.Condition {
 						expected := &nnfv1alpha1.NnfDataMovement{}
-						Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
+						g.Expect(k8sClient.Get(context.TODO(), dmKey, expected)).To(Succeed())
 						return expected.Status.Conditions
 					}, "3s").Should(ContainElements(
 						HaveField("Type", nnfv1alpha1.DataMovementConditionTypeStarting),
@@ -738,8 +733,8 @@ var _ = Describe("Data Movement Controller", func() {
 						return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)
 					}).Should(Succeed())
 
-					Eventually(func() string {
-						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
+					Eventually(func(g Gomega) string {
+						g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 						return rsync.Status.State
 					}).Should(Equal(nnfv1alpha1.DataMovementConditionTypeFinished))
 				})
@@ -766,8 +761,8 @@ var _ = Describe("Data Movement Controller", func() {
 
 				checkDataMovementFinishesWithReason := func(reason string) {
 
-					Eventually(func() metav1.Condition {
-						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					Eventually(func(g Gomega) metav1.Condition {
+						g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 						return dm.Status.Conditions[len(dm.Status.Conditions)-1]
 					}).WithTimeout(time.Second).Should(MatchFields(IgnoreExtras, Fields{
 						"Type":   Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
@@ -777,7 +772,7 @@ var _ = Describe("Data Movement Controller", func() {
 
 				Describe("Monitors successful rsync job", func() {
 
-					PIt("successfully reports rsync status", func() {
+					It("successfully reports rsync status", func() {
 						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 						Expect(rsync.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonSuccess))
 
@@ -796,7 +791,7 @@ var _ = Describe("Data Movement Controller", func() {
 						rsync.Spec.Source = "invalid.file"
 					})
 
-					PIt("successfully reports failed rysnc status", func() {
+					It("successfully reports failed rysnc status", func() {
 						Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(rsync), rsync)).To(Succeed())
 						Expect(rsync.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonFailed))
 
