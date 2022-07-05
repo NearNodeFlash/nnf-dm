@@ -49,7 +49,7 @@ import (
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
-	dm "github.com/NearNodeFlash/nnf-dm/controllers"
+	dmctrl "github.com/NearNodeFlash/nnf-dm/controllers"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
 
@@ -169,7 +169,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(ce event.CreateEvent) bool { return false },
 		UpdateFunc: func(ue event.UpdateEvent) bool {
-			if initiator, _ := ue.ObjectNew.GetLabels()[dm.InitiatorLabel]; initiator == s.name {
+			if initiator, _ := ue.ObjectNew.GetLabels()[dmctrl.InitiatorLabel]; initiator == s.name {
 				return true
 			}
 			return false
@@ -268,7 +268,7 @@ Retry:
 			Name:      name.String(),
 			Namespace: s.namespace,
 			Labels: map[string]string{
-				dm.InitiatorLabel: s.name,
+				dmctrl.InitiatorLabel: s.name,
 			},
 		},
 		Spec: dmv1alpha1.RsyncNodeDataMovementSpec{
