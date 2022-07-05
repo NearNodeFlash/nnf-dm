@@ -45,7 +45,7 @@ import (
 
 const (
 	finalizer = "dm.cray.hpe.com"
-	
+
 	InitiatorLabel = "dm.cray.hpe.com/initiator"
 )
 
