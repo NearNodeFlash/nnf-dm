@@ -59,7 +59,13 @@ func GetOptions() (*ServerOptions, error) {
 	return &opts, nil
 }
 
-func Create(opts *ServerOptions) (pb.DataMoverServer, error) {
+type Server interface {
+	pb.DataMoverServer
+
+	StartManager() error
+}
+
+func Create(opts *ServerOptions) (Server, error) {
 	if opts.simulated {
 		return CreateSimulatedServer(opts)
 	}

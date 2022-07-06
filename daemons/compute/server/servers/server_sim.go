@@ -38,6 +38,10 @@ func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
 	return &simulatedServer{}, nil
 }
 
+func (s *simulatedServer) StartManager() error {
+	return nil
+}
+
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 

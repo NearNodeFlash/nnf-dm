@@ -54,7 +54,7 @@ message DataMovementCreateResponse {
 // data movement request by specifying the request's unique identifier.
 message DataMovementStatusRequest {
     string uid = 1;
-    int64 timeout = 2;
+    int64 maxWaitTime = 2;
 }
 
 // The data movement status response message defines the current status of a data movement request. The

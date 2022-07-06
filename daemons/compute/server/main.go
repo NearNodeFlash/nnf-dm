@@ -93,10 +93,7 @@ func (service *Service) Manage() (string, error) {
 		return fmt.Sprintf("Failed to listen at socket %s", *socketAddr), err
 	}
 
-	grpcServer := grpc.NewServer(grpc.Creds(&auth.ServerAuthCredentials{}))
-	pb.RegisterDataMoverServer(grpcServer, server)
-
-	go service.Run(grpcServer, listener)
+	go service.Run(server, listener)
 
 	for {
 		select {
@@ -108,10 +105,21 @@ func (service *Service) Manage() (string, error) {
 	}
 }
 
-func (service *Service) Run(server *grpc.Server, listener net.Listener) error {
+func (service *Service) Run(srv server.Server, listener net.Listener) error {
+
+	go func() {
+		if err := srv.StartManager(); err != nil {
+			errlog.Println("Manager Error: ", err)
+			listener.Close()
+			os.Exit(1)
+		}
+	}()
+
+	grpcServer := grpc.NewServer(grpc.Creds(&auth.ServerAuthCredentials{}))
+	pb.RegisterDataMoverServer(grpcServer, srv)
 
 	stdlog.Println("Start listening at ", listener.Addr())
-	if err := server.Serve(listener); err != nil {
+	if err := grpcServer.Serve(listener); err != nil {
 		return err
 	}
 
