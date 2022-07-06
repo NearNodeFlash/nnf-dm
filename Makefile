@@ -109,7 +109,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 FAILFAST ?= no
-test: #manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest ## Run tests.
 	if [[ "${FAILFAST}" == yes ]]; then \
 		failfast="-ginkgo.failFast"; \
 	fi; \
