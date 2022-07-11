@@ -306,7 +306,13 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 				},
 			},
 			VolumeMode:       &volumeMode,
-			StorageClassName: "nnf-lustre-fs",
+			StorageClassName: dm.Name,
+
+			// Reserve this PV for the matching PVC.
+			ClaimRef: &corev1.ObjectReference{
+				Name:      dm.Name + PersistentVolumeClaimSuffix,
+				Namespace: "nnf-dm-system",
+			},
 		}
 
 		return nil
@@ -335,10 +341,12 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 		},
 	}
 
-	storageClassName := "nnf-lustre-fs"
+	storageClassName := dm.Name
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		pvc.Spec = corev1.PersistentVolumeClaimSpec{
+			// Reserve this PVC for the matching PV.
 			VolumeName: dm.Name + persistentVolumeSuffix,
+
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteMany,
 			},

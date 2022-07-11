@@ -53,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	socketAddr := "unix:///" + *socket
+	socketAddr := "unix://" + *socket
 
 	log.Printf("Connecting to %s", socketAddr)
 	conn, err := grpc.Dial(socketAddr, grpc.WithInsecure(), grpc.WithBlock())
