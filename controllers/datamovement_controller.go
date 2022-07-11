@@ -121,6 +121,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if !controllerutil.ContainsFinalizer(dm, finalizer) {
 
+		now := metav1.NowMicro()
+		dm.Status.StartTime = &now
+
 		// Do first level validation
 		if len(dm.Status.Conditions) == 0 {
 
@@ -232,6 +235,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				message,
 			)
 
+			now := metav1.NowMicro()
+			dm.Status.EndTime = &now
 		}
 
 		if err := r.Status().Update(ctx, dm); err != nil {

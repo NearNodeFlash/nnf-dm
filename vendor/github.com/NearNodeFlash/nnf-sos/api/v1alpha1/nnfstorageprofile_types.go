@@ -21,6 +21,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NnfStorageProfileLustreData defines the Lustre-specific configuration
@@ -31,26 +32,37 @@ type NnfStorageProfileLustreData struct {
 
 	// ExternalMGS contains the NIDs of a pre-existing MGS that should be used
 	ExternalMGS []string `json:"externalMgs,omitempty"`
+
+	// CapacityMGT specifies the size of the MGT device.
+	// +kubebuilder:validation:Pattern:="^\\d+(KiB|KB|MiB|MB|GiB|GB|TiB|TB)$"
+	// +kubebuilder:default:="1GiB"
+	CapacityMGT string `json:"capacityMgt,omitempty"`
+
+	// CapacityMDT specifies the size of the MDT device.  This is also
+	// used for a combined MGT+MDT device.
+	// +kubebuilder:validation:Pattern:="^\\d+(KiB|KB|MiB|MB|GiB|GB|TiB|TB)$"
+	// +kubebuilder:default:="5GiB"
+	CapacityMDT string `json:"capacityMdt,omitempty"`
 }
 
 // NnfStorageProfileGFS2Data defines the GFS2-specific configuration
 type NnfStorageProfileGFS2Data struct {
 	// Placeholder
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Placeholder bool `json:"placeholder,omitempty"`
 }
 
 // NnfStorageProfileXFSData defines the XFS-specific configuration
 type NnfStorageProfileXFSData struct {
 	// Placeholder
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Placeholder bool `json:"placeholder,omitempty"`
 }
 
 // NnfStorageProfileRawData defines the Raw-specific configuration
 type NnfStorageProfileRawData struct {
 	// Placeholder
-	// +kubebuilder:default:=false
+	// +kubebuilder:default:=true
 	Placeholder bool `json:"placeholder,omitempty"`
 }
 
@@ -66,16 +78,16 @@ type NnfStorageProfileData struct {
 	Pinned bool `json:"pinned,omitempty"`
 
 	// LustreStorage defines the Lustre-specific configuration
-	LustreStorage *NnfStorageProfileLustreData `json:"lustreStorage,omitempty"`
+	LustreStorage NnfStorageProfileLustreData `json:"lustreStorage"`
 
 	// GFS2Storage defines the GFS2-specific configuration
-	GFS2Storage *NnfStorageProfileGFS2Data `json:"gfs2Storage,omitempty"`
+	GFS2Storage NnfStorageProfileGFS2Data `json:"gfs2Storage"`
 
 	// XFSStorage defines the XFS-specific configuration
-	XFSStorage *NnfStorageProfileXFSData `json:"xfsStorage,omitempty"`
+	XFSStorage NnfStorageProfileXFSData `json:"xfsStorage"`
 
 	// RawStorage defines the Raw-specific configuration
-	RawStorage *NnfStorageProfileRawData `json:"rawStorage,omitempty"`
+	RawStorage NnfStorageProfileRawData `json:"rawStorage"`
 }
 
 //+kubebuilder:object:root=true
@@ -97,6 +109,16 @@ type NnfStorageProfileList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NnfStorageProfile `json:"items"`
+}
+
+func (n *NnfStorageProfileList) GetObjectList() []client.Object {
+	objectList := []client.Object{}
+
+	for i := range n.Items {
+		objectList = append(objectList, &n.Items[i])
+	}
+
+	return objectList
 }
 
 func init() {
