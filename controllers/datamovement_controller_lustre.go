@@ -40,6 +40,7 @@ import (
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
 	lustrecsi "github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service"
@@ -76,7 +77,7 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nn
 	log := log.FromContext(ctx, "DataMovement", "Lustre")
 
 	// We need to label all the nodes in the NNF Storage object with a unique label that describes this
-	// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
+	// data movemement. This label is then used as a selector within the MPIJob so it correctly
 	// targets all the nodes
 	result, workerCount, err := r.labelStorageNodes(ctx, dm)
 	if err != nil {
@@ -186,6 +187,15 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 
 func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("unlabel")
+
+	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&nnfv1alpha1.NnfDataMovementList{}}, dm)
+	if err != nil {
+		return nil, err
+	}
+
+	if deleteStatus == dwsv1alpha1.DeleteRetry {
+		return &ctrl.Result{}, nil
+	}
 
 	label := dm.Name
 	nodes := &corev1.NodeList{}
@@ -306,7 +316,13 @@ func (r *DataMovementReconciler) createPersistentVolume(ctx context.Context, dm 
 				},
 			},
 			VolumeMode:       &volumeMode,
-			StorageClassName: "nnf-lustre-fs",
+			StorageClassName: dm.Name,
+
+			// Reserve this PV for the matching PVC.
+			ClaimRef: &corev1.ObjectReference{
+				Name:      dm.Name + PersistentVolumeClaimSuffix,
+				Namespace: "nnf-dm-system",
+			},
 		}
 
 		return nil
@@ -335,10 +351,12 @@ func (r *DataMovementReconciler) createPersistentVolumeClaim(ctx context.Context
 		},
 	}
 
-	storageClassName := "nnf-lustre-fs"
+	storageClassName := dm.Name
 	result, err := ctrl.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		pvc.Spec = corev1.PersistentVolumeClaimSpec{
+			// Reserve this PVC for the matching PV.
 			VolumeName: dm.Name + persistentVolumeSuffix,
+
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteMany,
 			},
