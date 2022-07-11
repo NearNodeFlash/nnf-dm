@@ -95,7 +95,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	// Record that this rsync node data movement operation was received and is running. It is important
 	// to record that the request started so we can reliably return status to any entity that is monitoring
 	// this job (like a compute node), differentiating from a pending request and a received request.
-	rsyncNode.Status.StartTime = metav1.Now()
+	rsyncNode.Status.StartTime = metav1.NowMicro()
 	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 	rsyncNode.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
 	if err := r.Status().Update(ctx, rsyncNode); err != nil {
@@ -141,7 +141,7 @@ func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	// Record the completion status.
-	rsyncNode.Status.EndTime = metav1.Now()
+	rsyncNode.Status.EndTime = metav1.NowMicro()
 	rsyncNode.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 
 	if err != nil {

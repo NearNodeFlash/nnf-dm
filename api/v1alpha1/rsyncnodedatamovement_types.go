@@ -59,10 +59,10 @@ type RsyncNodeDataMovementStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Start Time of the data movement operation
-	StartTime metav1.Time `json:"startTime,omitempty"`
+	StartTime metav1.MicroTime `json:"startTime,omitempty"`
 
 	// End Time of the data movement operation
-	EndTime metav1.Time `json:"endTime,omitempty"`
+	EndTime metav1.MicroTime `json:"endTime,omitempty"`
 
 	// Current state of the data movement operation
 	State string `json:"state,omitempty"`

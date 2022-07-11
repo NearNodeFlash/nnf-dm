@@ -22,6 +22,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NnfAccessSpec defines the desired state of NnfAccess
@@ -71,6 +72,10 @@ type NnfAccessStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="DESIREDSTATE",type="string",JSONPath=".spec.desiredState",description="The desired state"
+//+kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".status.state",description="The current state"
+//+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="Whether the state has been achieved"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // NnfAccess is the Schema for the nnfaccesses API
 type NnfAccess struct {
@@ -88,6 +93,16 @@ type NnfAccessList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NnfAccess `json:"items"`
+}
+
+func (n *NnfAccessList) GetObjectList() []client.Object {
+	objectList := []client.Object{}
+
+	for i := range n.Items {
+		objectList = append(objectList, &n.Items[i])
+	}
+
+	return objectList
 }
 
 func init() {

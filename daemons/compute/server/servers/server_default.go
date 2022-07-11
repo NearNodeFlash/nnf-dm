@@ -233,12 +233,9 @@ func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	/*
-		TODO: Add a StartTime and EndTime to the data movement resource instead of encoding them in the Conditions array
-		if !dm.Status.EndTime.IsZero() {
-			r.server.notifyCompletion(req.Name)
-		}
-	*/
+	if !dm.Status.EndTime.IsZero() {
+		r.server.notifyCompletion(req.Name)
+	}
 
 	return ctrl.Result{}, nil
 }
