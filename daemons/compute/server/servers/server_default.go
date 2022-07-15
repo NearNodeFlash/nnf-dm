@@ -132,11 +132,12 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 	}
 
 	return &defaultServer{
-		config:    config,
-		client:    client,
-		name:      opts.name,
-		namespace: opts.nodeName,
-		cond:      sync.NewCond(&sync.Mutex{}),
+		config:      config,
+		client:      client,
+		name:        opts.name,
+		namespace:   opts.nodeName,
+		cond:        sync.NewCond(&sync.Mutex{}),
+		completions: make(map[string]struct{}),
 	}, nil
 }
 
