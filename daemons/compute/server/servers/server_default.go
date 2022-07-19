@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -265,14 +264,11 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-	response := &pb.DataMovementCreateResponse{}
-
 	if computeMountInfo.Type == "lustre" {
-		response, err = s.createNnfDataMovement(ctx, req, userId, groupId, computeClientMount)
+		return s.createNnfDataMovement(ctx, req, userId, groupId, computeMountInfo, computeClientMount)
 	} else {
-		response, err = s.createRsyncNodeDataMovement(ctx, req, userId, groupId, computeMountInfo)
+		return s.createRsyncNodeDataMovement(ctx, req, userId, groupId, computeMountInfo)
 	}
-	return response, err
 }
 
 func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, error) {
@@ -290,7 +286,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, 
 	return dwIndex, nil
 }
 
-func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, userId uint32, groupId uint32, computeClientMount *dwsv1alpha1.ClientMount) (*pb.DataMovementCreateResponse, error) {
+func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, userId uint32, groupId uint32, computeMountInfo *dwsv1alpha1.ClientMountInfo, computeClientMount *dwsv1alpha1.ClientMount) (*pb.DataMovementCreateResponse, error) {
 
 	var dwIndex string
 	if dw, err := getDirectiveIndexFromClientMount(computeClientMount); err != nil {
@@ -319,23 +315,17 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		},
 	}
 
-	// We don't have the actual source NnfStorage available, but we know
-	// the name and the namespace because they will match the workflow's
-	// name, with the directive index, and namespace.
-	source := &nnfv1alpha1.NnfStorage{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", req.Workflow, dwIndex),
-			Namespace: req.Namespace,
-		},
-	}
-
 	dm := &nnfv1alpha1.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "", // below
+			// Be careful about how much you put into GenerateName.
+			// The MPI operator will use the resulting name as a
+			// prefix for its own names.
+			GenerateName: fmt.Sprintf("%s-", nameBase),
 			// Use the compute's namespace.
 			Namespace: s.name,
 			Labels: map[string]string{
-				dmctrl.InitiatorLabel: s.name,
+				dmctrl.InitiatorLabel:           s.name,
+				nnfv1alpha1.DirectiveIndexLabel: dwIndex,
 			},
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
@@ -348,12 +338,8 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 				},
 			},
 			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-				Path: "/",
-				Storage: &corev1.ObjectReference{
-					Kind:      reflect.TypeOf(*source).Name(),
-					Namespace: source.Namespace,
-					Name:      source.Name,
-				},
+				Path:    "/",
+				Storage: &computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
 			UserId:  userId,
 			GroupId: groupId,
@@ -362,16 +348,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 
 	dwsv1alpha1.AddOwnerLabels(dm, parentDm)
 
-	counter := -1
-Retry:
-	counter += 1
-	dm.ObjectMeta.Name = fmt.Sprintf("%s%d-%s-%s", nameBase, counter, req.Namespace, req.Workflow)
-
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
-		if errors.IsAlreadyExists(err) {
-			goto Retry
-		}
-
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
 			Message: err.Error(),
@@ -379,7 +356,7 @@ Retry:
 	}
 
 	return &pb.DataMovementCreateResponse{
-		Uid:    dm.ObjectMeta.Name,
+		Uid:    dm.GetName(),
 		Status: pb.DataMovementCreateResponse_CREATED,
 	}, nil
 }
@@ -394,13 +371,10 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 		}, nil
 	}
 
-Retry:
-	name := uuid.New()
-
 	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.String(),
-			Namespace: s.namespace,
+			GenerateName: fmt.Sprintf("%s-%s-", req.Namespace, req.Workflow),
+			Namespace:    s.namespace,
 			Labels: map[string]string{
 				dmctrl.InitiatorLabel: s.name,
 			},
@@ -428,10 +402,6 @@ Retry:
 	dwsv1alpha1.AddOwnerLabels(dm, parent)
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
-		if errors.IsAlreadyExists(err) {
-			goto Retry
-		}
-
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
 			Message: err.Error(),
@@ -439,7 +409,7 @@ Retry:
 	}
 
 	return &pb.DataMovementCreateResponse{
-		Uid:    name.String(),
+		Uid:    dm.GetName(),
 		Status: pb.DataMovementCreateResponse_CREATED,
 	}, nil
 }
@@ -659,13 +629,13 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 		return nil, fmt.Errorf("Destination must be an absolute path")
 	}
 	origDest := dest
-	if strings.TrimRight(dest, "/") == dest {
+	if !strings.HasSuffix(dest, "/") {
 		dest += "/"
 	}
 
 	lustrefsList := &lusv1alpha1.LustreFileSystemList{}
 	if err := s.client.List(ctx, lustrefsList); err != nil {
-		return nil, fmt.Errorf("Unable to list LustreFileSystem resources")
+		return nil, fmt.Errorf("Unable to list LustreFileSystem resources: %s", err.Error())
 	}
 	if len(lustrefsList.Items) == 0 {
 		return nil, fmt.Errorf("No LustreFileSystem resources found")
@@ -673,7 +643,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 
 	for _, lustrefs := range lustrefsList.Items {
 		mroot := lustrefs.Spec.MountRoot
-		if strings.TrimRight(mroot, "/") == mroot {
+		if !strings.HasSuffix(mroot, "/") {
 			mroot += "/"
 		}
 		if strings.HasPrefix(dest, mroot) {
