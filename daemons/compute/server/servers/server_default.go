@@ -256,7 +256,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		return nil, err
 	}
 
-	_, computeMountInfo, err := s.findComputeMountInfo(ctx, req)
+	computeMountInfo, err := s.findComputeMountInfo(ctx, req)
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
@@ -296,18 +296,11 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		}, nil
 	}
 
-	// We don't have the actual NnfDataMovement parent available, but we know the name
-	// and the namespace because they will match the workflow's name and namespace.
-	parentDm := &nnfv1alpha1.NnfDataMovement{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Workflow,
-			Namespace: req.Namespace,
-		},
-	}
-
 	dm := &nnfv1alpha1.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			//GenerateName: fmt.Sprintf("%s-%s-%s-", nameBase, req.Namespace, req.Workflow),
+			// Be careful about how much you put into GenerateName.
+			// The MPI operator will use the resulting name as a
+			// prefix for its own names.
 			GenerateName: fmt.Sprintf("%s-", nameBase),
 			// Use the compute's namespace.
 			Namespace: s.name,
@@ -325,7 +318,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 				},
 			},
 			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-				Path:    "/", //req.GetSource(),
+				Path:    "/",
 				Storage: &computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
 			UserId:  userId,
@@ -333,7 +326,14 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		},
 	}
 
-	dwsv1alpha1.AddOwnerLabels(dm, parentDm)
+	workflow := &dwsv1alpha1.Workflow{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Workflow,
+			Namespace: req.Namespace,
+		},
+	}
+	dwsv1alpha1.AddOwnerLabels(dm, workflow)
+	dwsv1alpha1.AddWorkflowLabels(dm, workflow)
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
@@ -677,7 +677,7 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha1.ClientMount, *dwsv1alpha1.ClientMountInfo, error) {
+func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha1.ClientMountInfo, error) {
 
 	listOptions := []client.ListOption{
 		client.InNamespace(s.name),
@@ -689,24 +689,24 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 
 	clientMounts := &dwsv1alpha1.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return nil, nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
+		return nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
 	}
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
 			if strings.HasPrefix(req.GetSource(), mount.MountPath) {
 				if mount.Device.DeviceReference == nil && mount.Device.Type != "lustre" {
-					return nil, nil, fmt.Errorf("ClientMount %s/%s: Source path '%s' does not have device reference", clientMount.Namespace, clientMount.Name, req.GetSource())
+					return nil, fmt.Errorf("ClientMount %s/%s: Source path '%s' does not have device reference", clientMount.Namespace, clientMount.Name, req.GetSource())
 				}
 
-				return &clientMount, &mount, nil
+				return &mount, nil
 			}
 		}
 	}
 
-	return nil, nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
+	return nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
 }
