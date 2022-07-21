@@ -26,11 +26,13 @@ import (
 	"log"
 	"math"
 	"net"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
@@ -58,6 +61,10 @@ import (
 
 var (
 	scheme = runtime.NewScheme()
+
+	// This naming prefix is used during status calls to indicate that
+	// this is an NnfDataMovement rather than an RsyncNodeDataMovement.
+	nameBase = "nnfdm"
 )
 
 func init() {
@@ -65,6 +72,7 @@ func init() {
 	utilruntime.Must(dwsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(lusv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -248,7 +256,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		return nil, err
 	}
 
-	source, err := s.findRabbitRelativeSource(ctx, req)
+	computeClientMount, computeMountInfo, err := s.findComputeMountInfo(ctx, req)
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
@@ -256,15 +264,117 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-Retry:
-	// Create an ID - We could optionally perform a Get here and ensure that the UUID is not present, but the
-	// chances of a random UUID colliding on a single NNF Node is close to zero.
-	name := uuid.New()
+	if computeMountInfo.Type == "lustre" {
+		return s.createNnfDataMovement(ctx, req, userId, groupId, computeMountInfo, computeClientMount)
+	} else {
+		return s.createRsyncNodeDataMovement(ctx, req, userId, groupId, computeMountInfo)
+	}
+}
+
+func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, error) {
+	// Find the DW index for our work.
+	labels := object.GetLabels()
+	if labels == nil {
+		return "", fmt.Errorf("Unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
+	}
+
+	dwIndex, found := labels[nnfv1alpha1.DirectiveIndexLabel]
+	if !found {
+		return "", fmt.Errorf("Unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
+	}
+
+	return dwIndex, nil
+}
+
+func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, userId uint32, groupId uint32, computeMountInfo *dwsv1alpha1.ClientMountInfo, computeClientMount *dwsv1alpha1.ClientMount) (*pb.DataMovementCreateResponse, error) {
+
+	var dwIndex string
+	if dw, err := getDirectiveIndexFromClientMount(computeClientMount); err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
+	} else {
+		dwIndex = dw
+	}
+
+	lustrefs, err := s.findDestinationLustreFilesystem(ctx, req.GetDestination())
+	if err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
+	}
+
+	// We don't have the actual NnfDataMovement parent available, but we know the name
+	// and the namespace because they will match the workflow's name and namespace.
+	parentDm := &nnfv1alpha1.NnfDataMovement{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Workflow,
+			Namespace: req.Namespace,
+		},
+	}
+
+	dm := &nnfv1alpha1.NnfDataMovement{
+		ObjectMeta: metav1.ObjectMeta{
+			// Be careful about how much you put into GenerateName.
+			// The MPI operator will use the resulting name as a
+			// prefix for its own names.
+			GenerateName: fmt.Sprintf("%s-", nameBase),
+			// Use the compute's namespace.
+			Namespace: s.name,
+			Labels: map[string]string{
+				dmctrl.InitiatorLabel:           s.name,
+				nnfv1alpha1.DirectiveIndexLabel: dwIndex,
+			},
+		},
+		Spec: nnfv1alpha1.NnfDataMovementSpec{
+			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+				Path: req.GetDestination(),
+				Storage: &corev1.ObjectReference{
+					Kind:      reflect.TypeOf(*lustrefs).Name(),
+					Namespace: lustrefs.Namespace,
+					Name:      lustrefs.Name,
+				},
+			},
+			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+				Path:    "/",
+				Storage: &computeMountInfo.Device.DeviceReference.ObjectReference,
+			},
+			UserId:  userId,
+			GroupId: groupId,
+		},
+	}
+
+	dwsv1alpha1.AddOwnerLabels(dm, parentDm)
+
+	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.DataMovementCreateResponse{
+		Uid:    dm.GetName(),
+		Status: pb.DataMovementCreateResponse_CREATED,
+	}, nil
+}
+
+func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, userId uint32, groupId uint32, computeMountInfo *dwsv1alpha1.ClientMountInfo) (*pb.DataMovementCreateResponse, error) {
+	// Find the ClientMount for the rabbit.
+	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
+	if err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: err.Error(),
+		}, nil
+	}
 
 	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name.String(),
-			Namespace: s.namespace,
+			GenerateName: fmt.Sprintf("%s-%s-", req.Namespace, req.Workflow),
+			Namespace:    s.namespace,
 			Labels: map[string]string{
 				dmctrl.InitiatorLabel: s.name,
 			},
@@ -292,10 +402,6 @@ Retry:
 	dwsv1alpha1.AddOwnerLabels(dm, parent)
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
-		if errors.IsAlreadyExists(err) {
-			goto Retry
-		}
-
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
 			Message: err.Error(),
@@ -303,12 +409,21 @@ Retry:
 	}
 
 	return &pb.DataMovementCreateResponse{
-		Uid:    name.String(),
+		Uid:    dm.GetName(),
 		Status: pb.DataMovementCreateResponse_CREATED,
 	}, nil
 }
 
 func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
+
+	if strings.HasPrefix(req.Uid, nameBase) {
+		return s.nnfDataMovementStatus(ctx, req)
+	} else {
+		return s.rsyncNodeDataMovementStatus(ctx, req)
+	}
+}
+
+func (s *defaultServer) rsyncNodeDataMovementStatus(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
 
 	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
@@ -318,7 +433,6 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 				Status: pb.DataMovementStatusResponse_NOT_FOUND,
 			}, nil
 		}
-
 		return nil, err
 	}
 
@@ -326,7 +440,6 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 		s.waitForCompletionOrTimeout(req)
 
-		rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
 			if errors.IsNotFound(err) {
 				return &pb.DataMovementStatusResponse{
@@ -379,6 +492,50 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 	}
 
 	return &pb.DataMovementStatusResponse{State: state, Status: status, Message: rsync.Status.Message}, nil
+}
+
+func (s *defaultServer) nnfDataMovementStatus(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
+
+	dm := &nnfv1alpha1.NnfDataMovement{}
+	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.name}, dm); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.DataMovementStatusResponse{
+				State:  pb.DataMovementStatusResponse_UNKNOWN_STATE,
+				Status: pb.DataMovementStatusResponse_NOT_FOUND,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	if dm.Status.EndTime.IsZero() && req.MaxWaitTime != 0 {
+
+		s.waitForCompletionOrTimeout(req)
+
+		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.name}, dm); err != nil {
+			if errors.IsNotFound(err) {
+				return &pb.DataMovementStatusResponse{
+					State:  pb.DataMovementStatusResponse_UNKNOWN_STATE,
+					Status: pb.DataMovementStatusResponse_NOT_FOUND,
+				}, nil
+			}
+
+			return nil, err
+		}
+	}
+
+	if dm.Status.StartTime.IsZero() {
+		return &pb.DataMovementStatusResponse{
+			State:  pb.DataMovementStatusResponse_PENDING,
+			Status: pb.DataMovementStatusResponse_SUCCESS,
+		}, nil
+	}
+
+	return &pb.DataMovementStatusResponse{
+			State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
+			Status:  pb.DataMovementStatusResponse_UNKNOWN_STATUS,
+			Message: "State unknown"},
+		fmt.Errorf("failed to decode returned state")
 }
 
 func (s *defaultServer) notifyCompletion(name string) {
@@ -466,12 +623,38 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 	}, nil
 }
 
-func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, req *pb.DataMovementCreateRequest) (string, error) {
+func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, dest string) (*lusv1alpha1.LustreFileSystem, error) {
 
-	computeMountInfo, err := s.findComputeMountInfo(ctx, req)
-	if err != nil {
-		return "", err
+	if !filepath.IsAbs(dest) {
+		return nil, fmt.Errorf("Destination must be an absolute path")
 	}
+	origDest := dest
+	if !strings.HasSuffix(dest, "/") {
+		dest += "/"
+	}
+
+	lustrefsList := &lusv1alpha1.LustreFileSystemList{}
+	if err := s.client.List(ctx, lustrefsList); err != nil {
+		return nil, fmt.Errorf("Unable to list LustreFileSystem resources: %s", err.Error())
+	}
+	if len(lustrefsList.Items) == 0 {
+		return nil, fmt.Errorf("No LustreFileSystem resources found")
+	}
+
+	for _, lustrefs := range lustrefsList.Items {
+		mroot := lustrefs.Spec.MountRoot
+		if !strings.HasSuffix(mroot, "/") {
+			mroot += "/"
+		}
+		if strings.HasPrefix(dest, mroot) {
+			return &lustrefs, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Unable to find a LustreFileSystem resource matching %s", origDest)
+}
+
+func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha1.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
 
 	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
 	// to this value resulting in the full path on the Rabbit.
@@ -507,7 +690,7 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, req *pb.Da
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha1.ClientMountInfo, error) {
+func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha1.ClientMount, *dwsv1alpha1.ClientMountInfo, error) {
 
 	listOptions := []client.ListOption{
 		client.InNamespace(s.name),
@@ -519,24 +702,24 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 
 	clientMounts := &dwsv1alpha1.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
+		return nil, nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
 	}
 
 	for _, clientMount := range clientMounts.Items {
 		for _, mount := range clientMount.Spec.Mounts {
 			if strings.HasPrefix(req.GetSource(), mount.MountPath) {
-				if mount.Device.DeviceReference == nil {
-					return nil, fmt.Errorf("Source path '%s' does not have device reference", req.GetSource())
+				if mount.Device.DeviceReference == nil && mount.Device.Type != "lustre" {
+					return nil, nil, fmt.Errorf("ClientMount %s/%s: Source path '%s' does not have device reference", clientMount.Namespace, clientMount.Name, req.GetSource())
 				}
 
-				return &mount, nil
+				return &clientMount, &mount, nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
+	return nil, nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
 }
