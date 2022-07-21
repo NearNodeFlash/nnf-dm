@@ -629,7 +629,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 		return nil, fmt.Errorf("Destination must be an absolute path")
 	}
 	origDest := dest
-	if strings.TrimRight(dest, "/") == dest {
+	if !strings.HasSuffix(dest, "/") {
 		dest += "/"
 	}
 
@@ -643,7 +643,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 
 	for _, lustrefs := range lustrefsList.Items {
 		mroot := lustrefs.Spec.MountRoot
-		if strings.TrimRight(mroot, "/") == mroot {
+		if !strings.HasSuffix(mroot, "/") {
 			mroot += "/"
 		}
 		if strings.HasPrefix(dest, mroot) {

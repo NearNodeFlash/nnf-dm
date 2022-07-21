@@ -77,7 +77,7 @@ func (r *DataMovementReconciler) initializeLustreJob(ctx context.Context, dm *nn
 	log := log.FromContext(ctx, "DataMovement", "Lustre")
 
 	// We need to label all the nodes in the NNF Storage object with a unique label that describes this
-	// data movememnt. This label is then used as a selector within the the MPIJob so it correctly
+	// data movemement. This label is then used as a selector within the MPIJob so it correctly
 	// targets all the nodes
 	result, workerCount, err := r.labelStorageNodes(ctx, dm)
 	if err != nil {
