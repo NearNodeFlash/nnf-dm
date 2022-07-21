@@ -40,6 +40,7 @@ import (
 	kubeflowv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
 	lustrecsi "github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service"
@@ -186,6 +187,15 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 
 func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("unlabel")
+
+	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&nnfv1alpha1.NnfDataMovementList{}}, dm)
+	if err != nil {
+		return nil, err
+	}
+
+	if deleteStatus == dwsv1alpha1.DeleteRetry {
+		return &ctrl.Result{}, nil
+	}
 
 	label := dm.Name
 	nodes := &corev1.NodeList{}
