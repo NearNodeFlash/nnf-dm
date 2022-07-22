@@ -167,7 +167,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	currentConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
+	conditionIndex := len(dm.Status.Conditions) - 1
+	currentConditionType := dm.Status.Conditions[conditionIndex].Type
 	log.Info("Executing", "IsLustre2Lustre", isLustre2Lustre, "Condition", currentConditionType)
 	switch currentConditionType {
 
@@ -181,6 +182,16 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		result, err := startFn(ctx, dm)
 		if err != nil {
 			log.Error(err, "Failed to start")
+
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Conditions[conditionIndex].Reason = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Conditions[conditionIndex].Message = fmt.Sprintf("Failed to start: %v", err)
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				log.Error(err, "Failed to record start error status")
+				return ctrl.Result{}, err
+			}
+
 			return ctrl.Result{}, err
 		} else if result != nil && !result.IsZero() {
 			return *result, nil
@@ -210,6 +221,16 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		if err != nil {
 			log.Error(err, "Failed to monitor")
+
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Conditions[conditionIndex].Reason = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Conditions[conditionIndex].Message = fmt.Sprintf("Failed to monitor: %v", err)
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				log.Error(err, "Failed to record monitor error status")
+				return ctrl.Result{}, err
+			}
+
 			return ctrl.Result{}, err
 		} else if result != nil && !result.IsZero() {
 			return *result, nil
@@ -304,6 +325,8 @@ func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string
 		dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
 	}
 
+	dm.Status.State = typ
+	dm.Status.Status = reason
 	dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
 		Type:               typ,
 		Reason:             reason,
