@@ -126,6 +126,8 @@ github.com/NearNodeFlash/nnf-sos v0.0.0-20220715175100-d63904c02e85 h1:liyDzeOox
 github.com/NearNodeFlash/nnf-sos v0.0.0-20220715175100-d63904c02e85/go.mod h1:CuZPvwgElI7Y65xH5HRyAtOiYuB1So/BfWEM1FZfjZM=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20220722191935-250f79628ff6 h1:BIC11Pk4IvZRbNqSsd7lzxYOUXdw0TOfg97orfAAxug=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20220722191935-250f79628ff6/go.mod h1:XDnGihdNibEcJorWJRX69+F4riaFtwVvBIRG5MtowS8=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20220722212512-1f58caf7d93a h1:eYFJ32Z5vJ/OKJ1KR2K18C/HLGTAY1MaxG+u/oPkTK4=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20220722212512-1f58caf7d93a/go.mod h1:XDnGihdNibEcJorWJRX69+F4riaFtwVvBIRG5MtowS8=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/PuerkitoBio/purell v1.0.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=

@@ -9,7 +9,7 @@ require (
 	github.com/HewlettPackard/dws v0.0.0-20220722142328-61ef62704d60
 	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220623194136-08b4e1a6e302
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20220722191935-250f79628ff6
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20220722212512-1f58caf7d93a
 	github.com/google/uuid v1.3.0
 	github.com/kubeflow/common v0.4.1
 	github.com/kubeflow/mpi-operator/v2 v2.0.0-20211209024655-d7fc50603a4d

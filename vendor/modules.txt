@@ -27,7 +27,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 github.com/NearNodeFlash/lustre-fs-operator/controllers
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20220706162210-e3216b00db0b
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220722191935-250f79628ff6
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220722212512-1f58caf7d93a
 ## explicit
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
