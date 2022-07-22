@@ -23,7 +23,7 @@
 #include <stdlib.h>
 
 #include "client.h"
-#include "rsyncdatamovement.pb-c.h"
+#include "datamovement.pb-c.h"
 
 void die(const char *format, ...) {
     va_list args;
