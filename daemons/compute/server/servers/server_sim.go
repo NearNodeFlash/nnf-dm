@@ -35,7 +35,7 @@ type simulatedServer struct {
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
-	return &simulatedServer{}, nil
+	return &simulatedServer{requests: make(map[uuid.UUID]interface{})}, nil
 }
 
 func (s *simulatedServer) StartManager() error {
