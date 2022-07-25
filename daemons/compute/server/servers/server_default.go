@@ -531,11 +531,39 @@ func (s *defaultServer) nnfDataMovementStatus(ctx context.Context, req *pb.DataM
 		}, nil
 	}
 
-	return &pb.DataMovementStatusResponse{
-			State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
-			Status:  pb.DataMovementStatusResponse_UNKNOWN_STATUS,
-			Message: "State unknown"},
-		fmt.Errorf("failed to decode returned state")
+	stateMap := map[string]pb.DataMovementStatusResponse_State{
+		"": pb.DataMovementStatusResponse_UNKNOWN_STATE,
+		nnfv1alpha1.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
+		nnfv1alpha1.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
+		nnfv1alpha1.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
+	}
+
+	state, ok := stateMap[dm.Status.State]
+	if !ok {
+		return &pb.DataMovementStatusResponse{
+				State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
+				Status:  pb.DataMovementStatusResponse_FAILED,
+				Message: fmt.Sprintf("State %s unknown", dm.Status.State)},
+			fmt.Errorf("failed to decode returned state")
+	}
+
+	statusMap := map[string]pb.DataMovementStatusResponse_Status{
+		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
+		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.DataMovementStatusResponse_FAILED,
+		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.DataMovementStatusResponse_INVALID,
+	}
+
+	status, ok := statusMap[dm.Status.Status]
+	if !ok {
+		return &pb.DataMovementStatusResponse{
+				State:   state,
+				Status:  pb.DataMovementStatusResponse_UNKNOWN_STATUS,
+				Message: fmt.Sprintf("Status %s unknown", dm.Status.Status)},
+			fmt.Errorf("failed to decode returned status")
+	}
+
+	return &pb.DataMovementStatusResponse{State: state, Status: status, Message: dm.Status.Message}, nil
 }
 
 func (s *defaultServer) notifyCompletion(name string) {
@@ -591,6 +619,15 @@ func (s *defaultServer) waitForCompletionOrTimeout(req *pb.DataMovementStatusReq
 
 func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {
 
+	if strings.HasPrefix(req.Uid, nameBase) {
+		return s.nnfDataMovementDelete(ctx, req)
+	} else {
+		return s.rsyncNodeDataMovementDelete(ctx, req)
+	}
+}
+
+func (s *defaultServer) rsyncNodeDataMovementDelete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {
+
 	rsync := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
 		if errors.IsNotFound(err) {
@@ -609,6 +646,40 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 	}
 
 	if err := s.client.Delete(ctx, rsync); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.DataMovementDeleteResponse{
+				Status: pb.DataMovementDeleteResponse_NOT_FOUND,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	return &pb.DataMovementDeleteResponse{
+		Status: pb.DataMovementDeleteResponse_DELETED,
+	}, nil
+}
+
+func (s *defaultServer) nnfDataMovementDelete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {
+
+	dm := &nnfv1alpha1.NnfDataMovement{}
+	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.name}, dm); err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.DataMovementDeleteResponse{
+				Status: pb.DataMovementDeleteResponse_NOT_FOUND,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	if dm.Status.State != nnfv1alpha1.DataMovementConditionTypeFinished {
+		return &pb.DataMovementDeleteResponse{
+			Status: pb.DataMovementDeleteResponse_ACTIVE,
+		}, nil
+	}
+
+	if err := s.client.Delete(ctx, dm); err != nil {
 		if errors.IsNotFound(err) {
 			return &pb.DataMovementDeleteResponse{
 				Status: pb.DataMovementDeleteResponse_NOT_FOUND,
