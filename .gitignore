@@ -19,6 +19,7 @@ test.out
 *.out
 
 # Daemon executables & libraries
+daemons/compute/server/nnf-dm
 daemons/compute/client-c/client
 daemons/compute/client-c/client.a
 daemons/compute/server/server

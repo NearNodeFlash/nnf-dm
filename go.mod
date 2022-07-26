@@ -6,10 +6,10 @@ go 1.16
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20220622180158-5515cc45cbce
+	github.com/HewlettPackard/dws v0.0.0-20220722155127-cce5fcd2f966
 	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220623194136-08b4e1a6e302
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20220708181325-025c60634669
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20220725185203-a8a68b078e0f
 	github.com/google/uuid v1.3.0
 	github.com/kubeflow/common v0.4.1
 	github.com/kubeflow/mpi-operator/v2 v2.0.0-20211209024655-d7fc50603a4d

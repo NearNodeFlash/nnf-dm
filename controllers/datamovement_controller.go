@@ -181,6 +181,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		result, err := startFn(ctx, dm)
 		if err != nil {
 			log.Error(err, "Failed to start")
+
+			msg := fmt.Sprintf("Failed to start: %v", err)
+			resetConditionRollup(dm, nnfv1alpha1.DataMovementConditionReasonFailed, msg)
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				log.Error(err, "Failed to record start error status")
+				return ctrl.Result{}, err
+			}
+
 			return ctrl.Result{}, err
 		} else if result != nil && !result.IsZero() {
 			return *result, nil
@@ -210,6 +219,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		if err != nil {
 			log.Error(err, "Failed to monitor")
+
+			msg := fmt.Sprintf("Failed to monitor: %v", err)
+			resetConditionRollup(dm, nnfv1alpha1.DataMovementConditionReasonFailed, msg)
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				log.Error(err, "Failed to record monitor error status")
+				return ctrl.Result{}, err
+			}
+
 			return ctrl.Result{}, err
 		} else if result != nil && !result.IsZero() {
 			return *result, nil
@@ -299,10 +317,27 @@ func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1a
 	return fsType == "lustre", err
 }
 
+// resetConditionRollup will reset the rollup Reason and Message for the current
+// condition type, and will also update the latest element of the Conditions array.
+func resetConditionRollup(dm *nnfv1alpha1.NnfDataMovement, reason string, message string) {
+
+	dm.Status.Status = reason
+	dm.Status.Message = message
+
+	idx := len(dm.Status.Conditions) - 1
+	dm.Status.Conditions[idx].Reason = reason
+	dm.Status.Conditions[idx].Message = message
+}
+
 func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string, message string) {
 	if len(dm.Status.Conditions) != 0 {
 		dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
 	}
+
+	// Set the rollup status.
+	dm.Status.State = typ
+	dm.Status.Status = reason
+	dm.Status.Message = message
 
 	dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
 		Type:               typ,
