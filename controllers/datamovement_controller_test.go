@@ -239,9 +239,7 @@ var _ = Describe("Data Movement Controller", func() {
 	})
 
 	createGlobalLustre := func() {
-		mgsNids := []string{
-			globalMGS,
-		}
+		mgsNids := globalMGS
 
 		lustre = &lusv1alpha1.LustreFileSystem{
 			ObjectMeta: metav1.ObjectMeta{
