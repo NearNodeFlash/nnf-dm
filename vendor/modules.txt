@@ -13,21 +13,21 @@ github.com/Azure/go-autorest/autorest/date
 github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 github.com/Azure/go-autorest/tracing
-# github.com/HewlettPackard/dws v0.0.0-20220726224215-294e62b7e652
+# github.com/HewlettPackard/dws v0.0.0-20220727174355-452479fbcc79
 ## explicit
 github.com/HewlettPackard/dws/api/v1alpha1
 github.com/HewlettPackard/dws/utils/dwdparse
 # github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95
 ## explicit
 github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service
-# github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220726174415-75ead3791889
+# github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220727174249-9b7004c2cb38
 ## explicit
 github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 github.com/NearNodeFlash/lustre-fs-operator/controllers
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20220706162210-e3216b00db0b
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220727153317-de5dbed664b9
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220727181002-fed241b11a5e
 ## explicit
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
