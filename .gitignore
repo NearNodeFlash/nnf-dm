@@ -23,6 +23,7 @@ daemons/compute/server/nnf-dm
 daemons/compute/client-c/client
 daemons/compute/client-c/client.a
 daemons/compute/server/server
+daemons/compute/client-go/client-go
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 
