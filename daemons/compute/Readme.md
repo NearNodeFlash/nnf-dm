@@ -77,8 +77,8 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 | ----- | ---- | ----------- |
 | `initiator` | string | Name of the initiating resource. Defaults to the environmental variable `NODE_NAME` |
 | `target` | string | Name of the target resource which should execute this request. Defaults to the environmental variable `NNF_NODE_NAME` |
-| `workflow` | string | Name of the workflow that is associated with this data movement request. WLM must proivded this as en environmental variable (i.e. `DW_WORKFLOW_NAME`) |
-| `namespace` | string | Namespace of the workflow that is associated with this data movement request. WLM must proivded this as en environmental variable (i.e. `DW_WORKFLOW_NAMESPACE`) |
+| `workflow` | string | Name of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAME`) |
+| `namespace` | string | Namespace of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAMESPACE`) |
 | `source` | string | The source file or directory |
 | `destination` | string | The destination file or directory |
 | `dryrun` | bool | If True, the rsync copy operation should evaluate the inputs but not perform the copy |
@@ -86,15 +86,14 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 ### Create Response
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `uid` | string | The unique identifier for the created data movememnt resource |
-
+| `uid` | string | The unique identifier for the created data movement resource |
 
 ## Query the status of a data movement request
 
 ### Status Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `uid` | string | The unique identifier for the created data movememnt resource |
+| `uid` | string | The unique identifier for the created data movement resource |
 | `maxWaitTime` | int64 | The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait |
 
 ### Status Responsee
@@ -120,12 +119,32 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 | 2 | Succeess | The request completed with success |
 | 3 | Failed | The request failed. See `message` for details |
 
+
+## List the data movement requests
+
+`namespace` and `workflow` must be supplied in order to retrieve data movement
+requests. An empty list of `uids` will be returned if there are no data movement
+requests that match both `namespace` and `workflow`.
+
+### List Request
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `workflow` | string | Name of the workflow that is associated with the data movement requests to be retrieved. |
+| `namespace` | string | Namespace of the workflow that is associated with the data movement requests to be retrieved. |
+
+### List Response
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `uids` | string[] | List of data movement requests associated with the given workflow and namespace. |
+
 ## Delete a data movement request
 
 ### Delete Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `uid` | string | The unique identifier for the data movememnt resource |
+| `uid` | string | The unique identifier for the data movement resource |
 
 ### Delete Response 
 | Field | Type | Description |

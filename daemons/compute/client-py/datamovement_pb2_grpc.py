@@ -31,6 +31,11 @@ class DataMoverStub(object):
                 request_serializer=datamovement__pb2.DataMovementDeleteRequest.SerializeToString,
                 response_deserializer=datamovement__pb2.DataMovementDeleteResponse.FromString,
                 )
+        self.List = channel.unary_unary(
+                '/datamovement.DataMover/List',
+                request_serializer=datamovement__pb2.DataMovementListRequest.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementListResponse.FromString,
+                )
 
 
 class DataMoverServicer(object):
@@ -55,8 +60,15 @@ class DataMoverServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def Delete(self, request, context):
-        """Delete will attempt to delete a completed data movement request. It accepts a unique identifer
+        """Delete will attempt to delete a completed data movement request. It accepts a unique identifier
         that identifies the request and returns the status of the delete operation.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def List(self, request, context):
+        """List returns all current data movement requests for a given namespace and workflow.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -79,6 +91,11 @@ def add_DataMoverServicer_to_server(servicer, server):
                     servicer.Delete,
                     request_deserializer=datamovement__pb2.DataMovementDeleteRequest.FromString,
                     response_serializer=datamovement__pb2.DataMovementDeleteResponse.SerializeToString,
+            ),
+            'List': grpc.unary_unary_rpc_method_handler(
+                    servicer.List,
+                    request_deserializer=datamovement__pb2.DataMovementListRequest.FromString,
+                    response_serializer=datamovement__pb2.DataMovementListResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -140,5 +157,22 @@ class DataMover(object):
         return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Delete',
             datamovement__pb2.DataMovementDeleteRequest.SerializeToString,
             datamovement__pb2.DataMovementDeleteResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def List(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/List',
+            datamovement__pb2.DataMovementListRequest.SerializeToString,
+            datamovement__pb2.DataMovementListResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

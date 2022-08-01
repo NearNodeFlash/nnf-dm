@@ -95,3 +95,17 @@ func (s *simulatedServer) Delete(ctx context.Context, req *pb.DataMovementDelete
 		Status: pb.DataMovementDeleteResponse_DELETED,
 	}, nil
 }
+
+func (s *simulatedServer) List(ctx context.Context, req *pb.DataMovementListRequest) (*pb.DataMovementListResponse, error) {
+	if len(s.requests) > 0 {
+		// Get the uuids from the requests map
+		uids := make([]string, 0)
+		for key := range s.requests {
+			uids = append(uids, key.String())
+		}
+
+		return &pb.DataMovementListResponse{Uids: uids}, nil
+	} else {
+		return &pb.DataMovementListResponse{Uids: nil}, nil
+	}
+}

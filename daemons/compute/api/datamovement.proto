@@ -1,4 +1,19 @@
-// TODO: Copyright
+// Copyright 2022 Hewlett Packard Enterprise Development LP
+// Other additional copyright holders may be indicated within.
+//
+// The entirety of this work is licensed under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+//
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 syntax = "proto3";
 
@@ -20,12 +35,15 @@ service DataMover {
     // identifier that identifies the request and returns a status message.
     rpc Status (DataMovementStatusRequest) returns (DataMovementStatusResponse) {}
 
-    // Delete will attempt to delete a completed data movement request. It accepts a unique identifer
+    // Delete will attempt to delete a completed data movement request. It accepts a unique identifier
     // that identifies the request and returns the status of the delete operation.
     rpc Delete (DataMovementDeleteRequest) returns (DataMovementDeleteResponse) {}
+
+    // List returns all current data movement requests for a given namespace and workflow.
+    rpc List (DataMovementListRequest) returns (DataMovementListResponse) {}
 }
 
-// The data movemement create request message containing the source and destination files or directories. The
+// The data movement create request message containing the source and destination files or directories. The
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
 message DataMovementCreateRequest {
@@ -38,7 +56,7 @@ message DataMovementCreateRequest {
 
 // The data movement create response message contains a unique identifier amont all data movement requests for
 // the lifetime of the active job. The UID can be used to query for status of the request using the
-// data movememnt status request message.
+// data movement status request message.
 message DataMovementCreateResponse {
     string uid = 1;
 
@@ -97,4 +115,18 @@ message DataMovementDeleteResponse {
         UNKNOWN = 4;
     }
     Status status = 1;
+}
+
+// The data movement list request allows a user to get a list of the current
+// data movement requests. The user must supply the workflow and namespace
+// which will be used to filter the data movement requests for retrieval.
+message DataMovementListRequest {
+    string workflow = 1;
+    string namespace = 2;
+}
+
+// The data movement list response returns a list of the matching data movement
+// requests' uids
+message DataMovementListResponse {
+    repeated string uids = 1;
 }
