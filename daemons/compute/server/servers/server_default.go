@@ -414,6 +414,30 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 	}, nil
 }
 
+func (s *defaultServer) List(ctx context.Context, req *pb.DataMovementListRequest) (*pb.DataMovementListResponse, error) {
+
+	// Only get the DMs that match the workflow and workflow namespace
+	opts := []client.ListOption{
+		client.MatchingLabels{dwsv1alpha1.OwnerNamespaceLabel: req.Namespace},
+		client.MatchingLabels{dwsv1alpha1.OwnerNameLabel: req.Workflow},
+	}
+
+	list := dmv1alpha1.RsyncNodeDataMovementList{}
+	if err := s.client.List(ctx, &list, opts...); err != nil {
+		return nil, err
+	}
+
+	rsyncdm_uids := make([]string, 0)
+	for i := 0; i < len(list.Items); i++ {
+		// extract the uid (name) and add to the list
+		rsyncdm_uids = append(rsyncdm_uids, list.Items[i].ObjectMeta.Name)
+	}
+
+	return &pb.DataMovementListResponse{
+		Uids: rsyncdm_uids,
+	}, nil
+}
+
 func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
 
 	if strings.HasPrefix(req.Uid, nameBase) {
