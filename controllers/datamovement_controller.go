@@ -55,7 +55,7 @@ type DataMovementReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
@@ -95,18 +95,19 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		isLustre2Lustre, _ := r.isLustre2Lustre(ctx, dm)
-		teardownFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
-			false: r.teardownRsyncJob,
-			true:  r.teardownLustreJob,
-		}[isLustre2Lustre]
+		teardownFns := []func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
+			r.teardownRsyncJob,
+			r.teardownLustreJob,
+		}
 
-		result, err := teardownFn(ctx, dm)
-		log.Info("Teardown", "Result", result, "Error", err)
-		if err != nil {
-			return ctrl.Result{}, err
-		} else if result != nil {
-			return *result, nil
+		for _, teardownFn := range teardownFns {
+			result, err := teardownFn(ctx, dm)
+			log.Info("Teardown", "Result", result, "Error", err)
+			if err != nil {
+				return ctrl.Result{}, err
+			} else if result != nil {
+				return *result, nil
+			}
 		}
 
 		controllerutil.RemoveFinalizer(dm, finalizer)

@@ -186,20 +186,23 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 }
 
 func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
-	log := log.FromContext(ctx).WithName("unlabel")
+	log := log.FromContext(ctx).WithName("teardown")
+	log.Info("Deleting all lustre jobs")
 
 	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&nnfv1alpha1.NnfDataMovementList{}}, dm)
 	if err != nil {
+		log.Error(err, "Unable to delete NnfDataMovment children")
 		return nil, err
 	}
 
 	if deleteStatus == dwsv1alpha1.DeleteRetry {
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	label := dm.Name
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes, client.HasLabels{label}); err != nil {
+		log.Error(err, "Unable to list nodes")
 		return nil, err
 	}
 
@@ -207,6 +210,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 	for _, node := range nodes.Items {
 		delete(node.Labels, label)
 		if err := r.Update(ctx, &node); err != nil {
+			log.Error(err, "Unable to unlabel node", "node", node.Name)
 			return nil, err
 		}
 	}
@@ -219,6 +223,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 
 	if err := r.Delete(ctx, pv); err != nil {
 		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Unable to delete PV", "pvname", pv.Name)
 			return nil, err
 		}
 	}
@@ -232,6 +237,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 
 	if err := r.Delete(ctx, pvc); err != nil {
 		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Unable to delete PVC", "pvcname", pvc.Name)
 			return nil, err
 		}
 	}
@@ -245,6 +251,7 @@ func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv
 
 	if err := r.Delete(ctx, job); err != nil {
 		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Unable to delete MPIJob", "name", job.Name)
 			return nil, err
 		}
 	}
