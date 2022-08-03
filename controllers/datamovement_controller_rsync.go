@@ -283,7 +283,7 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 }
 
 func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	log := log.FromContext(ctx).WithName("teardown")
 	log.Info("Deleting all rsync jobs")
 
 	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&dmv1alpha1.RsyncNodeDataMovementList{}}, dm)

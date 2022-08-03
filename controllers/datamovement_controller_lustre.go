@@ -186,7 +186,7 @@ func (r *DataMovementReconciler) labelStorageNodes(ctx context.Context, dm *nnfv
 }
 
 func (r *DataMovementReconciler) teardownLustreJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	log := log.FromContext(ctx).WithName("teardown")
 	log.Info("Deleting all lustre jobs")
 
 	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&nnfv1alpha1.NnfDataMovementList{}}, dm)
