@@ -284,15 +284,16 @@ func (r *DataMovementReconciler) monitorRsyncJob(ctx context.Context, dm *nnfv1a
 
 func (r *DataMovementReconciler) teardownRsyncJob(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error) {
 	log := log.FromContext(ctx)
-	log.V(1).Info("Deleting all nodes")
+	log.Info("Deleting all rsync jobs")
 
 	deleteStatus, err := dwsv1alpha1.DeleteChildren(ctx, r.Client, []dwsv1alpha1.ObjectList{&dmv1alpha1.RsyncNodeDataMovementList{}}, dm)
 	if err != nil {
+		log.Error(err, "Unable to delete RsyncNodeDataMovement children")
 		return nil, err
 	}
 
 	if deleteStatus == dwsv1alpha1.DeleteRetry {
-		return &ctrl.Result{}, nil
+		return &ctrl.Result{Requeue: true}, nil
 	}
 
 	return nil, nil

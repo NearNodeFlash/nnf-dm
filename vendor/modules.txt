@@ -25,9 +25,9 @@ github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service
 github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 github.com/NearNodeFlash/lustre-fs-operator/controllers
-# github.com/NearNodeFlash/nnf-ec v0.0.0-20220706162210-e3216b00db0b
+# github.com/NearNodeFlash/nnf-ec v0.0.0-20220726184901-f1d60304f049
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220727181002-fed241b11a5e
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220801194142-f58084033fd8
 ## explicit
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
