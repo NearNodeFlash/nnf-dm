@@ -10,8 +10,8 @@ To generate the gRPC client interfaces from our .proto service definition, use t
 $ make protoc
 ```
 Running this command generate the following files in your current directory
-- datamovement.pb-c.h, the header which declares your generated message classes
-- datamovement.pb-c.c, which contains the implementation of your message classes
+- `datamovement.pb-c.h`, the header which declares your generated message classes
+- `datamovement.pb-c.c`, which contains the implementation of your message classes
 
 ## Creating the Client
 
@@ -26,7 +26,7 @@ Build the client
 ```
 $ make client
 ```
-Assuming you have a server running (i.e. `./server --simulated --socket=/tmp/nnf.sock`) Run the client
+Assuming you have a server running (i.e. `./server --simulated --socket=/tmp/nnf.sock`), run the client
 ```
 $ ./client
 ```

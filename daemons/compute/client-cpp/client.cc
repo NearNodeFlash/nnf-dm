@@ -51,7 +51,6 @@ int main(int argc, char** argv) {
 
     DataMoverClient client(
         grpc::CreateChannel("unix:///tmp/nnf.sock", grpc::InsecureChannelCredentials()));
-    
 
     std::string uid;
     
