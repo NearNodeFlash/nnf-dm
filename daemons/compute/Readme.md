@@ -169,6 +169,13 @@ The Go client, which resides in ./client-go, is the most customizable client exa
 
 The C client, which resides in ./_client-c, is a simple client that uses CGo as an interface to the server. (The leading underscore "\_" in the directory is so Go ignores directory as part of a larger repository build). As there is no native C GRPC implementation, Go is used to interface with the GRPC server while providing an interface to the C code. A Makefile is provided to build the various components and assemble it into a final executable.
 
+The C client should not be used for anything more than rapid prototyping. No new features will be added to the C client.
+
+
+## C++
+
+The C++ client, which resides in ./client-cpp, is a simple client that uses [gRPC C++](https://grpc.io/docs/languages/cpp/). 
+
 ## Python
 
 The Python client, which resides in ./client-py, is a very simple client. No customization options are provided

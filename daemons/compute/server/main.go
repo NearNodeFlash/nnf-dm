@@ -32,7 +32,7 @@ import (
 	"github.com/takama/daemon"
 	"google.golang.org/grpc"
 
-	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
 	server "github.com/NearNodeFlash/nnf-dm/daemons/compute/server/servers"

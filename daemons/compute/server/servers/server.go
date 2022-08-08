@@ -23,7 +23,7 @@ import (
 	"flag"
 	"os"
 
-	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 )
 
 type ServerOptions struct {

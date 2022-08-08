@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 	"github.com/google/uuid"
 )
 
