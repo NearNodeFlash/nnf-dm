@@ -21,6 +21,7 @@ test.out
 # Daemon executables & libraries
 daemons/compute/client-c/client
 daemons/compute/client-c/client.a
+daemons/compute/client-cpp/cmake
 daemons/compute/client-go/client-go
 daemons/compute/server/nnf-dm
 daemons/compute/server/server
