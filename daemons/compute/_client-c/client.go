@@ -32,7 +32,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/api"
+	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 )
 
 var (
@@ -74,10 +74,12 @@ func Create(source, destination *C.char) (uid *C.char, rc int32) {
 	}
 
 	rsp, err := client.Create(context.TODO(), &pb.DataMovementCreateRequest{
+		Workflow: &pb.DataMovementCreateRequest_Workflow{
+			Name:      os.Getenv("DW_WORKFLOW_NAME"),
+			Namespace: os.Getenv("DW_WORKFLOW_NAMESPACE"),
+		},
 		Source:      C.GoString(source),
 		Destination: C.GoString(destination),
-		Workflow:    os.Getenv("DW_WORKFLOW_NAME"),
-		Namespace:   os.Getenv("DW_WORKFLOW_NAMESPACE"),
 	})
 
 	if err != nil {

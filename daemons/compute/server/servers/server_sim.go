@@ -92,7 +92,7 @@ func (s *simulatedServer) Delete(ctx context.Context, req *pb.DataMovementDelete
 	delete(s.requests, uid)
 
 	return &pb.DataMovementDeleteResponse{
-		Status: pb.DataMovementDeleteResponse_DELETED,
+		Status: pb.DataMovementDeleteResponse_SUCCESS,
 	}, nil
 }
 

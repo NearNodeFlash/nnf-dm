@@ -47,11 +47,14 @@ service DataMover {
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
 message DataMovementCreateRequest {
-    string workflow = 3;
-    string namespace = 4;
-    string source = 5;
-    string destination = 6;
-    bool dryrun = 7;
+    message Workflow {
+        string name = 1;
+        string namespace = 2;
+    }
+    Workflow workflow = 1;
+    string source = 2;
+    string destination = 3;
+    bool dryrun = 4;
 }
 
 // The data movement create response message contains a unique identifier amont all data movement requests for
@@ -61,7 +64,7 @@ message DataMovementCreateResponse {
     string uid = 1;
 
     enum Status {
-        CREATED = 0;
+        SUCCESS = 0;
         FAILED = 1;
     }
     Status status = 2;
@@ -71,8 +74,9 @@ message DataMovementCreateResponse {
 // The data movement status request message permits users to query the status of a previously issued
 // data movement request by specifying the request's unique identifier.
 message DataMovementStatusRequest {
-    string uid = 1;
-    int64 maxWaitTime = 2;
+    DataMovementCreateRequest.Workflow workflow = 1;
+    string uid = 2;
+    int64 maxWaitTime = 3;
 }
 
 // The data movement status response message defines the current status of a data movement request. The
@@ -102,7 +106,8 @@ message DataMovementStatusResponse {
 // The data movement delete request permits users to delete a completed data movement request (any request with a 
 // status of COMPLETED) by specifying the request's unique identifier.
 message DataMovementDeleteRequest {
-    string uid = 1;
+    DataMovementCreateRequest.Workflow workflow = 1;
+    string uid = 2;
 }
 
 // The data movement delete response returns the status of the delete operation.
@@ -110,7 +115,7 @@ message DataMovementDeleteResponse {
     enum Status {
         INVALID = 0;
         NOT_FOUND = 1;
-        DELETED = 2;
+        SUCCESS = 2;
         ACTIVE = 3;
         UNKNOWN = 4;
     }
@@ -121,8 +126,7 @@ message DataMovementDeleteResponse {
 // data movement requests. The user must supply the workflow and namespace
 // which will be used to filter the data movement requests for retrieval.
 message DataMovementListRequest {
-    string workflow = 1;
-    string namespace = 2;
+    DataMovementCreateRequest.Workflow workflow = 1;
 }
 
 // The data movement list response returns a list of the matching data movement

@@ -70,15 +70,20 @@ Command line options are defined below; Most default to their corresponding envi
 # Data Movement Interface
 The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating, querying, and deleting data movement requests. The definitions for these can be found in [./api/datamovement.proto](./api/datamovement.proto) file. Consulting this file should be done in addition to the context in this section to ensure the latest API definitions are used.
 
+## Common fields for all requests
+Each nnf-dm request contains a Workflow message containing the Name and Namespace fields. WLM must provide these values to the user application that are then provided to the data-movement API. The recommended implementation is to use environmental variables.
+
+### Workflow
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `name` | string | Name of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAME`) |
+| `namespace` | string | Namespace of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAMESPACE`) |
 ## Creating a data movement request
 
 ### Create Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `initiator` | string | Name of the initiating resource. Defaults to the environmental variable `NODE_NAME` |
-| `target` | string | Name of the target resource which should execute this request. Defaults to the environmental variable `NNF_NODE_NAME` |
-| `workflow` | string | Name of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAME`) |
-| `namespace` | string | Namespace of the workflow that is associated with this data movement request. WLM must provide this as an environmental variable (i.e. `DW_WORKFLOW_NAMESPACE`) |
+| `workflow` | Workflow | The name and namespace of the initiating workflow |
 | `source` | string | The source file or directory |
 | `destination` | string | The destination file or directory |
 | `dryrun` | bool | If True, the rsync copy operation should evaluate the inputs but not perform the copy |
@@ -86,13 +91,21 @@ The nnf-dm service uses Protocol Buffers to define a set of APIs for initiating,
 ### Create Response
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `uid` | string | The unique identifier for the created data movement resource |
+| `uid` | string | The unique identifier for the created data movement resource if `Status` is Success |
+| `status` | Status | Status of the data movement create request |
+| `message` | string | String providing detailed message pertaining to the current status of the create request |
 
+#### Create Response `Status`
+| Value | Name | Description |
+| ----- | ---- | ----------- |
+| 0 | Success | The data movement resource created succcessfully |
+| 1 | Failed | The data movement resource failed to create. See `message` field for more information |
 ## Query the status of a data movement request
 
 ### Status Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
+| `workflow` | Workflow | The name and namespace of the initiating workflow |
 | `uid` | string | The unique identifier for the created data movement resource |
 | `maxWaitTime` | int64 | The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait |
 
@@ -130,8 +143,7 @@ requests that match both `namespace` and `workflow`.
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
-| `workflow` | string | Name of the workflow that is associated with the data movement requests to be retrieved. |
-| `namespace` | string | Namespace of the workflow that is associated with the data movement requests to be retrieved. |
+| `workflow` | Workflow | The name and namespace of the initiating workflow |
 
 ### List Response
 
@@ -144,6 +156,7 @@ requests that match both `namespace` and `workflow`.
 ### Delete Request
 | Field | Type | Description |
 | ----- | ---- | ----------- |
+| `workflow` | Workflow | The name and namespace of the initiating workflow |
 | `uid` | string | The unique identifier for the data movement resource |
 
 ### Delete Response 
@@ -156,7 +169,7 @@ requests that match both `namespace` and `workflow`.
 | ----- | ---- | ----------- |
 | 0 | Invalid | The delete request was found to be invalid |
 | 1 | Not Found | The request with the supplied UID was not found |
-| 2 | Deleted | The data movement request was deleted successfully |
+| 2 | Success | The data movement request was deleted successfully |
 | 3 | Active | The data movement request is currently active and cannot be deleted |
 
 # Example Clients
