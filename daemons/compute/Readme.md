@@ -98,7 +98,7 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 #### Create Response `Status`
 | Value | Name | Description |
 | ----- | ---- | ----------- |
-| 0 | Success | The data movement resource created succcessfully |
+| 0 | Success | The data movement resource created successfully |
 | 1 | Failed | The data movement resource failed to create. See `message` field for more information |
 ## Query the status of a data movement request
 
