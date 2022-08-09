@@ -74,7 +74,7 @@ func Create(source, destination *C.char) (uid *C.char, rc int32) {
 	}
 
 	rsp, err := client.Create(context.TODO(), &pb.DataMovementCreateRequest{
-		Workflow: &pb.DataMovementCreateRequest_Workflow{
+		Workflow: &pb.DataMovementWorkflow{
 			Name:      os.Getenv("DW_WORKFLOW_NAME"),
 			Namespace: os.Getenv("DW_WORKFLOW_NAMESPACE"),
 		},

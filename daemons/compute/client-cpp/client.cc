@@ -29,7 +29,7 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 using datamovement::DataMover;
-using datamovement::DataMovementCreateRequest_Workflow;
+using datamovement::DataMovementWorkflow;
 using datamovement::DataMovementCreateRequest;
 using datamovement::DataMovementCreateResponse;
 using datamovement::DataMovementCreateResponse_Status;
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 
     std::string uid;
     
-    DataMovementCreateRequest_Workflow workflow;
+    DataMovementWorkflow workflow;
     workflow.set_name("YOUR-WORKFLOW-NAME");
     workflow.set_namespace_("YOUR-WORKFLOW-NAMESPACE");
 

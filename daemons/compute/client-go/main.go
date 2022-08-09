@@ -139,7 +139,7 @@ func main() {
 func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
-		Workflow: &pb.DataMovementCreateRequest_Workflow{
+		Workflow: &pb.DataMovementWorkflow{
 			Name:      workflow,
 			Namespace: namespace,
 		},
@@ -157,7 +157,7 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 
 func getStatus(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string, maxWaitTime int64) (*pb.DataMovementStatusResponse, error) {
 	rsp, err := client.Status(ctx, &pb.DataMovementStatusRequest{
-		Workflow: &pb.DataMovementCreateRequest_Workflow{
+		Workflow: &pb.DataMovementWorkflow{
 			Name:      workflow,
 			Namespace: namespace,
 		},
@@ -174,7 +174,7 @@ func getStatus(ctx context.Context, client pb.DataMoverClient, workflow string, 
 
 func listRequests(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string) (*pb.DataMovementListResponse, error) {
 	rsp, err := client.List(ctx, &pb.DataMovementListRequest{
-		Workflow: &pb.DataMovementCreateRequest_Workflow{
+		Workflow: &pb.DataMovementWorkflow{
 			Name:      workflow,
 			Namespace: namespace,
 		},
@@ -189,7 +189,7 @@ func listRequests(ctx context.Context, client pb.DataMoverClient, workflow strin
 
 func deleteRequest(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string) (*pb.DataMovementDeleteResponse, error) {
 	rsp, err := client.Delete(ctx, &pb.DataMovementDeleteRequest{
-		Workflow: &pb.DataMovementCreateRequest_Workflow{
+		Workflow: &pb.DataMovementWorkflow{
 			Name:      workflow,
 			Namespace: namespace,
 		},
