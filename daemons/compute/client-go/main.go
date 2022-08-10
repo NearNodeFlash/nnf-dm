@@ -81,7 +81,7 @@ func main() {
 			log.Fatalf("could not create data movement request: %v", err)
 		}
 
-		if createResponse.GetStatus() == pb.DataMovementCreateResponse_CREATED {
+		if createResponse.GetStatus() == pb.DataMovementCreateResponse_SUCCESS {
 			log.Printf("Data movement request created: %s", createResponse.GetUid())
 		} else {
 			log.Fatal("Create request failed: ", createResponse.String())
@@ -89,7 +89,7 @@ func main() {
 
 		// Wait for request to be completed
 		for {
-			statusResponse, err := getStatus(ctx, c, createResponse.GetUid(), *maxWaitTime)
+			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, createResponse.GetUid(), *maxWaitTime)
 			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
 				log.Fatalf("Data movement failed: %v", err)
 			}
@@ -120,7 +120,7 @@ func main() {
 		// Use List to cleanup and delete requests
 		for _, uid := range listResponse.GetUids() {
 			log.Printf("Deleting request: %v", uid)
-			deleteResponse, err := deleteRequest(ctx, c, uid)
+			deleteResponse, err := deleteRequest(ctx, c, *workflow, *namespace, uid)
 			if err != nil {
 				log.Fatalf("could not delete data movement request: %v", err)
 			}
@@ -139,8 +139,10 @@ func main() {
 func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
-		Workflow:    workflow,
-		Namespace:   namespace,
+		Workflow: &pb.DataMovementWorkflow{
+			Name:      workflow,
+			Namespace: namespace,
+		},
 		Source:      source,
 		Destination: destination,
 		Dryrun:      dryrun,
@@ -153,8 +155,12 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 	return rsp, nil
 }
 
-func getStatus(ctx context.Context, client pb.DataMoverClient, uid string, maxWaitTime int64) (*pb.DataMovementStatusResponse, error) {
+func getStatus(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string, maxWaitTime int64) (*pb.DataMovementStatusResponse, error) {
 	rsp, err := client.Status(ctx, &pb.DataMovementStatusRequest{
+		Workflow: &pb.DataMovementWorkflow{
+			Name:      workflow,
+			Namespace: namespace,
+		},
 		Uid:         uid,
 		MaxWaitTime: maxWaitTime,
 	})
@@ -168,8 +174,10 @@ func getStatus(ctx context.Context, client pb.DataMoverClient, uid string, maxWa
 
 func listRequests(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string) (*pb.DataMovementListResponse, error) {
 	rsp, err := client.List(ctx, &pb.DataMovementListRequest{
-		Workflow:  workflow,
-		Namespace: namespace,
+		Workflow: &pb.DataMovementWorkflow{
+			Name:      workflow,
+			Namespace: namespace,
+		},
 	})
 
 	if err != nil {
@@ -179,8 +187,12 @@ func listRequests(ctx context.Context, client pb.DataMoverClient, workflow strin
 	return rsp, err
 }
 
-func deleteRequest(ctx context.Context, client pb.DataMoverClient, uid string) (*pb.DataMovementDeleteResponse, error) {
+func deleteRequest(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string) (*pb.DataMovementDeleteResponse, error) {
 	rsp, err := client.Delete(ctx, &pb.DataMovementDeleteRequest{
+		Workflow: &pb.DataMovementWorkflow{
+			Name:      workflow,
+			Namespace: namespace,
+		},
 		Uid: uid,
 	})
 

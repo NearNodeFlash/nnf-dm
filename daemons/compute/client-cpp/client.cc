@@ -29,6 +29,7 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 using datamovement::DataMover;
+using datamovement::DataMovementWorkflow;
 using datamovement::DataMovementCreateRequest;
 using datamovement::DataMovementCreateResponse;
 using datamovement::DataMovementCreateResponse_Status;
@@ -54,14 +55,17 @@ int main(int argc, char** argv) {
 
     std::string uid;
     
+    DataMovementWorkflow workflow;
+    workflow.set_name("YOUR-WORKFLOW-NAME");
+    workflow.set_namespace_("YOUR-WORKFLOW-NAMESPACE");
+
     {
         ClientContext context;
 
         DataMovementCreateRequest createRequest;
-        createRequest.set_workflow("YOUR-WORKFLOW");
-        createRequest.set_namespace_("YOUR-WORKFLOW-NAMESPACE");
+        createRequest.set_allocated_workflow(&workflow);
         createRequest.set_source("YOUR-SOURCE");
-        createRequest.set_destination("YOUR_DESTINATION");
+        createRequest.set_destination("YOUR-DESTINATION");
 
         DataMovementCreateResponse createResponse;
 
@@ -72,7 +76,7 @@ int main(int argc, char** argv) {
         }
 
         switch (createResponse.status()) {
-            case datamovement::DataMovementCreateResponse_Status_CREATED:
+            case datamovement::DataMovementCreateResponse_Status_SUCCESS:
                 std::cout << "Create Success: UID: " << createResponse.uid() << std::endl;
                 break;
             default:
@@ -87,6 +91,7 @@ int main(int argc, char** argv) {
         ClientContext context;
 
         DataMovementStatusRequest statusRequest;
+        statusRequest.set_allocated_workflow(&workflow);
         statusRequest.set_uid(uid);
 
         DataMovementStatusResponse statusResponse;
@@ -111,6 +116,7 @@ int main(int argc, char** argv) {
         ClientContext context;
 
         DataMovementDeleteRequest deleteRequest;
+        deleteRequest.set_allocated_workflow(&workflow);
         deleteRequest.set_uid(uid);
 
         DataMovementDeleteResponse deleteResponse;
@@ -122,7 +128,7 @@ int main(int argc, char** argv) {
         }
 
         switch (deleteResponse.status()) {
-            case datamovement::DataMovementDeleteResponse_Status_DELETED:
+            case datamovement::DataMovementDeleteResponse_Status_SUCCESS:
                 std::cout << "Delete Success" << std::endl;
                 break;
             default:

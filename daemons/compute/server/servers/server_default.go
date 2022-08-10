@@ -310,8 +310,8 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 	// and the namespace because they will match the workflow's name and namespace.
 	parentDm := &nnfv1alpha1.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Workflow,
-			Namespace: req.Namespace,
+			Name:      req.Workflow.Name,
+			Namespace: req.Workflow.Namespace,
 		},
 	}
 
@@ -357,7 +357,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 
 	return &pb.DataMovementCreateResponse{
 		Uid:    dm.GetName(),
-		Status: pb.DataMovementCreateResponse_CREATED,
+		Status: pb.DataMovementCreateResponse_SUCCESS,
 	}, nil
 }
 
@@ -373,7 +373,7 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 
 	dm := &dmv1alpha1.RsyncNodeDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-%s-", req.Namespace, req.Workflow),
+			GenerateName: fmt.Sprintf("%s-%s-", req.Workflow.Namespace, req.Workflow.Name),
 			Namespace:    s.namespace,
 			Labels: map[string]string{
 				dmctrl.InitiatorLabel: s.name,
@@ -394,8 +394,8 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 	// a fake parent here to use for the AddOwnerLabels call.
 	parent := &nnfv1alpha1.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Workflow,
-			Namespace: req.Namespace,
+			Name:      req.Workflow.Name,
+			Namespace: req.Workflow.Namespace,
 		},
 	}
 
@@ -410,7 +410,7 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 
 	return &pb.DataMovementCreateResponse{
 		Uid:    dm.GetName(),
-		Status: pb.DataMovementCreateResponse_CREATED,
+		Status: pb.DataMovementCreateResponse_SUCCESS,
 	}, nil
 }
 
@@ -418,8 +418,10 @@ func (s *defaultServer) List(ctx context.Context, req *pb.DataMovementListReques
 
 	// Only get the DMs that match the workflow and workflow namespace
 	opts := []client.ListOption{
-		client.MatchingLabels{dwsv1alpha1.OwnerNamespaceLabel: req.Namespace},
-		client.MatchingLabels{dwsv1alpha1.OwnerNameLabel: req.Workflow},
+		client.MatchingLabels(map[string]string{
+			dwsv1alpha1.OwnerNameLabel:      req.Workflow.Name,
+			dwsv1alpha1.OwnerNamespaceLabel: req.Workflow.Namespace,
+		}),
 	}
 
 	list := dmv1alpha1.RsyncNodeDataMovementList{}
@@ -680,7 +682,7 @@ func (s *defaultServer) rsyncNodeDataMovementDelete(ctx context.Context, req *pb
 	}
 
 	return &pb.DataMovementDeleteResponse{
-		Status: pb.DataMovementDeleteResponse_DELETED,
+		Status: pb.DataMovementDeleteResponse_SUCCESS,
 	}, nil
 }
 
@@ -714,7 +716,7 @@ func (s *defaultServer) nnfDataMovementDelete(ctx context.Context, req *pb.DataM
 	}
 
 	return &pb.DataMovementDeleteResponse{
-		Status: pb.DataMovementDeleteResponse_DELETED,
+		Status: pb.DataMovementDeleteResponse_SUCCESS,
 	}, nil
 }
 
@@ -757,8 +759,8 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 	listOptions := []client.ListOption{
 		client.InNamespace(s.namespace),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel:      req.Workflow,
-			dwsv1alpha1.WorkflowNamespaceLabel: req.Namespace,
+			dwsv1alpha1.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha1.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
@@ -790,8 +792,8 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 	listOptions := []client.ListOption{
 		client.InNamespace(s.name),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha1.WorkflowNameLabel:      req.Workflow,
-			dwsv1alpha1.WorkflowNamespaceLabel: req.Namespace,
+			dwsv1alpha1.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha1.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
