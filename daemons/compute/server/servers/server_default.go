@@ -41,6 +41,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -386,6 +387,7 @@ func (s *defaultServer) createRsyncNodeDataMovement(ctx context.Context, req *pb
 			UserId:      userId,
 			GroupId:     groupId,
 			DryRun:      req.GetDryrun(),
+			// Simulate:    "sleep 30"
 		},
 	}
 
@@ -503,9 +505,10 @@ func (s *defaultServer) rsyncNodeDataMovementStatus(ctx context.Context, req *pb
 
 	statusMap := map[string]pb.DataMovementStatusResponse_Status{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
-		nnfv1alpha1.DataMovementConditionReasonFailed:  pb.DataMovementStatusResponse_FAILED,
-		nnfv1alpha1.DataMovementConditionReasonSuccess: pb.DataMovementStatusResponse_SUCCESS,
-		nnfv1alpha1.DataMovementConditionReasonInvalid: pb.DataMovementStatusResponse_INVALID,
+		nnfv1alpha1.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,
+		nnfv1alpha1.DataMovementConditionReasonSuccess:   pb.DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha1.DataMovementConditionReasonInvalid:   pb.DataMovementStatusResponse_INVALID,
+		nnfv1alpha1.DataMovementConditionReasonCancelled: pb.DataMovementStatusResponse_CANCELLED,
 	}
 
 	status, ok := statusMap[rsync.Status.Status]
@@ -641,6 +644,43 @@ func (s *defaultServer) waitForCompletionOrTimeout(req *pb.DataMovementStatusReq
 		timeout = true
 		s.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
 	}
+}
+
+func (s *defaultServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRequest) (*pb.DataMovementCancelResponse, error) {
+	// For now, just implement the rsync to anticipate Nate's DM v2
+	return s.rsyncNodeDataMovementCancel(ctx, req)
+}
+
+func (s *defaultServer) rsyncNodeDataMovementCancel(ctx context.Context, req *pb.DataMovementCancelRequest) (*pb.DataMovementCancelResponse, error) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		rsync := &dmv1alpha1.RsyncNodeDataMovement{}
+		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: s.namespace}, rsync); err != nil {
+			return err
+		}
+
+		// Set the cancel flag to start the process. Do not update if Cancel is already set
+		if !rsync.Spec.Cancel {
+			rsync.Spec.Cancel = true
+			return s.client.Update(ctx, rsync)
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return &pb.DataMovementCancelResponse{
+				Status: pb.DataMovementCancelResponse_NOT_FOUND,
+			}, nil
+		}
+		return &pb.DataMovementCancelResponse{
+			Status:  pb.DataMovementCancelResponse_FAILED,
+			Message: fmt.Sprintf("Failed to initiate cancel on rsync node: %s", err.Error()),
+		}, nil
+	}
+
+	return &pb.DataMovementCancelResponse{
+		Status: pb.DataMovementCancelResponse_SUCCESS,
+	}, nil
 }
 
 func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {

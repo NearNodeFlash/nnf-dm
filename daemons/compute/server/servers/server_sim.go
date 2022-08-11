@@ -79,20 +79,23 @@ func (s *simulatedServer) Delete(ctx context.Context, req *pb.DataMovementDelete
 	uid, err := uuid.Parse(req.Uid)
 	if err != nil {
 		return &pb.DataMovementDeleteResponse{
-			Status: pb.DataMovementDeleteResponse_INVALID,
+			Status:  pb.DataMovementDeleteResponse_INVALID,
+			Message: fmt.Sprintf("Request %s is invalid", req.Uid),
 		}, nil
 	}
 
 	if _, ok := s.requests[uid]; !ok {
 		return &pb.DataMovementDeleteResponse{
-			Status: pb.DataMovementDeleteResponse_NOT_FOUND,
+			Status:  pb.DataMovementDeleteResponse_NOT_FOUND,
+			Message: fmt.Sprintf("Request %s not found", req.Uid),
 		}, nil
 	}
 
 	delete(s.requests, uid)
 
 	return &pb.DataMovementDeleteResponse{
-		Status: pb.DataMovementDeleteResponse_SUCCESS,
+		Status:  pb.DataMovementDeleteResponse_SUCCESS,
+		Message: fmt.Sprintf("Request %s deleted successfully", req.Uid),
 	}, nil
 }
 
@@ -108,4 +111,26 @@ func (s *simulatedServer) List(ctx context.Context, req *pb.DataMovementListRequ
 	} else {
 		return &pb.DataMovementListResponse{Uids: nil}, nil
 	}
+}
+
+func (s *simulatedServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRequest) (*pb.DataMovementCancelResponse, error) {
+	uid, err := uuid.Parse(req.Uid)
+	if err != nil {
+		return &pb.DataMovementCancelResponse{
+			Status:  pb.DataMovementCancelResponse_INVALID,
+			Message: fmt.Sprintf("Cancel Request %s is invalid", req.Uid),
+		}, nil
+	}
+
+	if _, ok := s.requests[uid]; !ok {
+		return &pb.DataMovementCancelResponse{
+			Status:  pb.DataMovementCancelResponse_NOT_FOUND,
+			Message: fmt.Sprintf("Request %s not found", uid),
+		}, nil
+	}
+
+	return &pb.DataMovementCancelResponse{
+		Status:  pb.DataMovementCancelResponse_SUCCESS,
+		Message: fmt.Sprintf("Cancel Request %s initiated successfully", req.Uid),
+	}, nil
 }

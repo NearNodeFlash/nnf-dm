@@ -36,6 +36,11 @@ class DataMoverStub(object):
                 request_serializer=datamovement__pb2.DataMovementListRequest.SerializeToString,
                 response_deserializer=datamovement__pb2.DataMovementListResponse.FromString,
                 )
+        self.Cancel = channel.unary_unary(
+                '/datamovement.DataMover/Cancel',
+                request_serializer=datamovement__pb2.DataMovementCancelRequest.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementCancelResponse.FromString,
+                )
 
 
 class DataMoverServicer(object):
@@ -74,6 +79,14 @@ class DataMoverServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Cancel(self, request, context):
+        """Cancel will attempt to stop a data movement request. It accepts a unique identifier
+        that identifies the request and returns the status of the cancel operation.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DataMoverServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -96,6 +109,11 @@ def add_DataMoverServicer_to_server(servicer, server):
                     servicer.List,
                     request_deserializer=datamovement__pb2.DataMovementListRequest.FromString,
                     response_serializer=datamovement__pb2.DataMovementListResponse.SerializeToString,
+            ),
+            'Cancel': grpc.unary_unary_rpc_method_handler(
+                    servicer.Cancel,
+                    request_deserializer=datamovement__pb2.DataMovementCancelRequest.FromString,
+                    response_serializer=datamovement__pb2.DataMovementCancelResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -174,5 +192,22 @@ class DataMover(object):
         return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/List',
             datamovement__pb2.DataMovementListRequest.SerializeToString,
             datamovement__pb2.DataMovementListResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Cancel(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Cancel',
+            datamovement__pb2.DataMovementCancelRequest.SerializeToString,
+            datamovement__pb2.DataMovementCancelResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

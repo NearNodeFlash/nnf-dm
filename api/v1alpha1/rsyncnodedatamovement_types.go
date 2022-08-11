@@ -51,6 +51,15 @@ type RsyncNodeDataMovementSpec struct {
 	// DryRun specifies that this data movement request should show what would have been transferred without actually
 	// performing any copy operation.
 	DryRun bool `json:"dryRun,omitempty"`
+
+	// Cancel is a flag to indicate that this data movement should be
+	// terminated. This value should not be set on creation.
+	// +kubebuilder:default:=false
+	Cancel bool `json:"cancel,omitempty"`
+
+	// Use an alternative command to simulate data movement (e.g. sleep 120).
+	// Empty string performs actual data movement.
+	Simulate string `json:"simulate,omitempty"`
 }
 
 // RsyncNodeDataMovementStatus defines the observed state of RsyncNodeDataMovement

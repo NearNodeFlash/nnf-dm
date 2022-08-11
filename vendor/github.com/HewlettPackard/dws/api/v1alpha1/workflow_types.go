@@ -58,6 +58,15 @@ var workflowStrings = [...]string{
 	"teardown",
 }
 
+const (
+	StatusPending    = "Pending"
+	StatusQueued     = "Queued"
+	StatusRunning    = "Running"
+	StatusCompleted  = "Completed"
+	StatusError      = "Error"
+	StatusDriverWait = "DriverWait"
+)
+
 func (s WorkflowState) String() string {
 	return workflowStrings[s]
 }
@@ -109,8 +118,14 @@ type WorkflowDriverStatus struct {
 	// User readable reason.
 	// For the CDS driver, this could be the state of the underlying
 	// data movement request:  Pending, Queued, Running, Completed or Error
-	Reason  string `json:"reason,omitempty"`
+	// +kubebuilder:validation:Enum=Pending;Queued;Running;Completed;Error
+	Status string `json:"status,omitempty"`
+
 	Message string `json:"message,omitempty"`
+
+	// Driver error string. This is not rolled up into the workflow's
+	// overall status section
+	Error string `json:"error,omitempty"`
 
 	// CompleteTime reflects the time that the workflow reconciler marks the driver complete
 	CompleteTime *metav1.MicroTime `json:"completeTime,omitempty"`

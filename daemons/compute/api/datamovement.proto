@@ -41,6 +41,10 @@ service DataMover {
 
     // List returns all current data movement requests for a given namespace and workflow.
     rpc List (DataMovementListRequest) returns (DataMovementListResponse) {}
+
+    // Cancel will attempt to stop a data movement request. It accepts a unique identifier
+    // that identifies the request and returns the status of the cancel operation.
+    rpc Cancel (DataMovementCancelRequest) returns (DataMovementCancelResponse) {}
 }
 
 // Data Movement workflow message contains identifying information for the workflow initiating the data movement
@@ -99,7 +103,8 @@ message DataMovementStatusResponse {
         NOT_FOUND = 1;
         SUCCESS = 2;
         FAILED = 3;
-        UNKNOWN_STATUS = 4;
+        CANCELLED = 4;
+        UNKNOWN_STATUS = 5;
     }
     Status status = 2;
     string message = 3;
@@ -122,6 +127,7 @@ message DataMovementDeleteResponse {
         UNKNOWN = 4;
     }
     Status status = 1;
+    string message = 2;
 }
 
 // The data movement list request allows a user to get a list of the current
@@ -135,4 +141,26 @@ message DataMovementListRequest {
 // requests' uids
 message DataMovementListResponse {
     repeated string uids = 1;
+}
+
+// The data movement cancel request permits users to iniatiate a cancellation of
+// a data movement request that is in progress.
+message DataMovementCancelRequest {
+    DataMovementWorkflow workflow = 1;
+    string uid = 2;
+}
+
+// The data movement cancel response returns the status of the cancel request.
+// The cancel process will begin upon success. This response does not indicate
+// that that cancel process has completed, but rather that it has been
+// initiated.
+message DataMovementCancelResponse {
+    enum Status {
+        INVALID = 0;
+        NOT_FOUND = 1;
+        SUCCESS = 2;
+        FAILED = 3;
+      }
+      Status status = 1;
+      string message = 2;
 }
