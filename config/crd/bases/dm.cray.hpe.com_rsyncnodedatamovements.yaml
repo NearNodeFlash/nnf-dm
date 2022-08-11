@@ -48,6 +48,11 @@ spec:
           spec:
             description: RsyncNodeDataMovementSpec defines the desired state of RsyncNodeDataMovement
             properties:
+              cancel:
+                default: false
+                description: Cancel is a flag to indicate that this data movement
+                  should be terminated. This value should not be set on creation.
+                type: boolean
               destination:
                 description: Destination file or directory, the receipent of the source
                   contents
@@ -68,6 +73,10 @@ spec:
                   initiated the data movement request. This value must match one of
                   the compute resources selected by the WLM to run the job, or be
                   empty if this is not a compute initiated data transfer.
+                type: string
+              simulate:
+                description: Use an alternative command to simulate data movement
+                  (e.g. sleep 120). Empty string performs actual data movement.
                 type: string
               source:
                 description: Source file or directory, the contents of which are copied

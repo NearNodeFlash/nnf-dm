@@ -109,7 +109,7 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 | `uid` | string | The unique identifier for the created data movement resource |
 | `maxWaitTime` | int64 | The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait |
 
-### Status Responsee
+### Status Response
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `state` | State | Current state of the data movement request |
@@ -129,7 +129,7 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 | ----- | ---- | ----------- |
 | 0 | Invalid | The request was found to be invalid. See `message` for details |
 | 1 | Not Found | The request with the supplied UID was not found |
-| 2 | Succeess | The request completed with success |
+| 2 | Success | The request completed with success |
 | 3 | Failed | The request failed. See `message` for details |
 
 
