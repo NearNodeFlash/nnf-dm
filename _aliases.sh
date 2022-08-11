@@ -17,61 +17,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-shopt -s expand_aliases
-
-# Common command aliases for data movement. Source this file to load alias into your bash terminal
+# Common functions for data movement. Source this file to load functions into your bash terminal
 # i.e. source ./_aliases.sh
+function dmpods   { kubectl get pods -n nnf-dm-system "${@:1}"; }
 
-alias dmget="kubectl get nnfdatamovements --no-headers -n nnf-dm-system | head -n1 | awk '{print \$1}'"
-alias dmyaml="kubectl get nnfdatamovement/`dmget` -n nnf-dm-system -o yaml"
-alias dmdel="kubectl delete nnfdatamovement/`dmget` -n nnf-dm-system"
-alias dmpod="kubectl get pods -n nnf-dm-system --no-headers | grep nnf-dm-controller-manager | awk '{print \$1}'"
-alias dmlog="kubectl logs `dmpod` -n nnf-dm-system  -c manager"
-alias dmsh="kubectl exec --stdin --tty `dmpod` -n nnf-dm-system -c manager -- /bin/bash"
+function dmmget   { kubectl get  -n nnf-dm-system datamovementmanagers --no-headers  | head -n1 | awk '{print $1}'; }
+function dmmyaml  { kubectl get  -n nnf-dm-system datamovementmanagers/"$(dmmget)" -o yaml; }
+function dmmedit  { kubectl edit -n nnf-dm-system datamovementmanagers/"$(dmmget)"; }
+function dmmpod   { kubectl get  -n nnf-dm-system pods --no-headers | grep nnf-dm-manager | awk '{print $1}'; }
+function dmmlog   { kubectl logs -n nnf-dm-system "$(dmmpod)" -c manager "${@:1}"; }
 
-alias mpiget="kubectl get mpijobs -n nnf-dm-system --no-headers | head -n1 | awk '{print \$1}'"
-alias mpiyaml="kubectl get mpijob/`mpiget` -n nnf-dm-system -o yaml"
-alias mpidel="kubectl delete mpijob/`mpiget` -n nnf-dm-system"
-alias mpilog="kubectl logs `kubectl get pods -n mpi-operator --no-headers | awk '{print \$1}'` -n mpi-operator"
+function dmdsget  { kubectl get      -n nnf-dm-system daemonsets --no-headers | head -n1 | awk '{print $1}'; }
+function dmdsdesc { kubectl describe -n nnf-dm-system daemonsets/"$(dmdsget)" ; }
+function dmdsyaml { kubectl get      -n nnf-dm-system daemonsets/"$(dmdsget)" -o yaml; }
+function dmdsedit { kubectl edit     -n nnf-dm-system daemonsets/"$(dmdsget)"; }
 
-alias wrkget="kubectl get pods -n nnf-dm-system --no-headers | grep mpi-worker | head -n1 | awk '{print \$1}'"
-alias wrklog="kubectl logs `wrkget` -n nnf-dm-system"
+function dmpod    { kubectl get pods --no-headers -n nnf-dm-system | grep nnf-dm-controller-manager | awk '{print $1}'; }
+function dmlog    { kubectl logs "$(dmpod)" -n nnf-dm-system -c manager; }
+function dmexec   { kubectl exec --stdin --tty pod/"$(dmpod)" -n nnf-dm-system -c manager -- /bin/bash; }
 
-alias lchrget="kubectl get pods -n nnf-dm-system --no-headers | grep mpi-launcher | head -n1 | awk '{print \$1}'"
-alias lchryaml="kubectl get pod/`lchrget` -n nnf-dm-system -o yaml"
-alias lchrlog="kubectl logs pod/`lchrget` -n nnf-dm-system"
-alias lchrdes="kubectl describe pod/`lchrget` -n nnf-dm-system"
-alias lchrsh="kubectl exec --stdin --tty `lchrget` -n nnf-dm-system -- /bin/bash"
+function wkpod    { kubectl get pods --no-headers -n nnf-dm-system | grep nnf-dm-worker | head -n1 | awk '{print $1}'; }
+function wkyaml   { kubectl get pod/"$(wkpod)" -n nnf-dm-system -o yaml; }
+function wkexec   { kubectl exec --stdin --tty pod/"$(wkpod)" -n nnf-dm-system -c "${1:-manager}" -- /bin/bash; }
+function wkdesc   { kubectl describe -n nnf-dm-system pod/"$(wkpod)"; }
+function wklog    { kubectl logs "$(wkpod)" -n nnf-dm-system -c "${1:-manager}" "${@:2}"; }
+function wkdel    { kubectl delete pod/"$(wkpod)" -n nnf-dm-system; }
 
-alias rtget="kubectl get rsynctemplates -n nnf-dm-system --no-headers | awk '{print \$1}'"
-alias rtyaml="kubectl get rsynctemplate/`rtget` -n nnf-dm-system -o yaml"
+function dmslist  { kubectl get nnfdatamovements -A; }
+function dmsget   { kubectl get nnfdatamovements -A --no-headers | head -n "$((${1:-0}+1))" | tail -n 1 | awk '{print $2}'; }
+function dmsgetns { kubectl get nnfdatamovements -A --no-headers | head -n "$((${1:-0}+1))" | tail -n 1 | awk '{print $1}'; }
+function dmsyaml  { (( IDX=${1:-1} )) && kubectl get nnfdatamovements/"$(dmsget $IDX)" -n "$(dmsgetns $IDX)" -o yaml; }
 
-alias rsyncpod="kubectl get pods -n nnf-dm-system -o wide | grep -w kind-worker | awk '{print \$1}'"
-alias rsynclog="kubectl logs pod/`rsyncpod` -n nnf-dm-system"
-alias rsyncsh="kubectl exec --stdin --tty `rsyncpod` -n nnf-dm-system -- /bin/bash"
+cat <<-EOF
 
-echo "$(tput bold)DONE! Alias commands available: $(tput sgr 0)"
-echo "    dmget    - get data movement resource"
-echo "    dmyaml   - get data movement resource as yaml"
-echo "    dmdel    - delete the data movement resource"
-echo "    dmpod    - describe data movement pod"
-echo "    dmlog    - get data movement controller logs"
-echo "    "
-echo "    mpiget   - get the mpi job resource"
-echo "    mpiyaml  - get the mpi job resource as yaml"
-echo "    mpidel   - delete the mpi job"
-echo "    mpilog   - get the mpi controller logs"
-echo "    "
-echo "    wrkget   - get the mpi-worker pod (1 of N)"
-echo "    wrklog   - get the mpi-worker logs for pod 1 (of N)"
-echo "    "
-echo "    lchrget  - get the mpi-launcher resource"
-echo "    lchryaml - get the mpi-launcher resource as yaml"
-echo "    lchrlog  - get the mpi-launcher log"
-echo "    lchrdes  - describe the mpi-launcher pod"
-echo "    lchrsh   - execute a shell prompt to the mpi-launcher"
-echo "    "
-echo "    rtget    - get the rsync template resource"
-echo "    rtyaml   - get the rsync template resource as yaml"
-echo "    "
-echo "    rsyncsh  - shell into kind-worker rsync pod"
+    $(tput bold)Data Movement Manager (dmm) Functions:$(tput sgr 0)
+    dmmget              get data movement manager's name
+    dmmyaml             get data movement manager's yaml
+    dmmpod              get data movement manager's pod
+    dmmlog              get data movement manager's log
+
+    $(tput bold)Data Movement Daemon Set (dmds) Functions:$(tput sgr 0)
+    dmdsget             get data movement daemonset's name
+    dmdsyaml            get data movement daemonset's yaml
+
+EOF

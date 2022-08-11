@@ -34,12 +34,13 @@ kubectl label node kind-control-plane cray.nnf.manager=true
 kubectl label node kind-control-plane cray.wlm.manager=true
 
 # Label the kind-workers as rabbit nodes for the NLCMs.
-for NODE in $(kubectl get nodes --no-headers | grep --invert-match "control-plane" | awk '{print $1}'); do
+NODES=$(kubectl get nodes --no-headers | grep --invert-match "control-plane" | awk '{print $1}')
+for NODE in $NODES; do
     kubectl label node "$NODE" cray.nnf.node=true
     kubectl label node "$NODE" cray.nnf.x-name="$NODE"
 done
 
-kubectl taint nodes $(kubectl get nodes --no-headers -o custom-columns=:metadata.name | grep -v control-plane | paste -d" " -s -) cray.nnf.node=true:NoSchedule
+kubectl taint nodes $(echo $NODES | paste -d" " -s -) cray.nnf.node=true:NoSchedule
 
 certver="v1.7.0"
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/"$certver"/cert-manager.yaml

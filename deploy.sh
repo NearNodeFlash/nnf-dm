@@ -19,18 +19,45 @@
 
 # Deploy controller to the K8s cluster specified in ~/.kube/config.
 
-KUSTOMIZE=$1
-IMG=$2
+usage() {
+    cat <<EOF
+Deploy or Undeploy Data Movement
+Usage $0 COMMAND KUSTOMIZE [IMG]
 
-kubectl apply -f config/mpi/mpi-operator.yaml
+Commands:
+    deploy              Deploy data movement
+    undeploy            Undeploy data movement
+EOF
+}
 
-$(cd config/manager && $KUSTOMIZE edit set image controller=$IMG)
+CMD=$1
+KUSTOMIZE=$2
+IMG=$3
 
-$KUSTOMIZE build config/default | kubectl apply -f - || true
+case $CMD in
+    deploy)
+        $(cd config/manager && $KUSTOMIZE edit set image controller="$IMG")
 
-# Sometimes the deployment of the RsyncTemplate occurs to quickly for k8s to digest the CRD
-# Retry the deployment if this is the case. It seems to be fast enough where we can just
-# turn around and re-deploy; but this may need to move to a polling loop if that goes away.
-if [[ $(kubectl get rsynctemplates -n nnf-dm-system 2>&1) =~ "No resources found" ]]; then
-    $KUSTOMIZE build config/default | kubectl apply -f -
-fi
+        $KUSTOMIZE build config/default | kubectl apply -f - || true
+
+        # Sometimes the deployment of the RsyncTemplate occurs to quickly for k8s to digest the CRD
+        # Retry the deployment if this is the case. It seems to be fast enough where we can just
+        # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
+        echo "Waiting for DataMovementManager resource to become ready"
+        while : ; do
+            [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
+            $KUSTOMIZE build config/default | kubectl apply -f -
+            break
+        done
+        ;;
+    undeploy)
+        # When the rsync-template CRD gets deleted all related resource are also
+        # removed, so the delete will always fail. We ignore all errors at our
+        # own risk.
+        $KUSTOMIZE build config/default | kubectl delete -f - || true
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

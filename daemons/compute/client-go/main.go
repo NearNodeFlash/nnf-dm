@@ -81,20 +81,24 @@ func main() {
 			log.Fatalf("could not create data movement request: %v", err)
 		}
 
-		if createResponse.GetStatus() == pb.DataMovementCreateResponse_SUCCESS {
-			log.Printf("Data movement request created: %s", createResponse.GetUid())
-		} else {
-			log.Fatal("Create request failed: ", createResponse.String())
+		if createResponse.GetStatus() != pb.DataMovementCreateResponse_SUCCESS {
+			log.Fatalf("Create request failed: %+v", createResponse)
 		}
+
+		log.Printf("Data movement request created: %s", createResponse.GetUid())
 
 		// Wait for request to be completed
 		for {
 			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, createResponse.GetUid(), *maxWaitTime)
-			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
-				log.Fatalf("Data movement failed: %v", err)
+			if err != nil {
+				log.Fatalf("could not stat data movement request: %s", err)
 			}
 
-			log.Printf("Data movement status %s", statusResponse.String())
+			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
+				log.Fatalf("Data movement status failed: %+v", statusResponse)
+			}
+
+			log.Printf("Data movement status %+v", statusResponse)
 			if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
 				break
 			}
@@ -120,10 +124,16 @@ func main() {
 		// Use List to cleanup and delete requests
 		for _, uid := range listResponse.GetUids() {
 			log.Printf("Deleting request: %v", uid)
+
 			deleteResponse, err := deleteRequest(ctx, c, *workflow, *namespace, uid)
 			if err != nil {
-				log.Fatalf("could not delete data movement request: %v", err)
+				log.Fatalf("could not delete data movement request: %s", err)
 			}
+
+			if deleteResponse.Status != pb.DataMovementDeleteResponse_SUCCESS {
+				log.Fatalf("Data movement delete failed: %+v", deleteResponse)
+			}
+
 			log.Printf("Data movement request deleted: %v %v", uid, deleteResponse.String())
 		}
 

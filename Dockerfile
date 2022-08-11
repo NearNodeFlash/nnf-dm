@@ -40,7 +40,7 @@ FROM builder as testing
 
 WORKDIR /workspace
 
-RUN apk add rsync curl tar
+RUN apk add curl tar
 
 # These two steps follow the Kubebuilder envtest playbook https://book.kubebuilder.io/reference/envtest.html
 ARG K8S_VERSION=1.23.3
@@ -48,19 +48,30 @@ RUN curl -sSLo envtest-bins.tar.gz "https://go.kubebuilder.io/test-tools/${K8S_V
     && mkdir /usr/local/kubebuilder \
     && tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz
 
-
 COPY config/ config/
 COPY initiateContainerTest.sh .
 
 ENTRYPOINT [ "sh", "initiateContainerTest.sh" ]
 
 ###############################################################################
-FROM alpine:latest
+FROM ghcr.io/nearnodeflash/nnf-mfu:latest
 
-RUN apk add rsync
+RUN apt update
 
+RUN apt install -y openmpi-bin
+
+# TODO Remove this
+RUN apt install -y bash
+
+# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile; 
+# do not change them unless you know what it is you are doing
+ARG port=2222
+RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
+    && sed -i "s/[ #]\(.*Port \).*/ \1$port/g" /etc/ssh/ssh_config \
+    && echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
+# Copy the executable and execute
 WORKDIR /
 COPY --from=builder /workspace/manager .
-#USER 65532:65532
 
 ENTRYPOINT ["/manager"]

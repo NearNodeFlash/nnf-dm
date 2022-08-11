@@ -43,9 +43,6 @@ import (
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	_ "github.com/NearNodeFlash/nnf-sos/config/crd/bases"
 
-	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
-
-	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -63,7 +60,6 @@ func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	os.Setenv("ACK_GINKGO_DEPRECATIONS", "1.16.5")
-	os.Setenv("X_DATA_MOVEMENT_TEST_ENV", "")
 
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
@@ -98,13 +94,7 @@ var _ = BeforeSuite(func() {
 	err = nnfv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = mpiv2beta1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
 	err = dmv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = dwsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -125,19 +115,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&DataMovementReconciler{
-		Client: k8sManager.GetClient(),
-		Scheme: k8sManager.GetScheme(),
-	}).SetupWithManager(k8sManager)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = (&RsyncNodeDataMovementReconciler{
-		Client: k8sManager.GetClient(),
-		Scheme: k8sManager.GetScheme(),
-	}).SetupWithManager(k8sManager)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = (&RsyncTemplateReconciler{
+	err = (&DataMovementManagerReconciler{
 		Client: k8sManager.GetClient(),
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)

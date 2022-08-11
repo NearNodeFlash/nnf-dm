@@ -17,100 +17,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ $# -eq 0 ]; then
-  echo "Create DM requires one of 'lustre' or 'xfs'"
-  exit 1
-fi
+usage() {
+  cat <<EOF
+Run Data Movement commands
+Usage: $0 COMMAND [ARGS...]
 
-CMD=$1
-
-if [[ "$CMD" == lustre ]]; then
-  echo "$(tput bold)Creating override config $(tput sgr 0)"
-  kubectl delete configmap/data-movement-config &> /dev/null
-  cat <<-EOF | kubectl create -f -
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: data-movement-config
-    namespace: nnf-dm-system
-  data:
-    image: ghcr.io/nearnodeflash/nnf-mfu:latest
-    sourceVolume:      '{ "hostPath": { "path": "/nnf", "type": "Directory" } }'
-    destinationVolume: '{ "hostPath": { "path": "/nnf", "type": "Directory" } }'
+Commands:
+  create              create data movement resource
+  delete              delete data movement resource
 EOF
+}
 
+CMD=${1:-"create"}
 
-  echo "$(tput bold)Creating lustre data movement $(tput sgr 0)"
-  cat <<-EOF | kubectl apply -f -
-  apiVersion: nnf.cray.hpe.com/v1alpha1
-  kind: NnfDataMovement
-  metadata:
-    name: datamovement-sample-lustre-4
-    namespace: nnf-dm-system
-  spec:
-    userId: 0
-    groupId: 0
-    source:
-      path: /file.in
-      storageInstance:
-        kind: LustreFileSystem
-        name: lustrefilesystem-sample-maui
-        namespace: default
-    destination:
-      path: /file.out
-      storageInstance:
-        kind: NnfStorage
-        name: nnfstorage-sample
-        namespace: default
-      access:
-        kind: NnfAccess
-        name: nnfaccess-sample
-        namespace: default
+NAME=${2:-"datamovement-sample"}
+NS="nnf-dm-system"
+
+case $CMD in
+  create)
+    cat <<-EOF | kubectl apply -f -
+      apiVersion: nnf.cray.hpe.com/v1alpha1
+      kind: NnfDataMovement
+      metadata:
+        name: $NAME
+        namespace: $NS
+      spec:
+        userId: 0
+        groupId: 0
+        source:
+          path: /mnt/file.in
+          storageInstance:
+            kind: NnfStorage
+            name: nnfstorage-sample
+            namespace: default
+        destination:
+          path: /mnt/file.out
 EOF
-
-fi
-
-if [[ "$CMD" == xfs ]]; then
-  echo "$(tput bold)Creating override config $(tput sgr 0)"
-  kubectl delete configmap/data-movement-config &> /dev/null
-  cat <<-EOF | kubectl create -f -
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: data-movement-config
-    namespace: nnf-dm-system
-  data:
-    sourcePath: "/mnt/file.in"
-    destinationPath: "/mnt/file.out"
-EOF
-
-
-  echo "$(tput bold)Creating rsync data movement $(tput sgr 0)"
-  cat <<-EOF | kubectl apply -f -
-  apiVersion: nnf.cray.hpe.com/v1alpha1
-  kind: NnfDataMovement
-  metadata:
-    name: datamovement-sample-xfs
-    namespace: nnf-dm-system
-  spec:
-    userId: 65532
-    groupId: 0
-    source:
-      path: file.in
-      storageInstance:
-        kind: LustreFileSystem
-        name: lustrefilesystem-sample-maui
-        namespace: default
-    destination:
-      path: file.out
-      storageInstance:
-        kind: NnfStorage
-        name: nnfstorage-sample
-        namespace: default
-      access:
-        kind: NnfAccess
-        name: nnfaccess-sample
-        namespace: default
-EOF
-
-fi
+      ;;
+    delete)
+      kubectl delete nnfdatamovement/"$NAME" -n "$NS"
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+esac

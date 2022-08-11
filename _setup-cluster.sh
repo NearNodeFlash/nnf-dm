@@ -34,7 +34,6 @@ kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cr
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
 kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
-kubectl apply -f config/mpi/mpi-operator.yaml
 
 # Install the sample resources
 
@@ -48,8 +47,7 @@ metadata:
   namespace: nnf-dm-system
 spec:
   name: maui
-  mgsNids:
-  - 172.0.0.1@tcp
+  mgsNids: 172.0.0.1@tcp
   mountRoot: /lus/maui
 EOF
 
@@ -148,19 +146,4 @@ EOF
 
 fi
 
-
-echo "$(tput bold)Running make deploy to install data movement $(tput sgr 0)"
 make deploy
-
-if [[ $(kubectl get rsynctemplates -n nnf-dm-system 2>&1) =~ "No resources found" ]]; then
-  echo "$(tput bold)Rsync Template not loaded, retrying deployment $(tput sgr 0)"
-  make deploy
-fi
-
-if [[ "$CMD" == xfs ]]; then
-  echo "$(tput bold)Patching rsync template to disable Lustre File Systems $(tput sgr 0)"
-  echo "This will allow the rsync nodes to start - which is otherwise prevented"
-  echo "since the Lustre CSI is not loaded"
-  kubectl patch rsynctemplate/nnf-dm-rsynctemplate -n nnf-dm-system --type merge -p '{"spec":{"disableLustreFileSystems":true}}'
-fi
-

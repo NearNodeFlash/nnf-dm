@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: manager
   namespace: system
   labels:
     control-plane: controller-manager
@@ -29,7 +29,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        - --controller=system
+        - --controller=manager
         image: controller:latest
         name: manager
         securityContext:
@@ -57,9 +57,9 @@ spec:
       terminationGracePeriodSeconds: 10
 ---
 apiVersion: dm.cray.hpe.com/v1alpha1
-kind: RsyncTemplate
+kind: DataMovementManager
 metadata:
-  name: rsynctemplate
+  name: manager
   namespace: system
 spec:
   selector:
@@ -67,26 +67,40 @@ spec:
       cray.nnf.node: "true"
   hostPath: "/mnt"
   mountPath: "/mnt"
+  subdomain: "dm"
   template:
     spec:
+      serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix
       tolerations:
       - key: "cray.nnf.node"
         operator: "Equal"
         value: "true"
         effect: "NoSchedule"
       containers:
-        - name: rsync-controller
-          image: controller:latest
+        - name: worker
+          image: ghcr.io/nearnodeflash/nnf-mfu:latest
           command: 
-            - /manager
+            - /usr/sbin/sshd
           args:
-            - --controller=node
+            - -De
           env:
             - name: NNF_NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
           securityContext:
+            privileged: true
             capabilities:
-              add: ["SETUID", "SETGID"]
-      serviceAccountName: controller-manager
+              add: ["SETUID", "SETGID", "MKNOD"]
+        - name: manager
+          command: 
+          - /manager
+          args:
+          - --leader-elect=false
+          - --controller=node
+          image: controller:latest
+          env:
+            - name: NNF_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
