@@ -15,6 +15,7 @@ require (
 	github.com/kubeflow/mpi-operator/v2 v2.0.0-20211209024655-d7fc50603a4d
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.19.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/takama/daemon v1.0.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8

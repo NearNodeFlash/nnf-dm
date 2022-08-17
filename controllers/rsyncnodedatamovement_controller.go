@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
 
@@ -62,6 +63,8 @@ type RsyncNodeDataMovementReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncNodeDataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+
+	metrics.NnfDmRsyncNodeDataMovementReconcilesTotal.Inc()
 
 	rsyncNode := &dmv1alpha1.RsyncNodeDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, rsyncNode); err != nil {

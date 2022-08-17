@@ -39,6 +39,7 @@ import (
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 )
 
 const (
@@ -71,6 +72,8 @@ type RsyncTemplateReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *RsyncTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+
+	metrics.NnfDmRsyncTemplateReconcilesTotal.Inc()
 
 	rsyncTemplate := &dmv1alpha1.RsyncTemplate{}
 	if err := r.Get(ctx, req.NamespacedName, rsyncTemplate); err != nil {
