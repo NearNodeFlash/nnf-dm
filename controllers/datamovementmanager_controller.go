@@ -55,13 +55,12 @@ import (
 const (
 	deploymentName = "nnf-dm-controller-manager"
 	daemonsetName  = "nnf-dm-worker"
+	serviceName    = "dm"
 
 	nnfVolumeName = "nnf"
 
 	sshAuthVolume = "ssh-auth"
 	sshPublicKey  = "ssh-publickey"
-
-	secretSuffix = "-secret"
 )
 
 var (
@@ -91,7 +90,7 @@ type DataMovementManagerReconciler struct {
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovementmanagers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=datamovementmanagers/finalizers,verbs=update
 
-// Data Movement Manager initializes the secrets used in establishing SSH connections between the data movement depoloyment
+// Data Movement Manager initializes the secrets used in establishing SSH connections between the data movement deployment
 // and the data movement daemonset describing the worker nodes.
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
@@ -174,7 +173,7 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      manager.Name + secretSuffix,
+				Name:      manager.Name,
 				Namespace: manager.Namespace,
 			},
 			Type: corev1.SecretTypeSSHAuth,
@@ -193,7 +192,7 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manager.Name + secretSuffix,
+			Name:      manager.Name,
 			Namespace: manager.Namespace,
 		},
 	}
@@ -224,7 +223,7 @@ func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.
 		}
 
 		if len(base.Spec.Template.Spec.Containers) != 2 { // rbac policy & manager
-			return nil, fmt.Errorf("Deployment has unexpected container count")
+			return nil, fmt.Errorf("Deployment template has unexpected container count")
 		}
 
 		deployment := &appsv1.Deployment{
@@ -285,7 +284,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx con
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manager.Spec.Subdomain,
+			Name:      serviceName,
 			Namespace: manager.Namespace,
 		},
 	}
@@ -344,7 +343,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx c
 
 		podSpec := &podTemplateSpec.Spec
 		podSpec.NodeSelector = manager.Spec.Selector.MatchLabels
-		podSpec.Subdomain = manager.Spec.Subdomain
+		podSpec.Subdomain = serviceName
 
 		setupSSHAuthVolumes(manager, podSpec, &podSpec.Containers[0], &podSpec.Containers[1])
 
@@ -383,7 +382,7 @@ func setupSSHAuthVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				DefaultMode: &mode,
-				SecretName:  manager.Name + secretSuffix,
+				SecretName:  manager.Name,
 				Items:       sshAuthVolumeItems,
 			},
 		},
@@ -457,9 +456,11 @@ func findManagerContainer(podSpec *corev1.PodSpec) *corev1.Container {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dmv1alpha1.DataMovementManager{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.Service{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.DaemonSet{}).
 		Watches(

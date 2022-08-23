@@ -22,6 +22,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -65,7 +66,6 @@ type DataMovementReconciler struct {
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfaccesses,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts,verbs=get;list
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts/status,verbs=get;list
@@ -111,7 +111,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// Prevent gratuitous wakeups for an resource that is already finished.
+	// Prevent gratuitous wakeups for a resource that is already finished.
 	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeFinished {
 		return ctrl.Result{}, nil
 	}
@@ -126,9 +126,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	// The data movement operation may have completed but we failed to record the completion status
-	// due to a resource conflict. Check if the resource completed and retry updating the status.
-	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeRunning {
+	if dm.Status.EndTime.IsZero() {
+		// The data movement operation may have completed but we failed to record the completion status
+		// due to a resource conflict. Check if the resource completed and retry updating the status.
 		status, found := r.completions.Load(req.Name)
 		if found {
 			status := status.(nnfv1alpha1.NnfDataMovementStatus)
@@ -210,23 +210,25 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
 func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
 
-	// If this is a node data movement request (not in the default/dm namespaces) then the target NNF Node is ourselves.
-	if dm.Namespace != metav1.NamespaceDefault && dm.Namespace != dmv1alpha1.DataMovementNamespace {
+	// If this is a node data movement request simply reference the localhost
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
 		return []string{"localhost"}, nil
 	}
 
+	// TODO: Differentiate specification errors from runtime errors
+
 	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
-	var storageRef *corev1.ObjectReference
-	if dm.Spec.Source.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
-		storageRef = dm.Spec.Source.Storage
-	} else if dm.Spec.Destination.Storage.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
-		storageRef = dm.Spec.Destination.Storage
+	var storageRef corev1.ObjectReference
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Source.StorageReference
+	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Destination.StorageReference
 	} else {
 		return nil, fmt.Errorf("Neither source or destination is of NNF Storage type")
 	}
@@ -236,6 +238,9 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 		return nil, err
 	}
 
+	if storage.Spec.FileSystemType != "lustre" {
+		return nil, fmt.Errorf("Unsupported storage type %s", storage.Spec.FileSystemType)
+	}
 	targetAllocationSetIndex := -1
 	for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
 		if allocationSet.TargetType == "OST" {

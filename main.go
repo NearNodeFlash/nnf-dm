@@ -33,7 +33,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -194,7 +193,5 @@ type nodeController struct {
 
 func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
-
-	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+	opts.Namespace = os.Getenv("NNF_NODE_NAME")
 }

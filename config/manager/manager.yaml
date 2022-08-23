@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: manager
+  name: manager-controller-manager
   namespace: system
   labels:
     control-plane: controller-manager
@@ -67,7 +67,6 @@ spec:
       cray.nnf.node: "true"
   hostPath: "/mnt"
   mountPath: "/mnt"
-  subdomain: "dm"
   template:
     spec:
       serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix
@@ -83,11 +82,6 @@ spec:
             - /usr/sbin/sshd
           args:
             - -De
-          env:
-            - name: NNF_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
           securityContext:
             privileged: true
             capabilities:

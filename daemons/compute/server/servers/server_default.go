@@ -320,12 +320,12 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
 			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-				Path:    "/",
-				Storage: &computeMountInfo.Device.DeviceReference.ObjectReference,
+				Path:             "/", // TODO: Figure this out with Dean the lean mean fighting machine
+				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
-				Storage: &corev1.ObjectReference{
+				StorageReference: corev1.ObjectReference{
 					Kind:      reflect.TypeOf(*lustrefs).Name(),
 					Namespace: lustrefs.Namespace,
 					Name:      lustrefs.Name,

@@ -51,19 +51,22 @@ type DataMovementManagerSpec struct {
 
 	// Mount Path defines the location within the container at which the Host Path volume should be mounted.
 	MountPath string `json:"mountPath"`
-
-	Subdomain string `json:"subdomain"`
 }
 
 // DataMovementManagerStatus defines the observed state of DataMovementManager
 type DataMovementManagerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Ready indiciates the Data Movement Manager has achieved the desired readiness state
+	// and all managed resources are initialized.
 	Ready bool `json:"ready,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if manager readied all resoures"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // DataMovementManager is the Schema for the datamovementmanagers API
 type DataMovementManager struct {

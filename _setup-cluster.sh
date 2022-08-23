@@ -32,7 +32,6 @@ CMD=$1
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
-kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfaccesses.yaml
 kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
 
 # Install the sample resources
@@ -49,23 +48,6 @@ spec:
   name: maui
   mgsNids: 172.0.0.1@tcp
   mountRoot: /lus/maui
-EOF
-
-echo "$(tput bold)Installing sample NNF Access $(tput sgr 0)"
-cat <<-EOF | kubectl apply -f -
-  apiVersion: nnf.cray.hpe.com/v1alpha1
-  kind: NnfAccess
-  metadata:
-    name: nnfaccess-sample
-  spec:
-    desiredState: mounted
-    teardownState: data_out
-    target: all
-    mountPathPrefix: "/mnt"
-    storageReference:
-      kind: NnfStorage
-      name: nnfstorage-sample
-      namespace: default
 EOF
 
 
