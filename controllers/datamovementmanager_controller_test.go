@@ -41,11 +41,19 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 	labels := map[string]string{"control-plane": "controller-manager"}
 
 	BeforeAll(func() {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: dmv1alpha1.DataMovementNamespace,
+			},
+		}
+
+		Expect(k8sClient.Create(context.TODO(), &ns)).Should(Succeed())
+
 		// Create a dummy deployment of the data movement manager
 		deploy := appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "manager",
-				Namespace: corev1.NamespaceDefault,
+				Name:      "nnf-dm-manager-controller-manager",
+				Namespace: dmv1alpha1.DataMovementNamespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -74,8 +82,8 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 	BeforeEach(func() {
 		mgr = &dmv1alpha1.DataMovementManager{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "manager",
-				Namespace: corev1.NamespaceDefault,
+				Name:      "nnf-dm-manager-controller-manager",
+				Namespace: dmv1alpha1.DataMovementNamespace,
 			},
 			Spec: dmv1alpha1.DataMovementManagerSpec{
 				Selector: metav1.LabelSelector{
@@ -103,6 +111,9 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), mgr)).Should(Succeed())
+		Eventually(func() error {
+			return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mgr), mgr)
+		}).ShouldNot(Succeed())
 	})
 
 	It("Bootstraps all managed components", func() {
@@ -114,11 +125,17 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 
 	It("Adds global lustre volumes", func() {
 
+		By("Wait for the manager to go ready")
+		Eventually(func(g Gomega) bool {
+			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}).Should(BeTrue())
+
 		By("Creating a Global Lustre File System")
 		lustre := &lusv1alpha1.LustreFileSystem{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
-				Namespace: corev1.NamespaceDefault,
+				Namespace: dmv1alpha1.DataMovementNamespace,
 			},
 			Spec: lusv1alpha1.LustreFileSystemSpec{
 				Name:      "global",
@@ -146,7 +163,8 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 					MatchFields(IgnoreExtras, Fields{
 						"Name": Equal(lustre.Name),
 					}),
-				))
+				),
+			)
 
 			g.Expect(daemonset.Spec.Template.Spec.Containers[0].VolumeMounts).Should(
 				ContainElement(

@@ -478,8 +478,8 @@ func (r *DataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) error
 				return []reconcile.Request{
 					{
 						NamespacedName: types.NamespacedName{
-							Name:      "nnf-dm-manager",
-							Namespace: "nnf-dm-system", // TODO: Use const
+							Name:      "nnf-dm-manager-controller-manager",
+							Namespace: dmv1alpha1.DataMovementNamespace,
 						},
 					},
 				}
