@@ -325,6 +325,8 @@ func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx c
 		return fmt.Errorf("List lustre file systems failed: %w", err)
 	}
 
+	log.Info("LustreFileSystems", "count", len(filesystems.Items))
+
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      daemonsetName,
