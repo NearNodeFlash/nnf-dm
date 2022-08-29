@@ -59,14 +59,14 @@ spec:
 apiVersion: dm.cray.hpe.com/v1alpha1
 kind: DataMovementManager
 metadata:
-  name: manager
+  name: manager-controller-manager
   namespace: system
 spec:
   selector:
     matchLabels:
       cray.nnf.node: "true"
-  hostPath: "/mnt"
-  mountPath: "/mnt"
+  hostPath: "/mnt/nnf"
+  mountPath: "/mnt/nnf"
   template:
     spec:
       serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix

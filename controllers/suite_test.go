@@ -80,7 +80,7 @@ var _ = BeforeSuite(func() {
 			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "lustre-fs-operator", "config", "crd", "bases"),
 			filepath.Join("..", "vendor", "github.com", "NearNodeFlash", "nnf-sos", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "bases"),
-			filepath.Join("..", "config", "mpi")},
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -116,6 +116,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&DataMovementManagerReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&DataMovementReconciler{
 		Client: k8sManager.GetClient(),
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)

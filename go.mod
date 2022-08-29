@@ -10,7 +10,7 @@ require (
 	github.com/NearNodeFlash/nnf-sos v0.0.0-20220801194142-f58084033fd8
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.20.0
+	github.com/onsi/gomega v1.20.1
 	github.com/takama/daemon v1.0.0
 	go.uber.org/zap v1.22.0
 	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8

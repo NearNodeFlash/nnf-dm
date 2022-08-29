@@ -16,7 +16,15 @@ spec:
     singular: datamovementmanager
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: True if manager readied all resoures
+      jsonPath: .status.ready
+      name: READY
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: DataMovementManager is the Schema for the datamovementmanagers
@@ -91,8 +99,6 @@ spec:
                       are ANDed.
                     type: object
                 type: object
-              subdomain:
-                type: string
               template:
                 description: Template defines the pod template that is used for the
                   basis of the worker Daemon Set that manages the per node data movement
@@ -7184,16 +7190,14 @@ spec:
             - hostPath
             - mountPath
             - selector
-            - subdomain
             - template
             type: object
           status:
             description: DataMovementManagerStatus defines the observed state of DataMovementManager
             properties:
               ready:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
+                description: Ready indiciates the Data Movement Manager has achieved
+                  the desired readiness state and all managed resources are initialized.
                 type: boolean
             type: object
         type: object

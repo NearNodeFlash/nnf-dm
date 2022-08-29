@@ -222,10 +222,6 @@ func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.
 			return nil, fmt.Errorf("Retrieving base deployment failed %w", err)
 		}
 
-		if len(base.Spec.Template.Spec.Containers) != 2 { // rbac policy & manager
-			return nil, fmt.Errorf("Deployment template has unexpected container count")
-		}
-
 		deployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      deploymentName,
@@ -238,7 +234,11 @@ func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.
 
 		podSpec := &deployment.Spec.Template.Spec
 
-		container := findManagerContainer(podSpec)
+		container, err := findManagerContainer(podSpec)
+		if err != nil {
+			return nil, err
+		}
+
 		container.Args = append(container.Args, "--controller=default", "--leader-elect=false") // TODO: Need to figure out how to make the deployment work with leader-election
 
 		// Allow drive to reach workers through the service
@@ -247,7 +247,7 @@ func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.
 			Value: "true",
 		})
 
-		setupSSHAuthVolumes(manager, podSpec, container)
+		setupSSHAuthVolumes(manager, podSpec)
 
 		if err := ctrl.SetControllerReference(manager, deployment, r.Scheme); err != nil {
 			return nil, fmt.Errorf("Setting Deployment controller reference failed: %w", err)
@@ -320,10 +320,6 @@ func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx con
 func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
 	log := log.FromContext(ctx)
 
-	if len(manager.Spec.Template.Spec.Containers) != 2 {
-		return fmt.Errorf("Worker template has unexpected container count")
-	}
-
 	filesystems := &lusv1alpha1.LustreFileSystemList{}
 	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
 		return fmt.Errorf("List lustre file systems failed: %w", err)
@@ -339,15 +335,19 @@ func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx c
 	mutateFn := func() error {
 		podTemplateSpec := manager.Spec.Template.DeepCopy()
 		podTemplateSpec.Labels = manager.Spec.Selector.DeepCopy().MatchLabels
+
+		if podTemplateSpec.Labels == nil {
+			podTemplateSpec.Labels = make(map[string]string)
+		}
 		podTemplateSpec.Labels[dmv1alpha1.DataMovementWorkerLabel] = "true"
 
 		podSpec := &podTemplateSpec.Spec
 		podSpec.NodeSelector = manager.Spec.Selector.MatchLabels
 		podSpec.Subdomain = serviceName
 
-		setupSSHAuthVolumes(manager, podSpec, &podSpec.Containers[0], &podSpec.Containers[1])
+		setupSSHAuthVolumes(manager, podSpec)
 
-		setupLustreVolumes(manager, podSpec, filesystems.Items)
+		setupLustreVolumes(ctx, manager, podSpec, filesystems.Items)
 
 		ds.Spec = appsv1.DaemonSetSpec{
 			Selector: &manager.Spec.Selector,
@@ -375,10 +375,11 @@ func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx c
 	return nil
 }
 
-func setupSSHAuthVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec, containers ...*corev1.Container) {
+func setupSSHAuthVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec) {
 	mode := int32(0600)
 	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
 		Name: sshAuthVolume,
+
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				DefaultMode: &mode,
@@ -388,20 +389,25 @@ func setupSSHAuthVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev
 		},
 	})
 
-	for _, c := range containers {
-		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
+	for idx := range podSpec.Containers {
+		container := &podSpec.Containers[idx]
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
 			Name:      sshAuthVolume,
 			MountPath: "/root/.ssh",
 		})
 	}
 }
 
-func setupLustreVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1alpha1.LustreFileSystem) {
+func setupLustreVolumes(ctx context.Context, manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1alpha1.LustreFileSystem) {
+	log := log.FromContext(ctx)
 
 	// Setup Volumes / Volume Mounts for accessing global Lustre file systems
+
 	volumes := make([]corev1.Volume, len(fileSystems))
 	volumeMounts := make([]corev1.VolumeMount, len(fileSystems))
 	for idx, fs := range fileSystems {
+		log.Info("Adding global lustre volume", "name", client.ObjectKeyFromObject(&fs).String())
+
 		volumes[idx] = corev1.Volume{
 			Name: fs.Name,
 			VolumeSource: corev1.VolumeSource{
@@ -417,7 +423,7 @@ func setupLustreVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1
 		}
 	}
 
-	// Setup Volume / Volume Mount for the NNF Volume (where ephemeral Lustre / GFS mounts reside)
+	// Add the NNF Mounts
 	hostPathType := corev1.HostPathDirectoryOrCreate
 	volumes = append(volumes, corev1.Volume{
 		Name: nnfVolumeName,
@@ -429,6 +435,9 @@ func setupLustreVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1
 		},
 	})
 
+	podSpec.Volumes = append(podSpec.Volumes, volumes...)
+
+	// Setup the mounts for each container in the pod spec.
 	mountPropagation := corev1.MountPropagationHostToContainer
 	volumeMounts = append(volumeMounts, corev1.VolumeMount{
 		Name:             nnfVolumeName,
@@ -436,22 +445,20 @@ func setupLustreVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev1
 		MountPropagation: &mountPropagation,
 	})
 
-	podSpec.Volumes = append(podSpec.Volumes, volumes...)
-
 	for idx := range podSpec.Containers {
 		container := &podSpec.Containers[idx]
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 }
 
-func findManagerContainer(podSpec *corev1.PodSpec) *corev1.Container {
+func findManagerContainer(podSpec *corev1.PodSpec) (*corev1.Container, error) {
 	for idx, container := range podSpec.Containers {
 		if container.Name == "manager" {
-			return &podSpec.Containers[idx]
+			return &podSpec.Containers[idx], nil
 		}
 	}
 
-	panic("Container matching name 'manager' not found")
+	return nil, fmt.Errorf("Could not locate manager container in pod spec")
 }
 
 // SetupWithManager sets up the controller with the Manager.

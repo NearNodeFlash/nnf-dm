@@ -4,9 +4,6 @@ resources:
 generatorOptions:
   disableNameSuffixHash: true
 
-#configurations:
-#- rsync_template_config.yaml
-
 #patchesStrategicMerge:
 #- manager_imagepullsecret_patch.yaml
 
@@ -19,4 +16,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/nearnodeflash/nnf-dm
-  newTag: b85a1e2070356e1083908cb7d4daf5957329fc65
+  newTag: 84822243aebd76009e4ae74fa66bb7d53337edce

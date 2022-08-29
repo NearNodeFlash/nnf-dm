@@ -28,7 +28,7 @@ function dmmpod   { kubectl get  -n nnf-dm-system pods --no-headers | grep nnf-d
 function dmmlog   { kubectl logs -n nnf-dm-system "$(dmmpod)" -c manager "${@:1}"; }
 
 function dmdsget  { kubectl get      -n nnf-dm-system daemonsets --no-headers | head -n1 | awk '{print $1}'; }
-function dmdsdesc { kubectl describe -n nnf-dm-system daemonsets/"$(dmdsget)" ; }
+function dmdsdesc { kubectl describe -n nnf-dm-system daemonsets/"$(dmdsget)"; }
 function dmdsyaml { kubectl get      -n nnf-dm-system daemonsets/"$(dmdsget)" -o yaml; }
 function dmdsedit { kubectl edit     -n nnf-dm-system daemonsets/"$(dmdsget)"; }
 
