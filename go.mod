@@ -1,6 +1,6 @@
 module github.com/NearNodeFlash/nnf-dm
 
-go 1.17
+go 1.19
 
 // kubeflow/common requires an old version - absent this line later versions are pulled in that are incompatible
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
