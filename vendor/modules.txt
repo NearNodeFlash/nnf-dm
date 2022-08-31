@@ -21,7 +21,7 @@ github.com/Azure/go-autorest/logger
 ## explicit; go 1.12
 github.com/Azure/go-autorest/tracing
 # github.com/HewlettPackard/dws v0.0.0-20220826164140-9f0237adcfe7
-## explicit
+## explicit; go 1.16
 github.com/HewlettPackard/dws/api/v1alpha1
 github.com/HewlettPackard/dws/utils/dwdparse
 # github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95
@@ -35,8 +35,8 @@ github.com/NearNodeFlash/lustre-fs-operator/controllers
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20220726184901-f1d60304f049
 ## explicit; go 1.16
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220829191154-9a48ffd2321e
-## explicit
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220831154508-d6ea9847900d
+## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
 # github.com/PuerkitoBio/purell v1.1.1
