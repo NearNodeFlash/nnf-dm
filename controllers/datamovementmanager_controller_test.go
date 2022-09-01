@@ -22,12 +22,13 @@ package controllers
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,22 +36,26 @@ import (
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 )
 
-var _ = Describe("Data Movement Manager Test", Ordered, func() {
+var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
+	ns := &corev1.Namespace{}
+	deployment := &appsv1.Deployment{}
 	mgr := &dmv1alpha1.DataMovementManager{}
 	labels := map[string]string{"control-plane": "controller-manager"}
 
-	BeforeAll(func() {
-		ns := corev1.Namespace{
+	/* BeforeAll (Ginkgo v2)*/
+	BeforeEach(func() {
+		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: dmv1alpha1.DataMovementNamespace,
 			},
 		}
 
-		Expect(k8sClient.Create(context.TODO(), &ns)).Should(Succeed())
+		err := k8sClient.Create(context.TODO(), ns)
+		Expect(err == nil || errors.IsAlreadyExists(err)).Should(BeTrue())
 
 		// Create a dummy deployment of the data movement manager
-		deploy := appsv1.Deployment{
+		deployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
 				Namespace: dmv1alpha1.DataMovementNamespace,
@@ -76,7 +81,8 @@ var _ = Describe("Data Movement Manager Test", Ordered, func() {
 			},
 		}
 
-		Expect(k8sClient.Create(context.TODO(), &deploy)).Should(Succeed())
+		err = k8sClient.Create(context.TODO(), deployment)
+		Expect(err == nil || errors.IsAlreadyExists(err)).Should(BeTrue())
 	})
 
 	BeforeEach(func() {

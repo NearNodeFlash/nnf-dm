@@ -21,6 +21,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,7 +30,6 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
 
@@ -55,12 +56,16 @@ type DataMovementReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	// We maintain a map of active and completed operations which allows us to...
-	// 1. Process cancel requests (TODO Work with Blake)
-	// 2. Handle resource conflict errors where the operation completes but we fail to update the status.
-	//
-	// This is a thread safe map since multiple data movement reconcilers routines will be executing at the same time.
-	completions sync.Map
+	// We maintain a map of active operations which allows us to process cancel requests
+	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
+	contexts sync.Map
+}
+
+// Keep track of the context and its cancel function so that we can track
+// and cancel data movement operations in progress
+type dataMovementCancelContext struct {
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
@@ -78,6 +83,8 @@ type DataMovementReconciler struct {
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
+	metrics.NnfDmDataMovementReconcilesTotal.Inc()
+
 	dm := &nnfv1alpha1.NnfDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -86,8 +93,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if !dm.GetDeletionTimestamp().IsZero() {
 
 		// TODO: Cancel/Abort the operation from Blake
-
-		r.completions.Delete(req.Name)
 
 		if controllerutil.ContainsFinalizer(dm, finalizer) {
 			controllerutil.RemoveFinalizer(dm, finalizer)
@@ -116,36 +121,44 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if dm.Status.StartTime.IsZero() {
-		now := metav1.NowMicro()
-		dm.Status.StartTime = &now
-		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
-
-		if err := r.Status().Update(ctx, dm); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	if dm.Status.EndTime.IsZero() {
-		// The data movement operation may have completed but we failed to record the completion status
-		// due to a resource conflict. Check if the resource completed and retry updating the status.
-		status, found := r.completions.Load(req.Name)
-		if found {
-			status := status.(nnfv1alpha1.NnfDataMovementStatus)
-
-			log.Info("status update restored", "status", fmt.Sprintf("%+v", status))
-
-			status.DeepCopyInto(&dm.Status)
+	if dm.Spec.Cancel {
+		// Check for the scenario where a request is canceled before the DM has started.
+		// If so, record it as cancelled and do nothing
+		if dm.Status.StartTime.IsZero() {
+			now := metav1.NowMicro()
+			dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+			dm.Status.StartTime = &now
+			dm.Status.EndTime = &now
 
 			if err := r.Status().Update(ctx, dm); err != nil {
 				return ctrl.Result{}, err
 			}
 
+			log.Info("Cancel initiated before data movement started, doing nothing")
 			return ctrl.Result{}, nil
 		}
-	}
 
-	// TODO: Support Blake's Cancel API
+		storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
+		if !found {
+			return ctrl.Result{}, nil // Already cancelled?
+		}
+
+		cancelContext := storedCancelContext.(dataMovementCancelContext)
+
+		if errors.Is(cancelContext.ctx.Err(), context.Canceled) {
+			return ctrl.Result{}, nil // Already cancelled?
+		}
+
+		log.Info("Cancelling operation")
+		cancelContext.cancel()
+		<-cancelContext.ctx.Done()
+
+		// Nothing more to do - the go routine that is executing the data movement will exit
+		// and the status is recorded then.
+
+		return ctrl.Result{}, nil
+	}
 
 	nodes, err := r.getStorageNodeNames(ctx, dm)
 	if err != nil {
@@ -157,58 +170,78 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	// TODO: UserId/GroupId
-
-	cmd := exec.CommandContext(ctx,
-		"mpirun",
-		"--allow-run-as-root",
-		"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
-		"--host", strings.Join(hosts, ","),
-		"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
-
-	log.Info("Running Commands", "cmd", cmd.String())
-
-	// TODO: Capture output as it progresses and add a %complete to the resource
-
-	out, err := cmd.CombinedOutput()
-
+	// Record the start of the data movement operation
 	now := metav1.NowMicro()
-	dm.Status.EndTime = &now
-	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-	dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
+	dm.Status.StartTime = &now
+	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 
-	if err != nil {
-		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
-		dm.Status.Message = err.Error()
-
-		// TODO: Enhanced error capture: parse error response and provide useful message
-
-		log.Error(err, "Data movement operation failed", "output", string(out))
+	if err := r.Status().Update(ctx, dm); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	status := dm.Status.DeepCopy()
-
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		dm := &nnfv1alpha1.NnfDataMovement{}
-		if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-			return client.IgnoreNotFound(err)
-		}
-
-		status.DeepCopyInto(&dm.Status)
-
-		return r.Status().Update(ctx, dm)
+	// Expand the context with cancel and store it in the map so the cancel
+	// function can be used in another reconciler loop. Also add NamespacedName
+	// so we can retrieve the resource.
+	ctxCancel, cancel := context.WithCancel(ctx)
+	r.contexts.Store(dm.Name, dataMovementCancelContext{
+		ctx:    ctxCancel,
+		cancel: cancel,
 	})
 
-	if errors.IsConflict(err) {
+	// Execute the go routine to perform the data movement
+	go func() {
 
-		log.Info("Status update conflicted")
+		// TODO: UserId/GroupId
 
-		// Record the completion internally so when we requeue we won't
-		// restart the operation but update the resource with saved status.
-		r.completions.Store(req.Name, dm.Status)
+		cmd := exec.CommandContext(ctx,
+			"mpirun",
+			"--allow-run-as-root",
+			"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
+			"--host", strings.Join(hosts, ","),
+			"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
 
-		return ctrl.Result{Requeue: true}, nil
-	}
+		log.Info("Running Commands", "cmd", cmd.String())
+
+		// TODO: Capture output as it progresses and add a %complete to the resource
+
+		out, err := cmd.CombinedOutput()
+
+		now := metav1.NowMicro()
+		dm.Status.EndTime = &now
+		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
+
+		if errors.Is(ctxCancel.Err(), context.Canceled) {
+			log.Error(err, "Data movement operation cancelled", "output", string(out))
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+		} else if err != nil {
+			log.Error(err, "Data movement operation failed", "output", string(out))
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Message = err.Error()
+
+			// TODO: Enhanced error capture: parse error response and provide useful message
+		}
+
+		status := dm.Status.DeepCopy()
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			dm := &nnfv1alpha1.NnfDataMovement{}
+			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+
+			status.DeepCopyInto(&dm.Status)
+
+			return r.Status().Update(ctx, dm)
+		})
+
+		if err != nil {
+			log.Error(err, "failed to update rsync status with completion")
+			// TODO Add prometheus counter to track occurrences
+		}
+
+		r.contexts.Delete(dm.Name)
+	}()
 
 	return ctrl.Result{}, err
 }

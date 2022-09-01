@@ -43,6 +43,7 @@ func main() {
 	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
 	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
 	count := flag.Int("count", 1, "number of requests to create")
+	cancelExpiryTime := flag.Duration("cancel", -time.Second, "duration after create to cancel request")
 
 	flag.Parse()
 
@@ -86,12 +87,26 @@ func main() {
 		}
 
 		log.Printf("Data movement request created: %s", createResponse.GetUid())
+		uid := createResponse.GetUid()
 
-		// Wait for request to be completed
-		for {
-			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, createResponse.GetUid(), *maxWaitTime)
+		// Cancel the data movement after specified amount of time
+		if *cancelExpiryTime >= 0 {
+			log.Printf("Waiting %d seconds before cancelling request\n", *cancelExpiryTime)
+			time.Sleep(*cancelExpiryTime)
+
+			log.Printf("Canceling request: %v", uid)
+			cancelResponse, err := cancelRequest(ctx, c, *workflow, *namespace, uid)
 			if err != nil {
-				log.Fatalf("could not stat data movement request: %s", err)
+				log.Fatalf("error initiating data movement cancel request: %v", err)
+			}
+			log.Printf("Data movement request cancel initiated: %v %v", uid, cancelResponse.String())
+		}
+
+		// Poll request to check for completed/cancelled
+		for {
+			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, uid, *maxWaitTime)
+			if err != nil {
+				log.Fatalf("failed to get dat movement status: %v", err)
 			}
 
 			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
@@ -199,6 +214,22 @@ func listRequests(ctx context.Context, client pb.DataMoverClient, workflow strin
 
 func deleteRequest(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string) (*pb.DataMovementDeleteResponse, error) {
 	rsp, err := client.Delete(ctx, &pb.DataMovementDeleteRequest{
+		Workflow: &pb.DataMovementWorkflow{
+			Name:      workflow,
+			Namespace: namespace,
+		},
+		Uid: uid,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp, nil
+}
+
+func cancelRequest(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string, uid string) (*pb.DataMovementCancelResponse, error) {
+	rsp, err := client.Cancel(ctx, &pb.DataMovementCancelRequest{
 		Workflow: &pb.DataMovementWorkflow{
 			Name:      workflow,
 			Namespace: namespace,

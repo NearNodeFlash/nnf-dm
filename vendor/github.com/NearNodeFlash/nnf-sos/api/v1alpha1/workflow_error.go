@@ -37,16 +37,16 @@ func NewWorkflowError(message string) *WorkflowError {
 	}
 }
 
-func (e *WorkflowError) GetError() error {
-	return e.err
-}
-
 func (e *WorkflowError) GetMessage() string {
 	return e.message
 }
 
 func (e *WorkflowError) GetRecoverable() bool {
 	return e.recoverable
+}
+
+func (e *WorkflowError) GetError() error {
+	return e.err
 }
 
 func (e *WorkflowError) Error() string {
@@ -63,9 +63,7 @@ func (e *WorkflowError) Unwrap() error {
 
 func (e *WorkflowError) Inject(driverStatus *dwsv1alpha1.WorkflowDriverStatus) {
 	driverStatus.Message = e.GetMessage()
-	if e.GetRecoverable() {
-		driverStatus.Status = dwsv1alpha1.StatusRunning
-	} else {
+	if !e.GetRecoverable() {
 		driverStatus.Status = dwsv1alpha1.StatusError
 	}
 
@@ -86,6 +84,12 @@ func (e *WorkflowError) WithError(err error) *WorkflowError {
 	workflowError, ok := err.(*WorkflowError)
 	if ok {
 		return workflowError
+	}
+
+	resourceError, ok := err.(*dwsv1alpha1.ResourceError)
+	if ok {
+		e.message = resourceError.UserMessage
+		e.recoverable = resourceError.Recoverable
 	}
 
 	e.err = err
