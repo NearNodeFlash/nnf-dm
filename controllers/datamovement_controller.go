@@ -193,14 +193,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		// TODO: UserId/GroupId
 
-		cmd := exec.CommandContext(ctx,
+		cmd := exec.CommandContext(ctxCancel,
 			"mpirun",
 			"--allow-run-as-root",
 			"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
 			"--host", strings.Join(hosts, ","),
 			"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
 
-		log.Info("Running Commands", "cmd", cmd.String())
+		log.Info("Running Command", "cmd", cmd.String())
 
 		// TODO: Capture output as it progresses and add a %complete to the resource
 
@@ -220,6 +220,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dm.Status.Message = err.Error()
 
 			// TODO: Enhanced error capture: parse error response and provide useful message
+		} else {
+			log.Info("Completed Command", "cmd", cmd.String())
 		}
 
 		status := dm.Status.DeepCopy()
@@ -243,7 +245,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.contexts.Delete(dm.Name)
 	}()
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
