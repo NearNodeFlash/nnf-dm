@@ -48,6 +48,7 @@ import (
 
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 
 	lus "github.com/NearNodeFlash/lustre-fs-operator/controllers"
 )
@@ -110,6 +111,8 @@ type DataMovementManagerReconciler struct {
 // move the current state of the cluster closer to the desired state.
 func (r *DataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
+
+	metrics.NnfDmDataMovementManagerReconcilesTotal.Inc()
 
 	manager := &dmv1alpha1.DataMovementManager{}
 	if err := r.Get(ctx, req.NamespacedName, manager); err != nil {
