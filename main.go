@@ -171,8 +171,10 @@ func (c *managerController) SetupReconcilers(mgr manager.Manager) (err error) {
 // Default Controller is that which operates on Data Movement resources.
 type defaultController struct{}
 
-func (*defaultController) GetType() string               { return DefaultController }
-func (*defaultController) SetOptions(opts *ctrl.Options) {}
+func (*defaultController) GetType() string { return DefaultController }
+func (*defaultController) SetOptions(opts *ctrl.Options) {
+	opts.Namespace = dmv1alpha1.DataMovementNamespace
+}
 
 func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{
