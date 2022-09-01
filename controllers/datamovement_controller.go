@@ -160,6 +160,11 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	// Make sure if the DM is already running that we don't start up another command
+	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeRunning {
+		return ctrl.Result{}, nil
+	}
+
 	nodes, err := r.getStorageNodeNames(ctx, dm)
 	if err != nil {
 		return ctrl.Result{}, err // TODO: Filter out runtime errors (retryable) format errors (failures)
