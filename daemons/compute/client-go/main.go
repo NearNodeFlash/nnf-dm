@@ -91,7 +91,7 @@ func main() {
 
 		// Cancel the data movement after specified amount of time
 		if *cancelExpiryTime >= 0 {
-			log.Printf("Waiting %d seconds before cancelling request\n", *cancelExpiryTime)
+			log.Printf("Waiting %s before cancelling request\n", (*cancelExpiryTime).String())
 			time.Sleep(*cancelExpiryTime)
 
 			log.Printf("Canceling request: %v", uid)
