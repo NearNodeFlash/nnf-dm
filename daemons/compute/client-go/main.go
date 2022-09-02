@@ -83,7 +83,7 @@ func main() {
 		}
 
 		if createResponse.GetStatus() != pb.DataMovementCreateResponse_SUCCESS {
-			log.Fatalf("Create request failed: %+v", createResponse)
+			log.Fatalf("create request failed: %+v", createResponse)
 		}
 
 		log.Printf("Data movement request created: %s", createResponse.GetUid())
@@ -110,7 +110,7 @@ func main() {
 			}
 
 			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
-				log.Fatalf("Data movement status failed: %+v", statusResponse)
+				log.Fatalf("data movement status failed: %+v", statusResponse)
 			}
 
 			log.Printf("Data movement status %+v", statusResponse)
@@ -146,7 +146,7 @@ func main() {
 			}
 
 			if deleteResponse.Status != pb.DataMovementDeleteResponse_SUCCESS {
-				log.Fatalf("Data movement delete failed: %+v", deleteResponse)
+				log.Fatalf("data movement delete failed: %+v", deleteResponse)
 			}
 
 			log.Printf("Data movement request deleted: %v %v", uid, deleteResponse.String())
