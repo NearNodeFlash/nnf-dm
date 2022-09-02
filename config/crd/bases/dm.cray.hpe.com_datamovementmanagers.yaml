@@ -7244,7 +7244,7 @@ spec:
             description: DataMovementManagerStatus defines the observed state of DataMovementManager
             properties:
               ready:
-                description: Ready indiciates the Data Movement Manager has achieved
+                description: Ready indicates that the Data Movement Manager has achieved
                   the desired readiness state and all managed resources are initialized.
                 type: boolean
             type: object

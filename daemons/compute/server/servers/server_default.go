@@ -547,7 +547,7 @@ func (s *defaultServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRe
 		if errors.IsConflict(err) {
 			return &pb.DataMovementCancelResponse{
 				Status:  pb.DataMovementCancelResponse_FAILED,
-				Message: fmt.Sprintf("Failed to initiate cancel on rsync node: %s", err.Error()),
+				Message: fmt.Sprintf("Failed to initiate cancel on dm node: %s", err.Error()),
 			}, nil
 		}
 

@@ -141,14 +141,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
 		if !found {
-			return ctrl.Result{}, nil // Already cancelled?
+			return ctrl.Result{}, nil // Already completed or cancelled?
 		}
 
 		cancelContext := storedCancelContext.(dataMovementCancelContext)
-
-		if errors.Is(cancelContext.ctx.Err(), context.Canceled) {
-			return ctrl.Result{}, nil // Already cancelled?
-		}
 
 		log.Info("Cancelling operation")
 		cancelContext.cancel()
@@ -243,7 +239,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		})
 
 		if err != nil {
-			log.Error(err, "failed to update rsync status with completion")
+			log.Error(err, "failed to update dm status with completion")
 			// TODO Add prometheus counter to track occurrences
 		}
 

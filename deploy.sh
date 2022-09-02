@@ -40,7 +40,7 @@ case $CMD in
 
         $KUSTOMIZE build config/default | kubectl apply -f - || true
 
-        # Sometimes the deployment of the RsyncTemplate occurs to quickly for k8s to digest the CRD
+        # Sometimes the deployment of the DataMovementManager occurs to quickly for k8s to digest the CRD
         # Retry the deployment if this is the case. It seems to be fast enough where we can just
         # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
         echo "Waiting for DataMovementManager resource to become ready"
@@ -51,7 +51,7 @@ case $CMD in
         done
         ;;
     undeploy)
-        # When the rsync-template CRD gets deleted all related resource are also
+        # When the DataMovementManager CRD gets deleted all related resource are also
         # removed, so the delete will always fail. We ignore all errors at our
         # own risk.
         $KUSTOMIZE build config/default | kubectl delete -f - || true
