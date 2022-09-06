@@ -131,7 +131,7 @@ func (r *DataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.
 		return errorHandler(err, "Create Secret")
 	}
 
-	if err := r.createDeploymentIfNecessary(ctx, manager); err != nil {
+	if err := r.createOrUpdateDeploymentIfNecessary(ctx, manager); err != nil {
 		return errorHandler(err, "Create Deployment")
 	}
 
@@ -216,33 +216,39 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 	return err
 }
 
-func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) (err error) {
+func (r *DataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) (err error) {
 	log := log.FromContext(ctx)
 
-	newDeployment := func() (*appsv1.Deployment, error) {
-		base := &appsv1.Deployment{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(manager), base); err != nil {
-			return nil, fmt.Errorf("Retrieving base deployment failed %w", err)
-		}
+	base := &appsv1.Deployment{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(manager), base); err != nil {
+		return fmt.Errorf("Retrieving base deployment failed %w", err)
+	}
 
-		deployment := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      deploymentName,
-				Namespace: manager.Namespace,
-				Labels:    base.Labels,
-			},
-		}
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: manager.Namespace,
+		},
+	}
 
+	mutateFn := func() error {
+		deployment.Labels = base.Labels
 		deployment.Spec = *base.Spec.DeepCopy()
-
 		podSpec := &deployment.Spec.Template.Spec
 
 		container, err := findManagerContainer(podSpec)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		container.Args = append(container.Args, "--controller=default", "--leader-elect=false") // TODO: Need to figure out how to make the deployment work with leader-election
+		for idx, arg := range container.Args {
+			if arg == "--controller=manager" {
+				container.Args[idx] = "--controller=default"
+				break
+			}
+		}
+
+		container.Args = append(container.Args, "--leader-elect=false") // TODO: Need to figure out how to make the deployment work with leader-election
 
 		// Allow drive to reach workers through the service
 		container.Env = append(container.Env, corev1.EnvVar{
@@ -253,33 +259,24 @@ func (r *DataMovementManagerReconciler) createDeploymentIfNecessary(ctx context.
 		setupSSHAuthVolumes(manager, podSpec)
 
 		if err := ctrl.SetControllerReference(manager, deployment, r.Scheme); err != nil {
-			return nil, fmt.Errorf("Setting Deployment controller reference failed: %w", err)
+			return fmt.Errorf("Setting Deployment controller reference failed: %w", err)
 		}
 
-		return deployment, nil
+		return nil
 	}
 
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      deploymentName,
-			Namespace: manager.Namespace,
-		},
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, deployment, mutateFn)
+	if err != nil {
+		return err
 	}
 
-	if err = r.Get(ctx, client.ObjectKeyFromObject(deployment), deployment); errors.IsNotFound(err) {
-		deployment, err = newDeployment()
-		if err != nil {
-			return err
-		}
-
-		if err = r.Create(ctx, deployment); err != nil {
-			return err
-		}
-
+	if result == controllerutil.OperationResultCreated {
 		log.Info("Created Deployment", "object", client.ObjectKeyFromObject(deployment).String())
+	} else if result == controllerutil.OperationResultUpdated {
+		log.Info("Updated Deployment", "object", client.ObjectKeyFromObject(deployment).String())
 	}
 
-	return err
+	return nil
 }
 
 func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
