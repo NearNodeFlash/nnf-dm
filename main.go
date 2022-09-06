@@ -29,10 +29,12 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -173,7 +175,8 @@ type defaultController struct{}
 
 func (*defaultController) GetType() string { return DefaultController }
 func (*defaultController) SetOptions(opts *ctrl.Options) {
-	opts.Namespace = dmv1alpha1.DataMovementNamespace
+	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace}
+	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
 }
 
 func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
