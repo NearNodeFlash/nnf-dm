@@ -30,10 +30,12 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -67,6 +69,20 @@ type dataMovementCancelContext struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 }
+
+// Invalid error is a non-recoverable error type that implies the Data Movement resource is invalid
+type invalidError struct {
+	err error
+}
+
+func newInvalidError(format string, a ...any) *invalidError {
+	return &invalidError{
+		err: fmt.Errorf(format, a...),
+	}
+}
+
+func (i *invalidError) Error() string { return i.err.Error() }
+func (i *invalidError) Unwrap() error { return i.err }
 
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
@@ -161,14 +177,32 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	// Handle invalid errors that can occur when setting up the data movement
+	// resource. An invalid error is unrecoverable.
+	handleInvalidError := func(err error) error {
+		if errors.Is(err, &invalidError{}) {
+			dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
+			dm.Status.Message = err.Error()
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		return err
+	}
+
 	nodes, err := r.getStorageNodeNames(ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, err // TODO: Filter out runtime errors (retryable) format errors (failures)
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 
 	hosts, err := r.getWorkerHostnames(ctx, nodes)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 
 	// Record the start of the data movement operation
@@ -266,16 +300,19 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
 		storageRef = dm.Spec.Destination.StorageReference
 	} else {
-		return nil, fmt.Errorf("Neither source or destination is of NNF Storage type")
+		return nil, newInvalidError("Neither source or destination is of NNF Storage type")
 	}
 
 	storage := &nnfv1alpha1.NnfStorage{}
 	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, newInvalidError("NNF Storage not found: %s", err.Error())
+		}
 		return nil, err
 	}
 
 	if storage.Spec.FileSystemType != "lustre" {
-		return nil, fmt.Errorf("Unsupported storage type %s", storage.Spec.FileSystemType)
+		return nil, newInvalidError("Unsupported storage type %s", storage.Spec.FileSystemType)
 	}
 	targetAllocationSetIndex := -1
 	for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
@@ -285,7 +322,7 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	}
 
 	if targetAllocationSetIndex == -1 {
-		return nil, fmt.Errorf("OST allocation set not found")
+		return nil, newInvalidError("OST allocation set not found")
 	}
 
 	nodes := storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes
@@ -342,7 +379,7 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 
 		hostname, found := nodeNameToHostnameMap[nodes[idx]]
 		if !found {
-			return nil, fmt.Errorf("Hostname invalid for node %s", nodes[idx])
+			return nil, newInvalidError("Hostname invalid for node %s", nodes[idx])
 		}
 
 		hostnames[idx] = hostname
