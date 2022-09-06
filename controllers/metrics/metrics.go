@@ -6,30 +6,22 @@ import (
 )
 
 var (
+	NnfDmDataMovementManagerReconcilesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "nnfdm_datamovementmanager_reconciles_total",
+			Help: "Number of total reconciles in nnfdm datamovement manager controller",
+		},
+	)
+
 	NnfDmDataMovementReconcilesTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "nnfdm_datamovement_reconciles_total",
 			Help: "Number of total reconciles in nnfdm datamovement controller",
 		},
 	)
-
-	NnfDmRsyncNodeDataMovementReconcilesTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "nnfdm_rsyncnode_datamovement_reconciles_total",
-			Help: "Number of total reconciles in nnfdm rsyncnode_datamovement controller",
-		},
-	)
-
-	NnfDmRsyncTemplateReconcilesTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "nnfdm_rsynctemplate_reconciles_total",
-			Help: "Number of total reconciles in nnfdm rsynctemplate controller",
-		},
-	)
 )
 
 func init() {
+	metrics.Registry.MustRegister(NnfDmDataMovementManagerReconcilesTotal)
 	metrics.Registry.MustRegister(NnfDmDataMovementReconcilesTotal)
-	metrics.Registry.MustRegister(NnfDmRsyncNodeDataMovementReconcilesTotal)
-	metrics.Registry.MustRegister(NnfDmRsyncTemplateReconcilesTotal)
 }

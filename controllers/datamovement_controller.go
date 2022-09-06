@@ -21,27 +21,28 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"reflect"
+	"strings"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
-	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
-	mpiv2beta1 "github.com/kubeflow/mpi-operator/v2/pkg/apis/kubeflow/v2beta1"
 )
 
 const (
@@ -54,31 +55,31 @@ const (
 type DataMovementReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	// We maintain a map of active operations which allows us to process cancel requests
+	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
+	contexts sync.Map
 }
 
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// Keep track of the context and its cancel function so that we can track
+// and cancel data movement operations in progress
+type dataMovementCancelContext struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
-//+kubebuilder:rbac:groups=dm.cray.hpe.com,resources=rsyncnodedatamovements,verbs=get;list;watch;create;update;patch;delete;deletecollection
-//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfaccesses,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
+//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts,verbs=get;list
+//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts/status,verbs=get;list
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
-//+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubeflow.org,resources=mpijobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;pathc;delete
-//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the DataMovement object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
@@ -89,314 +90,271 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check if the object is being deleted. Deletion is coordinated around the sub-resources
-	// created or modified as part of data movement.
 	if !dm.GetDeletionTimestamp().IsZero() {
-		log.Info("Starting delete operation")
 
-		if !controllerutil.ContainsFinalizer(dm, finalizer) {
-			return ctrl.Result{}, nil
-		}
+		// TODO: Cancel/Abort the operation from Blake
 
-		teardownFns := []func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
-			r.teardownRsyncJob,
-			r.teardownLustreJob,
-		}
+		if controllerutil.ContainsFinalizer(dm, finalizer) {
+			controllerutil.RemoveFinalizer(dm, finalizer)
 
-		for _, teardownFn := range teardownFns {
-			result, err := teardownFn(ctx, dm)
-			log.Info("Teardown", "Result", result, "Error", err)
-			if err != nil {
+			if err := r.Update(ctx, dm); err != nil {
 				return ctrl.Result{}, err
-			} else if result != nil {
-				return *result, nil
 			}
 		}
 
-		controllerutil.RemoveFinalizer(dm, finalizer)
-		if err := r.Update(ctx, dm); err != nil {
-			log.Error(err, "Failed to update after removing finalizer")
-			return ctrl.Result{}, err
-		}
-
-		log.Info("Successfully deleted data movement resource")
 		return ctrl.Result{}, nil
 	}
 
 	if !controllerutil.ContainsFinalizer(dm, finalizer) {
-
-		now := metav1.NowMicro()
-		dm.Status.StartTime = &now
-
-		// Do first level validation
-		if len(dm.Status.Conditions) == 0 {
-
-			if err := r.validateSpec(dm); err != nil {
-				advanceCondition(dm,
-					nnfv1alpha1.DataMovementConditionTypeFinished,
-					nnfv1alpha1.DataMovementConditionReasonInvalid,
-					fmt.Sprintf("Input validation failed: %v", err),
-				)
-			} else {
-				advanceCondition(dm,
-					nnfv1alpha1.DataMovementConditionTypeStarting,
-					nnfv1alpha1.DataMovementConditionReasonSuccess,
-					"Data movement resource starting",
-				)
-			}
-
-			if err := r.Status().Update(ctx, dm); err != nil {
-				log.Error(err, "Failed to initialize status")
-				if errors.IsConflict(err) {
-					return ctrl.Result{Requeue: true}, nil
-				}
-
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{Requeue: true}, nil
-		}
-
 		controllerutil.AddFinalizer(dm, finalizer)
 		if err := r.Update(ctx, dm); err != nil {
-			log.Error(err, "Failed to initialize finalizer")
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{Requeue: true}, nil
+		// An update here will cause the reconciler to run again once kubernetes
+		// has recorded the resource it its database.
+		return ctrl.Result{}, nil
 	}
 
-	isLustre2Lustre, err := r.isLustre2Lustre(ctx, dm)
+	// Prevent gratuitous wakeups for a resource that is already finished.
+	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeFinished {
+		return ctrl.Result{}, nil
+	}
+
+	if dm.Spec.Cancel {
+		// Check for the scenario where a request is canceled before the DM has started.
+		// If so, record it as cancelled and do nothing
+		if dm.Status.StartTime.IsZero() {
+			now := metav1.NowMicro()
+			dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+			dm.Status.StartTime = &now
+			dm.Status.EndTime = &now
+
+			if err := r.Status().Update(ctx, dm); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			log.Info("Cancel initiated before data movement started, doing nothing")
+			return ctrl.Result{}, nil
+		}
+
+		storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
+		if !found {
+			return ctrl.Result{}, nil // Already completed or cancelled?
+		}
+
+		cancelContext := storedCancelContext.(dataMovementCancelContext)
+
+		log.Info("Cancelling operation")
+		cancelContext.cancel()
+		<-cancelContext.ctx.Done()
+
+		// Nothing more to do - the go routine that is executing the data movement will exit
+		// and the status is recorded then.
+
+		return ctrl.Result{}, nil
+	}
+
+	// Make sure if the DM is already running that we don't start up another command
+	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeRunning {
+		return ctrl.Result{}, nil
+	}
+
+	nodes, err := r.getStorageNodeNames(ctx, dm)
+	if err != nil {
+		return ctrl.Result{}, err // TODO: Filter out runtime errors (retryable) format errors (failures)
+	}
+
+	hosts, err := r.getWorkerHostnames(ctx, nodes)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	currentConditionType := dm.Status.Conditions[len(dm.Status.Conditions)-1].Type
-	log.Info("Executing", "IsLustre2Lustre", isLustre2Lustre, "Condition", currentConditionType)
-	switch currentConditionType {
+	// Record the start of the data movement operation
+	now := metav1.NowMicro()
+	dm.Status.StartTime = &now
+	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 
-	case nnfv1alpha1.DataMovementConditionTypeStarting:
-
-		startFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, error){
-			false: r.initializeRsyncJob,
-			true:  r.initializeLustreJob,
-		}[isLustre2Lustre]
-
-		result, err := startFn(ctx, dm)
-		if err != nil {
-			log.Error(err, "Failed to start")
-
-			msg := fmt.Sprintf("Failed to start: %v", err)
-			resetConditionRollup(dm, nnfv1alpha1.DataMovementConditionReasonFailed, msg)
-
-			if err := r.Status().Update(ctx, dm); err != nil {
-				log.Error(err, "Failed to record start error status")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, err
-		} else if result != nil && !result.IsZero() {
-			return *result, nil
-		}
-
-		advanceCondition(dm,
-			nnfv1alpha1.DataMovementConditionTypeRunning,
-			nnfv1alpha1.DataMovementConditionReasonSuccess,
-			"Data movement resource running",
-		)
-
-		if err := r.Status().Update(ctx, dm); err != nil {
-			log.Error(err, "Failed to transition to running state")
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{Requeue: true}, nil
-
-	case nnfv1alpha1.DataMovementConditionTypeRunning:
-		monitorFn := map[bool]func(context.Context, *nnfv1alpha1.NnfDataMovement) (*ctrl.Result, string, string, error){
-			false: r.monitorRsyncJob,
-			true:  r.monitorLustreJob,
-		}[isLustre2Lustre]
-
-		result, status, message, err := monitorFn(ctx, dm)
-		log.Info("Monitor job", "status", status, "message", message)
-
-		if err != nil {
-			log.Error(err, "Failed to monitor")
-
-			msg := fmt.Sprintf("Failed to monitor: %v", err)
-			resetConditionRollup(dm, nnfv1alpha1.DataMovementConditionReasonFailed, msg)
-
-			if err := r.Status().Update(ctx, dm); err != nil {
-				log.Error(err, "Failed to record monitor error status")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, err
-		} else if result != nil && !result.IsZero() {
-			return *result, nil
-		}
-
-		// Continue monitoring the resource, if specified, by preventing the data movement resource from finishing
-		// early while the client application is running and generating data movement requests. This is to protect
-		// the use case where this resource thinks it handled all the requests but in reality the client application
-		// continues to execute with the potential to generate more requests.
-		if dm.Spec.Monitor == true {
-			return ctrl.Result{}, nil
-		}
-
-		switch status {
-		case nnfv1alpha1.DataMovementConditionTypeRunning:
-			// Still running, nothing to do here
-			break
-		case nnfv1alpha1.DataMovementConditionReasonFailed, nnfv1alpha1.DataMovementConditionReasonSuccess:
-
-			advanceCondition(dm,
-				nnfv1alpha1.DataMovementConditionTypeFinished,
-				status,
-				message,
-			)
-
-			now := metav1.NowMicro()
-			dm.Status.EndTime = &now
-		}
-
-		if err := r.Status().Update(ctx, dm); err != nil {
-			log.Error(err, "Failed to transition to finished state")
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-
-	case nnfv1alpha1.DataMovementConditionTypeFinished:
-		return ctrl.Result{}, nil // Already finished, do nothing further.
+	if err := r.Status().Update(ctx, dm); err != nil {
+		return ctrl.Result{}, err
 	}
+
+	// Expand the context with cancel and store it in the map so the cancel
+	// function can be used in another reconciler loop. Also add NamespacedName
+	// so we can retrieve the resource.
+	ctxCancel, cancel := context.WithCancel(ctx)
+	r.contexts.Store(dm.Name, dataMovementCancelContext{
+		ctx:    ctxCancel,
+		cancel: cancel,
+	})
+
+	// Execute the go routine to perform the data movement
+	go func() {
+
+		// TODO: UserId/GroupId
+
+		cmd := exec.CommandContext(ctxCancel,
+			"mpirun",
+			"--allow-run-as-root",
+			"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
+			"--host", strings.Join(hosts, ","),
+			"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
+
+		log.Info("Running Command", "cmd", cmd.String())
+
+		// TODO: Capture output as it progresses and add a %complete to the resource
+
+		out, err := cmd.CombinedOutput()
+
+		now := metav1.NowMicro()
+		dm.Status.EndTime = &now
+		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
+
+		if errors.Is(ctxCancel.Err(), context.Canceled) {
+			log.Error(err, "Data movement operation cancelled", "output", string(out))
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+		} else if err != nil {
+			log.Error(err, "Data movement operation failed", "output", string(out))
+			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Message = err.Error()
+
+			// TODO: Enhanced error capture: parse error response and provide useful message
+		} else {
+			log.Info("Completed Command", "cmd", cmd.String())
+		}
+
+		status := dm.Status.DeepCopy()
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			dm := &nnfv1alpha1.NnfDataMovement{}
+			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+
+			status.DeepCopyInto(&dm.Status)
+
+			return r.Status().Update(ctx, dm)
+		})
+
+		if err != nil {
+			log.Error(err, "failed to update dm status with completion")
+			// TODO Add prometheus counter to track occurrences
+		}
+
+		r.contexts.Delete(dm.Name)
+	}()
 
 	return ctrl.Result{}, nil
 }
 
-func (r *DataMovementReconciler) validateSpec(dm *nnfv1alpha1.NnfDataMovement) error {
+// Retrieve the NNF Nodes that are the target of the data movement operation
+func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
 
-	// Permit empty data movement resources; this results in a data movement resource
-	// that monitors existing rsync resources
-	if dm.Spec.Source == nil && dm.Spec.Destination == nil {
-		return nil
+	// If this is a node data movement request simply reference the localhost
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
+		return []string{"localhost"}, nil
 	}
 
-	if dm.Spec.Source == nil || len(dm.Spec.Source.Path) == 0 {
-		return fmt.Errorf("source path must be defined")
-	}
-	if dm.Spec.Destination == nil || len(dm.Spec.Destination.Path) == 0 {
-		return fmt.Errorf("destination path must be defined")
-	}
+	// TODO: Differentiate specification errors from runtime errors
 
-	// If destination is just "path" this must be a lustre file system
-	if dm.Spec.Source.Storage == nil && dm.Spec.Destination.Storage == nil {
-		return fmt.Errorf("one of source or destination must be a storage instance")
-	}
-
-	return nil
-}
-
-func (r *DataMovementReconciler) isLustre2Lustre(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (isLustre bool, err error) {
-	if dm.Spec.Source == nil || dm.Spec.Destination == nil {
-		return false, nil
+	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
+	var storageRef corev1.ObjectReference
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Source.StorageReference
+	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Destination.StorageReference
+	} else {
+		return nil, fmt.Errorf("Neither source or destination is of NNF Storage type")
 	}
 
-	// Data Movement is a Lustre2Lustre copy if...
-	//   COPY_IN and Source is LustreFileSystem and
-	//      Destination is NnfStorage.fsType == lustre or
-	//      Destination is PersistentStorageInstance.fsType == lustre
-	//   or
-	//   COPY_OUT and Destination is LustreFileSystem and
-	//      Source is NnfStorage.fsType == lustre or
-	//      Source is PersistentStorageInstance.fsType == lustre
-	fsType := ""
-	if dm.Spec.Source.Storage != nil && dm.Spec.Source.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
-		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Destination.Storage)
-	} else if dm.Spec.Destination.Storage != nil && dm.Spec.Destination.Storage.Kind == reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name() {
-		fsType, err = r.getStorageInstanceFileSystemType(ctx, dm.Spec.Source.Storage)
+	storage := &nnfv1alpha1.NnfStorage{}
+	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+		return nil, err
 	}
 
-	return fsType == "lustre", err
-}
-
-// resetConditionRollup will reset the rollup Reason and Message for the current
-// condition type, and will also update the latest element of the Conditions array.
-func resetConditionRollup(dm *nnfv1alpha1.NnfDataMovement, reason string, message string) {
-
-	dm.Status.Status = reason
-	dm.Status.Message = message
-
-	idx := len(dm.Status.Conditions) - 1
-	dm.Status.Conditions[idx].Reason = reason
-	dm.Status.Conditions[idx].Message = message
-}
-
-func advanceCondition(dm *nnfv1alpha1.NnfDataMovement, typ string, reason string, message string) {
-	if len(dm.Status.Conditions) != 0 {
-		dm.Status.Conditions[len(dm.Status.Conditions)-1].Status = metav1.ConditionFalse
+	if storage.Spec.FileSystemType != "lustre" {
+		return nil, fmt.Errorf("Unsupported storage type %s", storage.Spec.FileSystemType)
 	}
-
-	// Set the rollup status.
-	dm.Status.State = typ
-	dm.Status.Status = reason
-	dm.Status.Message = message
-
-	dm.Status.Conditions = append(dm.Status.Conditions, metav1.Condition{
-		Type:               typ,
-		Reason:             reason,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-		Status:             metav1.ConditionTrue,
-	})
-}
-
-func (r *DataMovementReconciler) getStorageInstanceFileSystemType(ctx context.Context, object *corev1.ObjectReference) (string, error) {
-
-	switch object.Kind {
-	case reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name():
-
-		storage := &nnfv1alpha1.NnfStorage{}
-		if err := r.Get(ctx, types.NamespacedName{Name: object.Name, Namespace: object.Namespace}, storage); err != nil {
-			return "", err
-		}
-
-		return storage.Spec.FileSystemType, nil
-
-	case reflect.TypeOf(lusv1alpha1.LustreFileSystem{}).Name():
-		return "lustre", nil
-	}
-
-	panic(fmt.Sprintf("Unsupported storage type '%s'", object.Kind))
-}
-
-func (r *DataMovementReconciler) getDataMovementConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	config := &corev1.ConfigMap{}
-
-	if err := r.Get(ctx, types.NamespacedName{Name: "data-movement" + configSuffix, Namespace: configNamespace}, config); err != nil {
-		if !errors.IsNotFound(err) {
-			return nil, err
+	targetAllocationSetIndex := -1
+	for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
+		if allocationSet.TargetType == "OST" {
+			targetAllocationSetIndex = allocationSetIndex
 		}
 	}
 
-	return config, nil
+	if targetAllocationSetIndex == -1 {
+		return nil, fmt.Errorf("OST allocation set not found")
+	}
+
+	nodes := storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes
+	nodeNames := make([]string, len(nodes))
+	for idx := range nodes {
+		nodeNames[idx] = nodes[idx].Name
+	}
+
+	return nodeNames, nil
+}
+
+func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes []string) ([]string, error) {
+
+	if nodes[0] == "localhost" {
+		return nodes, nil
+	}
+
+	// For this first iteration, we need to look up the Pods associated with the MPI workers on each
+	// individual rabbit, mapping the nodename to a worker IP address. Since we've set up a headless
+	// service matching the subdomain, the worker's IP is used as the DNS name (substituting '-' for '.')
+	// following the description here:
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-hostname-and-subdomain-fields
+	//
+	// Ideally this look-up would not be required if the MPI worker pods could have the same hostname
+	// as the nodename. There is no straightfoward way for this to happen although it has been raised
+	// several times in the k8s community.
+	//
+	// A couple of ideas on how to support this...
+	// 1. Using an initContainer which would get the parent pod and modify the hostname.
+	// 2. Not use a DaemonSet to create the MPI worker pods, but do so manually, assigning
+	//    the correct hostname to each pod. Right now the daemon set provides scheduling and
+	//    pod restarts, and we would lose this feature if we managed the pods individually.
+
+	// Get the Rabbit DM Worker Pods
+	listOptions := []client.ListOption{
+		client.InNamespace(dmv1alpha1.DataMovementNamespace),
+		client.MatchingLabels(map[string]string{
+			dmv1alpha1.DataMovementWorkerLabel: "true",
+		}),
+	}
+
+	pods := &corev1.PodList{}
+	if err := r.List(ctx, pods, listOptions...); err != nil {
+		return nil, err
+	}
+
+	nodeNameToHostnameMap := map[string]string{}
+	for _, pod := range pods.Items {
+		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + dmv1alpha1.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
+	}
+
+	hostnames := make([]string, len(nodes))
+	for idx := range nodes {
+
+		hostname, found := nodeNameToHostnameMap[nodes[idx]]
+		if !found {
+			return nil, fmt.Errorf("Hostname invalid for node %s", nodes[idx])
+		}
+
+		hostnames[idx] = hostname
+	}
+
+	return hostnames, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nnfv1alpha1.NnfDataMovement{}).
-		Owns(&mpiv2beta1.MPIJob{}).
-		Owns(&corev1.PersistentVolume{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Watches(
-			&source.Kind{Type: &mpiv2beta1.MPIJob{}},
-			handler.EnqueueRequestsFromMapFunc(mpijobEnqueueRequestMapFunc),
-		).
-		Watches(
-			&source.Kind{Type: &dmv1alpha1.RsyncNodeDataMovement{}},
-			handler.EnqueueRequestsFromMapFunc(dwsv1alpha1.OwnerLabelMapFunc),
-		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 128}).
 		Complete(r)
 }

@@ -44,19 +44,31 @@ COPY config/ config/
 COPY hack/ hack/
 COPY Makefile Makefile
 
-RUN apk add make bash rsync
+RUN apk add make bash
 
 ENV CGO_ENABLED=0
 
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM alpine:latest
+FROM ghcr.io/nearnodeflash/nnf-mfu:latest
 
-RUN apk add rsync
+RUN apt update
 
+RUN apt install -y openmpi-bin
+
+# TODO Remove this
+RUN apt install -y bash
+
+# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile; 
+# do not change them unless you know what it is you are doing
+ARG port=2222
+RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
+    && sed -i "s/[ #]\(.*Port \).*/ \1$port/g" /etc/ssh/ssh_config \
+    && echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
+# Copy the executable and execute
 WORKDIR /
 COPY --from=builder /workspace/manager .
-#USER 65532:65532
 
 ENTRYPOINT ["/manager"]

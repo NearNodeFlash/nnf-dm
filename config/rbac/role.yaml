@@ -18,9 +18,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
+  - apps
   resources:
-  - configmaps
+  - deployments
   verbs:
   - create
   - delete
@@ -32,7 +32,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - nodes
+  - pods
   verbs:
   - get
   - list
@@ -41,7 +41,16 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - persistentvolumeclaims
+  - pods/status
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
   verbs:
   - create
   - delete
@@ -53,13 +62,13 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - persistentvolumes
+  - services
   verbs:
   - create
   - delete
   - get
   - list
-  - pathc
+  - patch
   - update
   - watch
 - apiGroups:
@@ -67,44 +76,13 @@ rules:
   resources:
   - lustrefilesystems
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - dm.cray.hpe.com
   resources:
-  - rsyncnodedatamovements
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - rsyncnodedatamovements/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - rsyncnodedatamovements/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - rsynctemplates
+  - datamovementmanagers
   verbs:
   - create
   - delete
@@ -116,13 +94,13 @@ rules:
 - apiGroups:
   - dm.cray.hpe.com
   resources:
-  - rsynctemplates/finalizers
+  - datamovementmanagers/finalizers
   verbs:
   - update
 - apiGroups:
   - dm.cray.hpe.com
   resources:
-  - rsynctemplates/status
+  - datamovementmanagers/status
   verbs:
   - get
   - patch
@@ -142,41 +120,12 @@ rules:
   - get
   - list
 - apiGroups:
-  - kubeflow.org
-  resources:
-  - mpijobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kubeflow.org
-  resources:
-  - mpijobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
-  - nnfaccesses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - nnf.cray.hpe.com
   resources:
   - nnfdatamovements
   verbs:
   - create
   - delete
-  - deletecollection
   - get
   - list
   - patch

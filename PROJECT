@@ -1,6 +1,5 @@
 domain: cray.hpe.com
 layout:
-
 - go.kubebuilder.io/v3
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
@@ -14,34 +13,7 @@ resources:
   controller: true
   domain: cray.hpe.com
   group: dm
-  kind: DataMovement
-  path: github.com/NearNodeFlash/nnf-dm/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: cray.hpe.com
-  group: dm
-  kind: RsyncTemplate
-  path: github.com/NearNodeFlash/nnf-dm/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: cray.hpe.com
-  group: dm
-  kind: RsyncNodeDataMovement
-  path: github.com/NearNodeFlash/nnf-dm/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: cray.hpe.com
-  group: dm
-  kind: RsyncDataMovement
+  kind: DataMovementManager
   path: github.com/NearNodeFlash/nnf-dm/api/v1alpha1
   version: v1alpha1
 version: "3"

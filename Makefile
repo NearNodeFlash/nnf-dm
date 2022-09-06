@@ -145,6 +145,9 @@ kind-push: ## Push docker image to kind
 	${DOCKER} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 	kind load docker-image --nodes `kubectl get node -l cray.nnf.manager=true --no-headers -o custom-columns=":metadata.name" | paste -d, -s -` gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 
+minikube-push:
+	minikube image load ${IMG}
+
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -154,10 +157,10 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	./deploy.sh $(KUSTOMIZE) $(IMG)
+	./deploy.sh deploy $(KUSTOMIZE) $(IMG)
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	./undeploy.sh $(KUSTOMIZE)
+	./deploy.sh undeploy $(KUSTOMIZE)
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin

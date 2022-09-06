@@ -29,6 +29,6 @@ This repository was bootstrapped using the operator-sdk
 ```
 operator-sdk init --domain cray.hpe.com --repo github.com/NearNodeFlash/nnf-dm
 operator-sdk create api --group dm --version v1alpha1 --kind DataMovement --resource --controller
-operator-sdk create api --group dm --version v1alpha1 --kind RsyncTemplate --resource --controller
-operator-sdk create api --group dm --version v1alpha1 --kind RsyncNodeDataMovement --resource --controller
+operator-sdk create api --group dm --version v1alpha1 --kind DataMovementManager --resource --controller
+
 ```

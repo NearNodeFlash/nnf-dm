@@ -1,6 +1,0 @@
-# Let Kustomize know we want to inherit the service account name into the rsync template
-nameReference:
-  - kind: ServiceAccount
-    fieldSpecs:
-      - kind: RsyncTemplate
-        path: spec/template/spec/serviceAccountName

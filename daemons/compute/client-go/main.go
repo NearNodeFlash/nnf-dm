@@ -43,7 +43,7 @@ func main() {
 	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
 	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
 	count := flag.Int("count", 1, "number of requests to create")
-	cancelExpiryTime := flag.Int("cancel", -1, "number of seconds after creation to cancel request")
+	cancelExpiryTime := flag.Duration("cancel", -time.Second, "duration after create to cancel request")
 
 	flag.Parse()
 
@@ -81,18 +81,18 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not create data movement request: %v", err)
 		}
-		uid := createResponse.GetUid()
 
-		if createResponse.GetStatus() == pb.DataMovementCreateResponse_SUCCESS {
-			log.Printf("Data movement request created: %s", createResponse.GetUid())
-		} else {
-			log.Fatal("Create request failed: ", createResponse.String())
+		if createResponse.GetStatus() != pb.DataMovementCreateResponse_SUCCESS {
+			log.Fatalf("create request failed: %+v", createResponse)
 		}
+
+		log.Printf("Data movement request created: %s", createResponse.GetUid())
+		uid := createResponse.GetUid()
 
 		// Cancel the data movement after specified amount of time
 		if *cancelExpiryTime >= 0 {
-			log.Printf("Waiting %d seconds before cancelling request\n", *cancelExpiryTime)
-			time.Sleep(time.Duration(*cancelExpiryTime) * time.Second)
+			log.Printf("Waiting %s before cancelling request\n", (*cancelExpiryTime).String())
+			time.Sleep(*cancelExpiryTime)
 
 			log.Printf("Canceling request: %v", uid)
 			cancelResponse, err := cancelRequest(ctx, c, *workflow, *namespace, uid)
@@ -105,11 +105,15 @@ func main() {
 		// Poll request to check for completed/cancelled
 		for {
 			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, uid, *maxWaitTime)
-			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
-				log.Fatalf("Data movement failed: %v", err)
+			if err != nil {
+				log.Fatalf("failed to get dat movement status: %v", err)
 			}
 
-			log.Printf("Data movement status %s", statusResponse.String())
+			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
+				log.Fatalf("data movement status failed: %+v", statusResponse)
+			}
+
+			log.Printf("Data movement status %+v", statusResponse)
 			if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
 				break
 			}
@@ -135,10 +139,16 @@ func main() {
 		// Use List to cleanup and delete requests
 		for _, uid := range listResponse.GetUids() {
 			log.Printf("Deleting request: %v", uid)
+
 			deleteResponse, err := deleteRequest(ctx, c, *workflow, *namespace, uid)
 			if err != nil {
-				log.Fatalf("could not delete data movement request: %v", err)
+				log.Fatalf("could not delete data movement request: %s", err)
 			}
+
+			if deleteResponse.Status != pb.DataMovementDeleteResponse_SUCCESS {
+				log.Fatalf("data movement delete failed: %+v", deleteResponse)
+			}
+
 			log.Printf("Data movement request deleted: %v %v", uid, deleteResponse.String())
 		}
 
