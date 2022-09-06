@@ -28,6 +28,12 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// The required namespace for an NNF Data Movement operation. This is for system wide (lustre) data movement.
+	// Individual nodes may also perform data movement in which case they use the NNF Node Name as the namespace.
+	DataMovementNamespace = "nnf-dm-system"
+)
+
 // NnfDataMovementSpec defines the desired state of DataMovement
 type NnfDataMovementSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -50,6 +56,7 @@ type NnfDataMovementSpec struct {
 	GroupId uint32 `json:"groupId,omitempty"`
 
 	// Set to true if the data movement operation should be canceled.
+	// +kubebuilder:default:=false
 	Cancel bool `json:"cancel,omitempty"`
 }
 
@@ -71,7 +78,7 @@ type NnfDataMovementStatus struct {
 	State string `json:"state,omitempty"`
 
 	// Status of the current state.
-	// +kubebuilder:validation:Enum=Success;Failed;Invalid
+	// +kubebuilder:validation:Enum=Success;Failed;Invalid;Cancelled
 	Status string `json:"status,omitempty"`
 
 	// Message contains any text that explains the Status.
