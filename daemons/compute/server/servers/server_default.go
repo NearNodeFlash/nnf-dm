@@ -294,6 +294,12 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, 
 
 func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha1.ClientMountInfo, computeClientMount *dwsv1alpha1.ClientMount) (*nnfv1alpha1.NnfDataMovement, error) {
 
+	// Find the ClientMount for the rabbit.
+	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
+	if err != nil {
+		return nil, err
+	}
+
 	var dwIndex string
 	if dw, err := getDirectiveIndexFromClientMount(computeClientMount); err != nil {
 		return nil, err
@@ -321,7 +327,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
 			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-				Path:             "/", // TODO: Figure this out with Dean the lean mean fighting machine
+				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
