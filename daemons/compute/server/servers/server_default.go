@@ -312,8 +312,8 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 			// The MPI operator will use the resulting name as a
 			// prefix for its own names.
 			GenerateName: nameBase,
-			// Use the compute's namespace.
-			Namespace: s.name,
+			// Use the data movement namespace.
+			Namespace: dmv1alpha1.DataMovementNamespace,
 			Labels: map[string]string{
 				dmctrl.InitiatorLabel:           s.name,
 				nnfv1alpha1.DirectiveIndexLabel: dwIndex,
@@ -701,5 +701,5 @@ func (s *defaultServer) getNamespace(uid string) string {
 		return s.namespace
 	}
 
-	return s.name
+	return dmv1alpha1.DataMovementNamespace
 }
