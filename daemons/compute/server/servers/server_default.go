@@ -231,10 +231,16 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	}
 
 	var dm *nnfv1alpha1.NnfDataMovement
-	if computeMountInfo.Type == "lustre" {
+	switch computeMountInfo.Type {
+	case "lustre":
 		dm, err = s.createNnfDataMovement(ctx, req, computeMountInfo, computeClientMount)
-	} else {
+	case "gfs2":
 		dm, err = s.createNnfNodeDataMovement(ctx, req, computeMountInfo)
+	default:
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_INVALID,
+			Message: fmt.Sprintf("filesystem not supported: '%s'", computeMountInfo.Type),
+		}, nil
 	}
 
 	if err != nil {
