@@ -108,7 +108,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if !dm.GetDeletionTimestamp().IsZero() {
 
-		// TODO: Cancel/Abort the operation from Blake
+		if err := r.cancel(ctx, dm); err != nil {
+			return ctrl.Result{}, err
+		}
 
 		if controllerutil.ContainsFinalizer(dm, finalizer) {
 			controllerutil.RemoveFinalizer(dm, finalizer)
@@ -137,37 +139,11 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	// Handle cancellation
 	if dm.Spec.Cancel {
-		// Check for the scenario where a request is canceled before the DM has started.
-		// If so, record it as cancelled and do nothing
-		if dm.Status.StartTime.IsZero() {
-			now := metav1.NowMicro()
-			dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
-			dm.Status.StartTime = &now
-			dm.Status.EndTime = &now
-
-			if err := r.Status().Update(ctx, dm); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			log.Info("Cancel initiated before data movement started, doing nothing")
-			return ctrl.Result{}, nil
+		if err := r.cancel(ctx, dm); err != nil {
+			return ctrl.Result{}, err
 		}
-
-		storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
-		if !found {
-			return ctrl.Result{}, nil // Already completed or cancelled?
-		}
-
-		cancelContext := storedCancelContext.(dataMovementCancelContext)
-
-		log.Info("Cancelling operation")
-		cancelContext.cancel()
-		<-cancelContext.ctx.Done()
-
-		// Nothing more to do - the go routine that is executing the data movement will exit
-		// and the status is recorded then.
 
 		return ctrl.Result{}, nil
 	}
@@ -283,6 +259,43 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
+func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
+	log := log.FromContext(ctx)
+
+	// Check for the scenario where a request is canceled but not deleted before the DM has started.
+	// If so, record it as cancelled and do nothing more with the data movement operation
+	if dm.Status.StartTime.IsZero() && !dm.DeletionTimestamp.IsZero() {
+		now := metav1.NowMicro()
+		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+		dm.Status.StartTime = &now
+		dm.Status.EndTime = &now
+
+		if err := r.Status().Update(ctx, dm); err != nil {
+			return err
+		}
+
+		log.Info("Cancel initiated before data movement started, doing nothing")
+		return nil
+	}
+
+	storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
+	if !found {
+		return nil // Already completed or cancelled?
+	}
+
+	cancelContext := storedCancelContext.(dataMovementCancelContext)
+
+	log.Info("Cancelling operation")
+	cancelContext.cancel()
+	<-cancelContext.ctx.Done()
+
+	// Nothing more to do - the go routine that is executing the data movement will exit
+	// and the status is recorded then.
+
+	return nil
+}
+
 // Retrieve the NNF Nodes that are the target of the data movement operation
 func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
 
@@ -290,8 +303,6 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
 		return []string{"localhost"}, nil
 	}
-
-	// TODO: Differentiate specification errors from runtime errors
 
 	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
 	var storageRef corev1.ObjectReference
