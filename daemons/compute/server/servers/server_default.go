@@ -231,10 +231,16 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	}
 
 	var dm *nnfv1alpha1.NnfDataMovement
-	if computeMountInfo.Type == "lustre" {
+	switch computeMountInfo.Type {
+	case "lustre":
 		dm, err = s.createNnfDataMovement(ctx, req, computeMountInfo, computeClientMount)
-	} else {
+	case "gfs2":
 		dm, err = s.createNnfNodeDataMovement(ctx, req, computeMountInfo)
+	default:
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_INVALID,
+			Message: fmt.Sprintf("filesystem not supported: '%s'", computeMountInfo.Type),
+		}, nil
 	}
 
 	if err != nil {
@@ -281,12 +287,12 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, 
 	// Find the DW index for our work.
 	labels := object.GetLabels()
 	if labels == nil {
-		return "", fmt.Errorf("Unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
+		return "", fmt.Errorf("unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
 	}
 
 	dwIndex, found := labels[nnfv1alpha1.DirectiveIndexLabel]
 	if !found {
-		return "", fmt.Errorf("Unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
+		return "", fmt.Errorf("unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
 	}
 
 	return dwIndex, nil
@@ -553,7 +559,7 @@ func (s *defaultServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRe
 		if errors.IsConflict(err) {
 			return &pb.DataMovementCancelResponse{
 				Status:  pb.DataMovementCancelResponse_FAILED,
-				Message: fmt.Sprintf("Failed to initiate cancel on dm node: %s", err.Error()),
+				Message: fmt.Sprintf("failed to initiate cancel on dm node: %s", err.Error()),
 			}, nil
 		}
 
@@ -604,7 +610,7 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, dest string) (*lusv1alpha1.LustreFileSystem, error) {
 
 	if !filepath.IsAbs(dest) {
-		return nil, fmt.Errorf("Destination must be an absolute path")
+		return nil, fmt.Errorf("destination must be an absolute path")
 	}
 	origDest := dest
 	if !strings.HasSuffix(dest, "/") {
@@ -613,10 +619,10 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 
 	lustrefsList := &lusv1alpha1.LustreFileSystemList{}
 	if err := s.client.List(ctx, lustrefsList); err != nil {
-		return nil, fmt.Errorf("Unable to list LustreFileSystem resources: %s", err.Error())
+		return nil, fmt.Errorf("unable to list LustreFileSystem resources: %s", err.Error())
 	}
 	if len(lustrefsList.Items) == 0 {
-		return nil, fmt.Errorf("No LustreFileSystem resources found")
+		return nil, fmt.Errorf("no LustreFileSystem resources found")
 	}
 
 	for _, lustrefs := range lustrefsList.Items {
@@ -629,7 +635,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 		}
 	}
 
-	return nil, fmt.Errorf("Unable to find a LustreFileSystem resource matching %s", origDest)
+	return nil, fmt.Errorf("unable to find a LustreFileSystem resource matching %s", origDest)
 }
 
 func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha1.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
@@ -651,7 +657,7 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return "", fmt.Errorf("No client mounts found on node '%s'", s.namespace)
+		return "", fmt.Errorf("no client mounts found on node '%s'", s.namespace)
 	}
 
 	for _, clientMount := range clientMounts.Items {
@@ -662,7 +668,7 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 		}
 	}
 
-	return "", fmt.Errorf("Initiator '%s' not found in list of client mounts residing on '%s'", s.name, s.namespace)
+	return "", fmt.Errorf("initiator '%s' not found in list of client mounts residing on '%s'", s.name, s.namespace)
 }
 
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
@@ -684,7 +690,7 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return nil, nil, fmt.Errorf("No client mounts found on node '%s'", s.name)
+		return nil, nil, fmt.Errorf("no client mounts found on node '%s'", s.name)
 	}
 
 	for _, clientMount := range clientMounts.Items {
@@ -699,7 +705,7 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 		}
 	}
 
-	return nil, nil, fmt.Errorf("Source path '%s' not found in list of client mounts", req.GetSource())
+	return nil, nil, fmt.Errorf("source path '%s' not found in list of client mounts", req.GetSource())
 }
 
 func (s *defaultServer) getNamespace(uid string) string {
