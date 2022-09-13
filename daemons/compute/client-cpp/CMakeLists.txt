@@ -19,7 +19,7 @@
 
 cmake_minimum_required(VERSION 3.5.1)
 
-project(HelloWorld C CXX)
+project(nnfdmlibs C CXX)
 
 include(common.cmake)
 
@@ -45,24 +45,30 @@ add_custom_command(
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
-# hw_grpc_proto
-add_library(hw_grpc_proto
+# nnfdm
+add_library(nnfdm
   ${hw_grpc_srcs}
   ${hw_grpc_hdrs}
   ${hw_proto_srcs}
   ${hw_proto_hdrs})
-target_link_libraries(hw_grpc_proto
+target_link_libraries(nnfdm
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
+
+target_sources(nnfdm INTERFACE ${hw_grpc_hdrs} ${hw_proto_hdrs})
+get_target_property(NNFDM_PUBLIC_HEADERS nnfdm INTERFACE_SOURCES)
+set_target_properties(nnfdm PROPERTIES PUBLIC_HEADER "${NNFDM_PUBLIC_HEADERS}")
+install(TARGETS nnfdm PUBLIC_HEADER DESTINATION "include/nnfdm")
 
 # Targets greeter_[async_](client|server)
 foreach(_target
   client)
   add_executable(${_target} "${_target}.cc")
   target_link_libraries(${_target}
-    hw_grpc_proto
+    nnfdm
     ${_REFLECTION}
     ${_GRPC_GRPCPP}
     ${_PROTOBUF_LIBPROTOBUF})
 endforeach()
+
