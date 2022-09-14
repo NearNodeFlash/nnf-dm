@@ -69,14 +69,11 @@ class Workflow {
     public:
         Workflow(std::string name, std::string namespace_);
 
-        std::string name() const { return name_; }
-        std::string namespace_() const { return namespace__; }
-
     private:
         friend DataMoverClient;
 
         std::string name_;
-        std::string namespace__;
+        std::string namespace_;
 };
 
 

@@ -45,8 +45,8 @@ RPCStatus DataMoverClient::Create(const Workflow &workflow, const CreateRequest 
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
-    workflow_->set_name(workflow.name());
-    workflow_->set_namespace_(workflow.namespace_());
+    workflow_->set_name(workflow.name_);
+    workflow_->set_namespace_(workflow.namespace_);
 
     auto request_ = static_cast<datamovement::DataMovementCreateRequest *>(request.data_);
     request_->set_allocated_workflow(workflow_);
@@ -64,8 +64,8 @@ RPCStatus DataMoverClient::Status(const Workflow &workflow, const StatusRequest 
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
-    workflow_->set_name(workflow.name());
-    workflow_->set_namespace_(workflow.namespace_());
+    workflow_->set_name(workflow.name_);
+    workflow_->set_namespace_(workflow.namespace_);
 
     auto request_ = static_cast<datamovement::DataMovementStatusRequest *>(request.data_);
     request_->set_allocated_workflow(workflow_);
@@ -83,8 +83,8 @@ RPCStatus DataMoverClient::Cancel(const Workflow &workflow, const CancelRequest 
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
-    workflow_->set_name(workflow.name());
-    workflow_->set_namespace_(workflow.namespace_());
+    workflow_->set_name(workflow.name_);
+    workflow_->set_namespace_(workflow.namespace_);
 
     auto request_ = static_cast<datamovement::DataMovementCancelRequest *>(request.data_);
     request_->set_allocated_workflow(workflow_);
@@ -102,8 +102,8 @@ RPCStatus DataMoverClient::Delete(const Workflow &workflow, const DeleteRequest 
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
-    workflow_->set_name(workflow.name());
-    workflow_->set_namespace_(workflow.namespace_());
+    workflow_->set_name(workflow.name_);
+    workflow_->set_namespace_(workflow.namespace_);
 
     auto request_ = static_cast<datamovement::DataMovementDeleteRequest *>(request.data_);
     request_->set_allocated_workflow(workflow_);
@@ -121,8 +121,8 @@ RPCStatus DataMoverClient::List(const Workflow &workflow, const ListRequest &req
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
-    workflow_->set_name(workflow.name());
-    workflow_->set_namespace_(workflow.namespace_());
+    workflow_->set_name(workflow.name_);
+    workflow_->set_namespace_(workflow.namespace_);
 
     auto request_ = static_cast<datamovement::DataMovementListRequest *>(request.data_);
     request_->set_allocated_workflow(workflow_);
@@ -144,7 +144,7 @@ RPCStatus::RPCStatus(bool ok, int error_code, std::string error_message) :
 
 Workflow::Workflow(std::string name, std::string namespace_) :
     name_(name),
-    namespace__(namespace_)
+    namespace_(namespace_)
 { }
 
 CreateRequest::CreateRequest(std::string source, std::string destination) {
