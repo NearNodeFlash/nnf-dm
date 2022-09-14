@@ -25,13 +25,11 @@
 #include "client.h"
 #include "datamovement.grpc.pb.h"
 
-using datamovement::DataMover;
-
 class DataMoverClientInternal {
     public:
-        DataMoverClientInternal(std::shared_ptr<grpc::Channel> channel) : stub_(DataMover::NewStub(channel)) {}
+        DataMoverClientInternal(std::shared_ptr<grpc::Channel> channel) : stub_(datamovement::DataMover::NewStub(channel)) {}
 
-        std::unique_ptr<DataMover::Stub> stub_;
+        std::unique_ptr<datamovement::DataMover::Stub> stub_;
 };
 
 DataMoverClient::DataMoverClient(const std::string &target) {
@@ -43,7 +41,7 @@ DataMoverClient::~DataMoverClient() {
     delete static_cast<DataMoverClientInternal *>(data_);
 }
 
-Status DataMoverClient::create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response) {
+RPCStatus DataMoverClient::Create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
@@ -59,10 +57,10 @@ Status DataMoverClient::create(const Workflow &workflow, const CreateRequest &re
         static_cast<datamovement::DataMovementCreateResponse *>(response->data_)
     );
 
-    return Status(status.ok(), status.error_code(), status.error_message());
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
 }
 
-Status DataMoverClient::status(const Workflow &workflow, const StatusRequest &request, StatusResponse *response) {
+RPCStatus DataMoverClient::Status(const Workflow &workflow, const StatusRequest &request, StatusResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
@@ -78,10 +76,10 @@ Status DataMoverClient::status(const Workflow &workflow, const StatusRequest &re
         static_cast<datamovement::DataMovementStatusResponse *>(response->data_)
     );
 
-    return Status(status.ok(), status.error_code(), status.error_message());
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
 }
 
-Status DataMoverClient::cancel(const Workflow &workflow, const CancelRequest &request, CancelResponse *response) {
+RPCStatus DataMoverClient::Cancel(const Workflow &workflow, const CancelRequest &request, CancelResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
@@ -97,10 +95,10 @@ Status DataMoverClient::cancel(const Workflow &workflow, const CancelRequest &re
         static_cast<datamovement::DataMovementCancelResponse *>(response->data_)
     );
 
-    return Status(status.ok(), status.error_code(), status.error_message());
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
 }
 
-Status DataMoverClient::delete_(const Workflow &workflow, const DeleteRequest &request, DeleteResponse *response) {
+RPCStatus DataMoverClient::Delete(const Workflow &workflow, const DeleteRequest &request, DeleteResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
@@ -116,10 +114,10 @@ Status DataMoverClient::delete_(const Workflow &workflow, const DeleteRequest &r
         static_cast<datamovement::DataMovementDeleteResponse *>(response->data_)
     );
 
-    return Status(status.ok(), status.error_code(), status.error_message());
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
 }
 
-Status DataMoverClient::list(const Workflow &workflow, const ListRequest &request, ListResponse *response) {
+RPCStatus DataMoverClient::List(const Workflow &workflow, const ListRequest &request, ListResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
     auto workflow_ = new datamovement::DataMovementWorkflow();
@@ -135,10 +133,10 @@ Status DataMoverClient::list(const Workflow &workflow, const ListRequest &reques
         static_cast<datamovement::DataMovementListResponse *>(response->data_)
     );
 
-    return Status(status.ok(), status.error_code(), status.error_message()); 
+    return RPCStatus(status.ok(), status.error_code(), status.error_message()); 
 }
 
-Status::Status(bool ok, int error_code, std::string error_message) :
+RPCStatus::RPCStatus(bool ok, int error_code, std::string error_message) :
     ok_(ok),
     error_code_(error_code),
     error_message_(error_message)

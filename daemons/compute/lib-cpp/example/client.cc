@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
         CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION");
         CreateResponse createResponse;
 
-        Status status = client.create(workflow, createRequest, &createResponse);
+        RPCStatus status = client.Create(workflow, createRequest, &createResponse);
         if (!status.ok()) {
             std::cout << "Create RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
         ListRequest listRequest;
         ListResponse listResponse;
 
-        Status status = client.list(workflow, listRequest, &listResponse);
+        RPCStatus status = client.List(workflow, listRequest, &listResponse);
         if (!status.ok()) {
             std::cout << "List RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
         StatusResponse statusResponse;
 
 RequestStatus:
-        Status status = client.status(workflow, statusRequest, &statusResponse);
+        RPCStatus status = client.Status(workflow, statusRequest, &statusResponse);
         if (!status.ok()) {
             std::cout << "Status RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -109,7 +109,7 @@ RequestStatus:
         CancelRequest cancelRequest(uid);
         CancelResponse cancelResponse;
 
-        Status status = client.cancel(workflow, cancelRequest, &cancelResponse);
+        RPCStatus status = client.Cancel(workflow, cancelRequest, &cancelResponse);
         if (!status.ok()) {
             std::cout << "Cancle RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -129,7 +129,7 @@ RequestStatus:
         DeleteRequest deleteRequest(uid);
         DeleteResponse deleteResponse;
 
-        Status status = client.delete_(workflow, deleteRequest, &deleteResponse);
+        RPCStatus status = client.Delete(workflow, deleteRequest, &deleteResponse);
         if (!status.ok()) {
             std::cout << "Delete RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;

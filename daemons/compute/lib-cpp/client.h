@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-class Status;
+class RPCStatus;
 class Workflow;
 
 class CreateRequest;
@@ -41,19 +41,19 @@ class DataMoverClient {
         DataMoverClient(const std::string &target);
         ~DataMoverClient();
 
-        Status create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response);
-        Status status(const Workflow &workflow, const StatusRequest &request, StatusResponse *response);
-        Status cancel(const Workflow &workflow, const CancelRequest &request, CancelResponse *response);
-        Status delete_(const Workflow &workflow, const DeleteRequest &request, DeleteResponse *response);
-        Status list (const Workflow &workflow, const ListRequest &request, ListResponse *response);
+        RPCStatus Create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response);
+        RPCStatus Status(const Workflow &workflow, const StatusRequest &request, StatusResponse *response);
+        RPCStatus Cancel(const Workflow &workflow, const CancelRequest &request, CancelResponse *response);
+        RPCStatus Delete(const Workflow &workflow, const DeleteRequest &request, DeleteResponse *response);
+        RPCStatus List  (const Workflow &workflow, const ListRequest &request, ListResponse *response);
 
     private:
         void *data_;
 };
 
-class Status {
+class RPCStatus {
     public:
-        Status(bool ok, int error_code, std::string error_message);
+        RPCStatus(bool ok, int error_code, std::string error_message);
 
         bool ok() const { return ok_; }
         int error_code() const { return error_code_; }
