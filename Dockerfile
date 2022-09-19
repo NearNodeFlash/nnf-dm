@@ -19,6 +19,8 @@
 FROM golang:1.19-alpine as builder
 
 WORKDIR /workspace
+ENV GOPATH=/go
+
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -34,6 +36,10 @@ COPY controllers/ controllers/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+
+# Build debug
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -gcflags "all=-N -l" -a -o manager-debug main.go
 
 ###############################################################################
 FROM builder as testing
@@ -51,7 +57,7 @@ ENV CGO_ENABLED=0
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM ghcr.io/nearnodeflash/nnf-mfu:latest
+FROM ghcr.io/nearnodeflash/nnf-mfu:latest as production
 
 RUN apt update
 
@@ -72,3 +78,12 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 
 ENTRYPOINT ["/manager"]
+
+###############################################################################
+FROM production as debug
+WORKDIR /workspace
+COPY . .
+
+WORKDIR /
+COPY --from=builder /go/bin/dlv /dlv
+COPY --from=builder /workspace/manager /manager-debug

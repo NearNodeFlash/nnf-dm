@@ -59,6 +59,9 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= ${IMAGE_TAG_BASE}:${VERSION}
+IMG_DEBUG ?= ${IMAGE_TAG_BASE}:debug-${VERSION}
+
+TARGET ?= production
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0
@@ -129,10 +132,14 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 docker-build: test ## Build docker image with the manager.
-	$(DOCKER) build -t ${IMG} .
+	$(DOCKER) build -t ${IMG} --target ${TARGET} .
+
+docker-build-debug: TARGET=debug
+docker-build-debug: IMG=${IMG_DEBUG}
+docker-build-debug: docker-build
 
 docker-build-only:
-	$(DOCKER) build -t ${IMG} .
+	$(DOCKER) build -t ${IMG} --target ${TARGET} .
 
 docker-push: ## Push docker image with the manager.
 	$(DOCKER) push ${IMG}
@@ -144,6 +151,9 @@ kind-push: ## Push docker image to kind
 	kind load docker-image ${IMG}
 	${DOCKER} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 	kind load docker-image --nodes `kubectl get node -l cray.nnf.manager=true --no-headers -o custom-columns=":metadata.name" | paste -d, -s -` gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+
+kind-push-debug: IMG=${IMG_DEBUG}
+kind-push-debug: kind-push
 
 minikube-push:
 	minikube image load ${IMG}
@@ -158,6 +168,9 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) $(IMG)
+
+deploy-debug: IMG=${IMG_DEBUG}
+deploy-debug: deploy
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	./deploy.sh undeploy $(KUSTOMIZE)

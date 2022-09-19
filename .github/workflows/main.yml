@@ -9,12 +9,16 @@ on:
 env:
   # TEST_TARGET: Name of the testing target in the Dockerfile
   TEST_TARGET: testing
+  PROD_TARGET: production
+  DEBUG_TARGET: debug
 
   # DO_TEST - true to build and run unit tests, false to skip the tests
   DO_TEST: true
 
   # DO_PUSH - true to push to the HPE_DEPLOY_REPO, false to not push
   DO_PUSH: true
+
+  DO_DEBUG: true
 
 jobs:
   build:
@@ -35,6 +39,7 @@ jobs:
         echo "TAG=${{ github.sha }}" >> ${GITHUB_ENV}
         echo "LATESTTAG=latest" >> ${GITHUB_ENV}
         echo "TESTTAG=test-${{ github.sha }}" >> ${GITHUB_ENV}
+        echo "DEBUGTAG=debug-${{ github.sha }}" >> ${GITHUB_ENV}
 
     - name: set TAG & TESTTAG for all other branches
       if: ${{ github.event.repository.default_branch != 'main' && github.event.repository.default_branch != 'master' }}
@@ -42,6 +47,7 @@ jobs:
         echo "TAG=dev-${{ github.sha }}" >> ${GITHUB_ENV}
         echo "LATESTTAG=dev-latest" >> ${GITHUB_ENV}
         echo "TESTTAG=test-${{ github.sha }}" >> ${GITHUB_ENV}
+        echo "DEBUGTAG=debug-${{ github.sha }}" >> ${GITHUB_ENV}
 
     - name: Docker login
       uses: docker/login-action@v1
@@ -63,12 +69,22 @@ jobs:
       if: ${{ env.DO_TEST == 'true' }}
       run: docker run ${HPE_BUILD_REPO}:${TESTTAG}
 
-    - name: Build the final Docker image
-      id: docker_build
+    - name: Build the production Docker image
+      id: docker_build_production
       uses: docker/build-push-action@v2
       with:
         push: false
+        target: ${{ env.PROD_TARGET }}
         tags: ${{ env.HPE_BUILD_REPO }}:${{ env.TAG }}
+
+    - name: Build the debug Docker image
+      if: ${{ env.DO_DEBUG == 'true' }}
+      id: docker_build_debug
+      uses: docker/build-push-action@v2
+      with:
+        push: false
+        target: ${{ env.DEBUG_TARGET }}
+        tags: ${{ env.HPE_BUILD_REPO }}:${{ env.DEBUGTAG }}
 
     - name: Peek at the docker images
       run: docker images

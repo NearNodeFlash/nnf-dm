@@ -54,6 +54,18 @@
                 "GOMEGA_DEFAULT_EVENTUALLY_POLLING_INTERVAL": "500ms",
             },
             "showLog": true
+        },
+        {
+            "name": "Debug k8s operator remotely",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "",
+            "port":40000,
+            "host":"127.0.0.1",
+            "showLog": true,
+            "trace": "log",
+            "logOutput": "rpc"
         }
     ]
 }
