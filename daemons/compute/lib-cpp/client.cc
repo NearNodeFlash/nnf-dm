@@ -25,6 +25,10 @@
 #include "client.h"
 #include "datamovement.grpc.pb.h"
 
+namespace near_node_flash {
+
+namespace data_movement {
+
 class DataMoverClientInternal {
     public:
         DataMoverClientInternal(std::shared_ptr<grpc::Channel> channel) : stub_(datamovement::DataMover::NewStub(channel)) {}
@@ -304,5 +308,8 @@ std::vector<std::string> ListResponse::uids() {
     }
 
     return uids;
-
 }
+
+} // namespace data_movement
+
+} // namespace near_node_flash

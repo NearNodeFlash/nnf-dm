@@ -23,6 +23,8 @@
 
 #include "../client.h"
 
+using namespace near_node_flash::data_movement;
+
 int main(int argc, char** argv) {
     std::string uid;
 

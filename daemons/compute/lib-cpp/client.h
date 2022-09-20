@@ -21,6 +21,11 @@
 #include <memory>
 #include <vector>
 
+namespace near_node_flash {
+    
+namespace data_movement {
+
+
 class RPCStatus;
 class Workflow;
 
@@ -239,3 +244,7 @@ class ListResponse {
 
         void *data_;
 };
+
+} // namespace data_movement
+
+} // namespace near_node_flash
