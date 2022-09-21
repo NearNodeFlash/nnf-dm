@@ -25,6 +25,9 @@
 #include "client.h"
 #include "datamovement.grpc.pb.h"
 
+#define CHECK_ENUM_EQUALITY(e1, e2) \
+    static_assert(static_cast<int>(e1) == static_cast<int>(e2), "Mismatch " #e1)
+
 namespace near_node_flash {
 
 namespace data_movement {
@@ -178,6 +181,10 @@ std::string CreateResponse::uid() {
 }
 
 CreateResponse::Status CreateResponse::status() {
+    CHECK_ENUM_EQUALITY(CreateResponse::STATUS_SUCCESS, datamovement::DataMovementCreateResponse_Status_SUCCESS);
+    CHECK_ENUM_EQUALITY(CreateResponse::STATUS_FAILED,  datamovement::DataMovementCreateResponse_Status_FAILED);
+    CHECK_ENUM_EQUALITY(CreateResponse::STATUS_INVALID, datamovement::DataMovementCreateResponse_Status_INVALID);
+
     auto status = static_cast<datamovement::DataMovementCreateResponse *>(data_)->status();
     return static_cast<CreateResponse::Status>(status);
 }
@@ -208,11 +215,24 @@ StatusResponse::~StatusResponse() {
 }
 
 StatusResponse::State StatusResponse::state() {
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_PENDING,   datamovement::DataMovementStatusResponse_State_PENDING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_STARTING,  datamovement::DataMovementStatusResponse_State_STARTING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_RUNNING,   datamovement::DataMovementStatusResponse_State_RUNNING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_COMPLETED, datamovement::DataMovementStatusResponse_State_COMPLETED);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_UNKNOWN,   datamovement::DataMovementStatusResponse_State_UNKNOWN_STATE);
+
     auto state = static_cast<datamovement::DataMovementStatusResponse *>(data_)->state();
     return static_cast<StatusResponse::State>(state);
 }
 
 StatusResponse::Status StatusResponse::status() {
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_INVALID,   datamovement::DataMovementStatusResponse_Status_INVALID);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_NOT_FOUND, datamovement::DataMovementStatusResponse_Status_NOT_FOUND);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_SUCCESS,   datamovement::DataMovementStatusResponse_Status_SUCCESS);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_FAILED,    datamovement::DataMovementStatusResponse_Status_FAILED);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_CANCELLED, datamovement::DataMovementStatusResponse_Status_CANCELLED);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATUS_UNKNOWN,   datamovement::DataMovementStatusResponse_Status_UNKNOWN_STATUS);
+
     auto status = static_cast<datamovement::DataMovementStatusResponse *>(data_)->status();
     return static_cast<StatusResponse::Status>(status);
 }
@@ -242,6 +262,11 @@ CancelResponse::~CancelResponse() {
 }
 
 CancelResponse::Status CancelResponse::status() {
+    CHECK_ENUM_EQUALITY(CancelResponse::STATUS_INVALID,   datamovement::DataMovementCancelResponse_Status_INVALID);
+    CHECK_ENUM_EQUALITY(CancelResponse::STATUS_NOT_FOUND, datamovement::DataMovementCancelResponse_Status_NOT_FOUND);
+    CHECK_ENUM_EQUALITY(CancelResponse::STATUS_SUCCESS,   datamovement::DataMovementCancelResponse_Status_SUCCESS);
+    CHECK_ENUM_EQUALITY(CancelResponse::STATUS_FAILED,    datamovement::DataMovementCancelResponse_Status_FAILED);
+
     auto status = static_cast<datamovement::DataMovementCancelResponse *>(data_)->status();
     return static_cast<CancelResponse::Status>(status);
 }
@@ -271,6 +296,12 @@ DeleteResponse::~DeleteResponse() {
 }
 
 DeleteResponse::Status DeleteResponse::status() {
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_INVALID,   datamovement::DataMovementDeleteResponse_Status_INVALID);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_NOT_FOUND,   datamovement::DataMovementDeleteResponse_Status_NOT_FOUND);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_SUCCESS,   datamovement::DataMovementDeleteResponse_Status_SUCCESS);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_ACTIVE,   datamovement::DataMovementDeleteResponse_Status_ACTIVE);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_UNKNOWN,   datamovement::DataMovementDeleteResponse_Status_UNKNOWN);
+
     auto status = static_cast<datamovement::DataMovementDeleteResponse *>(data_)->status();
     return static_cast<DeleteResponse::Status>(status);
 }
