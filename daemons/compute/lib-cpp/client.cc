@@ -297,9 +297,9 @@ DeleteResponse::~DeleteResponse() {
 
 DeleteResponse::Status DeleteResponse::status() {
     CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_INVALID,   datamovement::DataMovementDeleteResponse_Status_INVALID);
-    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_NOT_FOUND,   datamovement::DataMovementDeleteResponse_Status_NOT_FOUND);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_NOT_FOUND, datamovement::DataMovementDeleteResponse_Status_NOT_FOUND);
     CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_SUCCESS,   datamovement::DataMovementDeleteResponse_Status_SUCCESS);
-    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_ACTIVE,   datamovement::DataMovementDeleteResponse_Status_ACTIVE);
+    CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_ACTIVE,    datamovement::DataMovementDeleteResponse_Status_ACTIVE);
     CHECK_ENUM_EQUALITY(DeleteResponse::STATUS_UNKNOWN,   datamovement::DataMovementDeleteResponse_Status_UNKNOWN);
 
     auto status = static_cast<datamovement::DataMovementDeleteResponse *>(data_)->status();
