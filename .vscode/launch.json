@@ -54,6 +54,13 @@
                 "GOMEGA_DEFAULT_EVENTUALLY_POLLING_INTERVAL": "500ms",
             },
             "showLog": true
+        },
+        {
+            "name": "Debug Example C++ Library Client",
+            "type": "cppdbg",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceRoot}/daemons/compute/lib-cpp/example/cmake/build/client",
         }
     ]
 }

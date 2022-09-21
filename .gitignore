@@ -24,6 +24,8 @@ daemons/compute/client-c/client
 daemons/compute/client-c/client.a
 daemons/compute/client-cpp/cmake
 daemons/compute/client-go/client-go
+daemons/compute/lib-cpp/cmake
+daemons/compute/lib-cpp/example/cmake
 daemons/compute/server/nnf-dm
 daemons/compute/server/server
 
