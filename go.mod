@@ -3,10 +3,10 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20220901164709-192b9c0bd96c
+	github.com/HewlettPackard/dws v0.0.0-20220916174409-97df656c6e4e
 	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95 // indirect
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220727174249-9b7004c2cb38
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20220906195510-ca0414b86a6f
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20220920195825-56593babaad0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.1
 	github.com/prometheus/client_golang v1.12.1
@@ -31,7 +31,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/NearNodeFlash/nnf-ec v0.0.0-20220829193624-66025314aec0 // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.0-20220916150000-517a1ab34a59 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -86,9 +86,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.24.2 // indirect
-	k8s.io/klog/v2 v2.60.1 // indirect
+	k8s.io/klog/v2 v2.70.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect

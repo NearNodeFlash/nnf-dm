@@ -20,6 +20,7 @@
 package v1alpha1
 
 import (
+	"github.com/HewlettPackard/dws/utils/updater"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,6 +72,15 @@ type NnfDriveStatus struct {
 	// Model is the manufacturer information about the device
 	Model string `json:"model,omitempty"`
 
+	// The serial number for this storage controller.
+	SerialNumber string `json:"serialNumber,omitempty"`
+
+	// The firmware version of this storage controller.
+	FirmwareVersion string `json:"firmwareVersion,omitempty"`
+
+	// Physical slot location of the storage controller.
+	Slot string `json:"slot,omitempty"`
+
 	// Capacity in bytes of the device. The full capacity may not
 	// be usable depending on what the storage driver can provide.
 	Capacity int64 `json:"capacity,omitempty"`
@@ -95,6 +105,10 @@ type NnfNode struct {
 
 	Spec   NnfNodeSpec   `json:"spec,omitempty"`
 	Status NnfNodeStatus `json:"status,omitempty"`
+}
+
+func (n *NnfNode) GetStatus() updater.Status[*NnfNodeStatus] {
+	return &n.Status
 }
 
 //+kubebuilder:object:root=true
