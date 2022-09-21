@@ -270,6 +270,10 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 
 	dwsv1alpha1.AddOwnerLabels(dm, parentDm)
 
+	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
+	// controller can identify compute initiated data movements.
+	nnfv1alpha1.AddDataMovementTeardownStateLabel(dm, dwsv1alpha1.StatePostRun.String())
+
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
