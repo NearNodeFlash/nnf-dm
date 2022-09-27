@@ -209,7 +209,8 @@ class DeleteResponse {
             STATUS_INVALID = 0,
             STATUS_NOT_FOUND = 1,
             STATUS_SUCCESS = 2,
-            STATUS_FAILED = 3,
+            STATUS_ACTIVE = 3,
+            STATUS_UNKNOWN = 4,
         };
 
         Status          status();
