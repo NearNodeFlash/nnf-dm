@@ -26,6 +26,7 @@ import (
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,33 +83,34 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when a data movement operation succeeds", func() {
 		It("should have a state and status of 'Finished' and 'Success'", func() {
-			Eventually(func(g Gomega) {
+			Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-				g.Expect(dm.Status.State).To(Equal(nnfv1alpha1.DataMovementConditionTypeFinished))
-				g.Expect(dm.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonSuccess))
-			}, dmTestTimeout).Should(Succeed())
+				return dm.Status
+			}, dmTestTimeout).Should(MatchFields(IgnoreExtras, Fields{
+				"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+				"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+			}))
 		})
 	})
 
 	Context("when a data movement operation is cancelled", func() {
 		It("should have a state and status of 'Finished' and 'Cancelled'", func() {
 			By("ensuring the data movement started")
-			Eventually(func(g Gomega) {
+			Eventually(func(g Gomega) string {
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-				g.Expect(dm.Status.State).To(Equal(nnfv1alpha1.DataMovementConditionTypeRunning))
-			}, dmTestTimeout).Should(Succeed())
+				return dm.Status.State
+			}, dmTestTimeout).Should(Equal(nnfv1alpha1.DataMovementConditionTypeRunning))
 
 			By("setting the cancel flag to true")
-			Eventually(func(g Gomega) {
+			Eventually(func(g Gomega) error {
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 				dm.Spec.Cancel = true
-				g.Expect(k8sClient.Update(context.TODO(), dm)).To(Succeed())
+				return k8sClient.Update(context.TODO(), dm)
 			}, dmTestTimeout).Should(Succeed())
 
 			By("verifying that it was cancelled successfully")
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-				g.Expect(dm.Spec.Cancel).To(Equal(true))
 				g.Expect(dm.Status.State).To(Equal(nnfv1alpha1.DataMovementConditionTypeFinished))
 				g.Expect(dm.Status.Status).To(Equal(nnfv1alpha1.DataMovementConditionReasonCancelled))
 			}, dmTestTimeout).Should(Succeed())

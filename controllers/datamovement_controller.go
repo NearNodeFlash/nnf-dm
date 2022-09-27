@@ -301,11 +301,8 @@ func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha1.Nnf
 }
 
 func isTestEnv() bool {
-	if testEnv, found := os.LookupEnv("NNF_TEST_ENVIRONMENT"); found && strings.ToLower(testEnv) == "true" {
-		return true
-	} else {
-		return false
-	}
+	_, found := os.LookupEnv("NNF_TEST_ENVIRONMENT")
+	return found
 }
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
