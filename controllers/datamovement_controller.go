@@ -201,16 +201,20 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Execute the go routine to perform the data movement
 	go func() {
+		var cmd *exec.Cmd
 
 		// TODO: UserId/GroupId
 
-		cmd := exec.CommandContext(ctxCancel,
-			"mpirun",
-			"--allow-run-as-root",
-			"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
-			"--host", strings.Join(hosts, ","),
-			"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
-
+		if isTestEnv() {
+			cmd = exec.CommandContext(ctxCancel, "sleep", "1")
+		} else {
+			cmd = exec.CommandContext(ctxCancel,
+				"mpirun",
+				"--allow-run-as-root",
+				"-np", fmt.Sprintf("%d", len(hosts)), // # TODO: Might want to adjust this if running on a rabbit node
+				"--host", strings.Join(hosts, ","),
+				"dcp", dm.Spec.Source.Path, dm.Spec.Destination.Path)
+		}
 		log.Info("Running Command", "cmd", cmd.String())
 
 		// TODO: Capture output as it progresses and add a %complete to the resource
@@ -228,7 +232,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", string(out))
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
-			dm.Status.Message = err.Error()
+			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), string(out))
 
 			// TODO: Enhanced error capture: parse error response and provide useful message
 		} else {
@@ -296,11 +300,15 @@ func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha1.Nnf
 	return nil
 }
 
+func isTestEnv() bool {
+	_, found := os.LookupEnv("NNF_TEST_ENVIRONMENT")
+	return found
+}
+
 // Retrieve the NNF Nodes that are the target of the data movement operation
 func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
-
 	// If this is a node data movement request simply reference the localhost
-	if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() {
 		return []string{"localhost"}, nil
 	}
 

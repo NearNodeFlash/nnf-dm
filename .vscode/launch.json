@@ -61,6 +61,24 @@
             "request": "launch",
             "cwd": "${workspaceFolder}",
             "program": "${workspaceRoot}/daemons/compute/lib-cpp/example/cmake/build/client",
-        }
+        },
+        {
+            "name": "Test Current File",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/controllers",
+            "args": [
+                "-ginkgo.v",
+                "-ginkgo.progress",
+                "-ginkgo.failFast",
+            ],
+            "env": {
+                "KUBEBUILDER_ASSETS": "${workspaceRoot}/bin/k8s/1.25.0-darwin-amd64",
+                "GOMEGA_DEFAULT_EVENTUALLY_TIMEOUT": "10m",
+                "GOMEGA_DEFAULT_EVENTUALLY_POLLING_INTERVAL": "500ms",
+            },
+            "showLog": true
+        },
     ]
 }

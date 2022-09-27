@@ -57,10 +57,25 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 
+type envSetting struct {
+	envVar string
+	value  string
+}
+
+var envVars = []envSetting{
+	{"ACK_GINKGO_DEPRECATIONS", "1.16.5"},
+
+	// Enable certain quirks necessary for test
+	{"NNF_TEST_ENVIRONMENT", "true"},
+}
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	os.Setenv("ACK_GINKGO_DEPRECATIONS", "1.16.5")
+	// Setup environment variables for the test
+	for _, v := range envVars {
+		os.Setenv(v.envVar, v.value)
+	}
 
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
