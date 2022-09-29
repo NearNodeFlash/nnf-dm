@@ -46,7 +46,7 @@
             "args": [
                 "-ginkgo.v",
                 "-ginkgo.progress",
-                "-ginkgo.failFast",
+                "-ginkgo.fail-fast",
             ],
             "env": {
                 "KUBEBUILDER_ASSETS": "/Users/roiger/Library/Application Support/io.kubebuilder.envtest/k8s/1.22.1-darwin-amd64",
