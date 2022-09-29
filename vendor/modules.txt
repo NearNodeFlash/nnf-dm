@@ -20,7 +20,7 @@ github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 ## explicit; go 1.12
 github.com/Azure/go-autorest/tracing
-# github.com/HewlettPackard/dws v0.0.0-20220916174409-97df656c6e4e
+# github.com/HewlettPackard/dws v0.0.0-20220927153858-d90d8b09a69d
 ## explicit; go 1.19
 github.com/HewlettPackard/dws/api/v1alpha1
 github.com/HewlettPackard/dws/utils/dwdparse
@@ -38,7 +38,7 @@ github.com/NearNodeFlash/lustre-fs-operator/controllers
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20220916150000-517a1ab34a59
 ## explicit; go 1.16
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220920195825-56593babaad0
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20220929161939-12a2affac1ce
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases

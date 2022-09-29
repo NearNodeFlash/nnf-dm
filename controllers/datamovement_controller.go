@@ -150,7 +150,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Make sure if the DM is already running that we don't start up another command
 	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeRunning {
-		return ctrl.Result{}, nil
+
+		// If we're currently tracking the resource, then we know for certain the
+		// resource is running and there's nothing further we need to do.
+		if _, found := r.contexts.Load(dm.Name); found {
+			return ctrl.Result{}, nil
+		}
+
+		// Otherwise, if we're _not_ tracking the resource, we know the pod restarted
+		// and the DM command terminated. In this case we fall-through to restart the
+		// data movement operation.
+		dm.Status.Restarts += 1
+		log.Info("Restarting", "restarts", dm.Status.Restarts)
 	}
 
 	// Handle invalid errors that can occur when setting up the data movement

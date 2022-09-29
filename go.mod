@@ -3,10 +3,10 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20220916174409-97df656c6e4e
+	github.com/HewlettPackard/dws v0.0.0-20220927153858-d90d8b09a69d
 	github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220623192103-4ce53adacc95 // indirect
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220727174249-9b7004c2cb38
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20220920195825-56593babaad0
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20220929161939-12a2affac1ce
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.1
 	github.com/prometheus/client_golang v1.12.1
