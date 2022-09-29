@@ -161,6 +161,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// and the DM command terminated. In this case we fall-through to restart the
 		// data movement operation.
 		dm.Status.Restarts += 1
+		log.Info("Restarting", "restarts", dm.Status.Restarts)
 	}
 
 	// Handle invalid errors that can occur when setting up the data movement
