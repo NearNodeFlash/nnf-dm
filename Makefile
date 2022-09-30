@@ -111,7 +111,7 @@ vet: ## Run go vet against code.
 FAILFAST ?= no
 test: manifests generate fmt vet envtest ## Run tests.
 	if [[ "${FAILFAST}" == yes ]]; then \
-		failfast="-ginkgo.failFast"; \
+		failfast="-ginkgo.fail-fast"; \
 	fi; \
 	set -o errexit; \
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v -ginkgo.progress $$failfast
