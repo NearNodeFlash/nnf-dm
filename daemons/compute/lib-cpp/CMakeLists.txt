@@ -60,11 +60,6 @@ else()
   add_library(nnfdm STATIC ${generated_srcs} client.cc client.h)
 endif()
 
-#
-# Compile with position independant code if we are set to run as a shared library
-#
-set_target_properties(nnfdm PROPERTIES POSITION_INDEPENDANT_CODE ${BUILD_SHARED_LIBS})
-
 # Include generated *.pb.h files privately as these headers are for the library's
 # internal implementation.
 #
@@ -90,7 +85,7 @@ configure_package_config_file(
   "${PROJECT_BINARY_DIR}/nnfdm-config.cmake"
   INSTALL_DESTINATION share/cmake/nnfdm)
 
-# Generate install of when running 'make install':
+# Generate install when running 'make install':
 #
 # [build] -- Install configuration: "Release"
 # [build] -- Installing: <installdir>/include/nnfdm/client.h
