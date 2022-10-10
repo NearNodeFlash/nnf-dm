@@ -16,10 +16,18 @@
 # Assumes protobuf and gRPC have been installed using cmake.
 # See cmake_externalproject/CMakeLists.txt for all-in-one cmake build
 # that automatically builds all the dependencies before building helloworld.
+cmake_minimum_required(VERSION 3.11)
 
-cmake_minimum_required(VERSION 3.5.1)
+project(nnfdm-client-library VERSION 0.0.1 LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-project(HelloWorld VERSION 0.0.1 LANGUAGES C CXX)
+#
+# Add option for building static or shared library.  The
+# default will be shared library, but cmake can generate
+# static libraries by runnin "cmake -DBUILD_SHARED_LIBS=Off ..."
+#
+option(BUILD_SHARED_LIBS "Build using shared libraries" On)
 
 include(common.cmake)
 
@@ -32,6 +40,7 @@ set(hw_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/datamovement.pb.cc")
 set(hw_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/datamovement.pb.h")
 set(hw_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/datamovement.grpc.pb.cc")
 set(hw_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/datamovement.grpc.pb.h")
+set(generated_srcs ${hw_grpc_hdrs} ${hw_grpc_srcs} ${hw_proto_hdrs} ${hw_proto_srcs})
 add_custom_command(
       OUTPUT "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}
@@ -42,45 +51,50 @@ add_custom_command(
         "${hw_proto}"
       DEPENDS "${hw_proto}")
 
-# Include generated *.pb.h files
-include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+#
+# nnfdm library: libnnfdm.so for shared library and libnnfdm.a for static
+#
+if(BUILD_SHARED_LIBS)
+  add_library(nnfdm SHARED ${generated_srcs} client.cc client.h)
+else()
+  add_library(nnfdm STATIC ${generated_srcs} client.cc client.h)
+endif()
 
-# hw_grpc_proto
-add_library(hw_grpc_proto
-  ${hw_grpc_srcs}
-  ${hw_grpc_hdrs}
-  ${hw_proto_srcs}
-  ${hw_proto_hdrs})
-target_link_libraries(hw_grpc_proto
-  ${_REFLECTION}
-  ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF})
+# Include generated *.pb.h files privately as these headers are for the library's
+# internal implementation.
+#
+target_include_directories(nnfdm PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
-# Targets greeter_[async_](client|server)
-# foreach(_target
-#   client)
-#   add_executable(${_target} "${_target}.cc")
-#   target_link_libraries(${_target}
-#     hw_grpc_proto
-#     ${_REFLECTION}
-#     ${_GRPC_GRPCPP}
-#     ${_PROTOBUF_LIBPROTOBUF})
-# endforeach()
+# Noted: _REFLECTION, _GRPC_GRPCPP, and _PROTOBUF_LIBPROTOBUF are
+#        set by common.cmake
+#
+target_link_libraries(nnfdm
+    PUBLIC
+    ${_REFLECTION}
+    ${_GRPC_GRPCPP}
+    ${_PROTOBUF_LIBPROTOBUF}
+)
 
-include(GNUInstallDirs)
-add_library(mylib SHARED client.cc)
-link_libraries()
-target_link_libraries(mylib
-  hw_grpc_proto
-  ${_REFLECTION}
-  ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF})
-set_target_properties(mylib
-    PROPERTIES VERSION ${PROJECT_VERSION}
-    SOVERSION 1
-    PUBLIC_HEADER api/mylib.h)
-# configure_file(mylib.pc.in mylib.pc @ONLY)
-target_include_directories(mylib PRIVATE .)
-install(TARGETS mylib
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+#
+# Export a cmake configuration file for our library so downstream users
+# may (more easily) configure this library in to their cmake-based builds.
+#
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+  "${PROJECT_SOURCE_DIR}/nnfdm-config.cmake.in"
+  "${PROJECT_BINARY_DIR}/nnfdm-config.cmake"
+  INSTALL_DESTINATION share/cmake/nnfdm)
+
+# Generate install when running 'make install':
+#
+# [build] -- Install configuration: "Release"
+# [build] -- Installing: <installdir>/include/nnfdm/client.h
+# [build] -- Installing: <installdir>/lib/libnnfdm.a
+# [build] -- Installing: <installdir>/share/cmake/nnfdm/nnfdm-targets.cmake
+# [build] -- Installing: <installdir>/share/cmake/nnfdm/nnfdm-targets-release.cmake
+# [build] -- Installing: <installdir>/share/cmake/nnfdm/nnfdm-config.cmake
+#
+install(FILES client.h DESTINATION include/nnfdm)
+install(TARGETS nnfdm EXPORT nnfdm-targets DESTINATION lib)
+install(EXPORT nnfdm-targets FILE nnfdm-targets.cmake DESTINATION share/cmake/nnfdm)  
+install(FILES ${PROJECT_BINARY_DIR}/nnfdm-config.cmake DESTINATION share/cmake/nnfdm)
