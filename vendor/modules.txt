@@ -28,6 +28,8 @@ github.com/HewlettPackard/dws/utils/updater
 # github.com/HewlettPackard/lustre-csi-driver v0.0.0-20220901182413-1ce125c2e6ca
 ## explicit; go 1.19
 github.com/HewlettPackard/lustre-csi-driver/pkg/lustre-driver/service
+# github.com/HewlettPackard/structex v1.0.2
+## explicit; go 1.14
 # github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20220929204230-5dcfe552c9e0
 ## explicit; go 1.19
 github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
@@ -36,13 +38,15 @@ github.com/NearNodeFlash/lustre-fs-operator/controllers
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20220920142937-1080197e523b
 ## explicit; go 1.16
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20220929213241-b436d4bad171
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20221012202709-192706b48299
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/cespare/xxhash v1.1.0
+## explicit
 # github.com/cespare/xxhash/v2 v2.1.2
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -52,6 +56,12 @@ github.com/container-storage-interface/spec/lib/go/csi
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/dgraph-io/badger/v3 v3.2103.1
+## explicit; go 1.12
+# github.com/dgraph-io/ristretto v0.1.0
+## explicit; go 1.12
+# github.com/dustin/go-humanize v1.0.0
+## explicit
 # github.com/emicklei/go-restful/v3 v3.9.0
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -85,6 +95,8 @@ github.com/gogo/protobuf/sortkeys
 # github.com/golang-jwt/jwt/v4 v4.4.2
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
+# github.com/golang/glog v1.0.0
+## explicit; go 1.11
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
@@ -98,6 +110,10 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
+# github.com/golang/snappy v0.0.4
+## explicit
+# github.com/google/flatbuffers v2.0.0+incompatible
+## explicit
 # github.com/google/gnostic v0.6.9
 ## explicit; go 1.12
 github.com/google/gnostic/compiler
@@ -119,6 +135,8 @@ github.com/google/gofuzz/bytesource
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
+# github.com/gorilla/mux v1.8.0
+## explicit; go 1.12
 # github.com/imdario/mergo v0.3.13
 ## explicit; go 1.13
 github.com/imdario/mergo
@@ -128,11 +146,15 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/klauspost/compress v1.13.5
+## explicit; go 1.15
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
+# github.com/mattn/go-isatty v0.0.14
+## explicit; go 1.12
 # github.com/matttproud/golang_protobuf_extensions v1.0.2
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -177,6 +199,8 @@ github.com/onsi/gomega/types
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/pkg/term v1.1.0
+## explicit; go 1.14
 # github.com/prometheus/client_golang v1.13.0
 ## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus
@@ -196,6 +220,14 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/rs/cors v1.8.0
+## explicit; go 1.13
+# github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
+## explicit
+# github.com/sigurn/crc8 v0.0.0-20160107002456-e55481d6f45c
+## explicit
+# github.com/sigurn/utils v0.0.0-20190728110027-e1fefb11a144
+## explicit
 # github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
@@ -205,6 +237,10 @@ github.com/spf13/pflag
 # github.com/takama/daemon v1.0.0
 ## explicit; go 1.14
 github.com/takama/daemon
+# go.chromium.org/luci v0.0.0-20210915061045-7722a2154c29
+## explicit; go 1.16
+# go.opencensus.io v0.23.0
+## explicit; go 1.13
 # go.uber.org/atomic v1.10.0
 ## explicit; go 1.18
 go.uber.org/atomic

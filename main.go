@@ -198,5 +198,7 @@ type nodeController struct {
 
 func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
-	opts.Namespace = os.Getenv("NNF_NODE_NAME")
+	// Use the default namespace to access the nnf-dm-config ConfigMap
+	namespaces := []string{corev1.NamespaceDefault, os.Getenv("NNF_NODE_NAME")}
+	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
 }
