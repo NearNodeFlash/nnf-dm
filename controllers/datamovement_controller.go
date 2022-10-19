@@ -58,18 +58,25 @@ const (
 	InitiatorLabel = "dm.cray.hpe.com/initiator"
 
 	// DM ConfigMap Info
-	DMConfigMapName      = "nnf-dm-config"
-	DMConfigMapNamespace = corev1.NamespaceDefault
+	configMapName      = "nnf-dm-config"
+	configMapNamespace = corev1.NamespaceDefault
 
 	// DM ConfigMap Data Keys
-	DMConfigKeyCmd          = "dmCommand"
-	DMConfigKeyProgInterval = "dmProgressInterval"
-	DMConfigKeyNumProcesses = "dmNumProcesses"
+	configMapKeyCmd             = "dmCommand"
+	configMapKeyProgInterval    = "dmProgressInterval"
+	configMapKeyDcpProgInterval = "dcpProgressInterval"
+	configMapKeyNumProcesses    = "dmNumProcesses"
 
 	// DM ConfigMap Default Values
-	DMConfigDefaultCmd          = ""
-	DMConfigDefaultProgInterval = 5 * time.Second
+	configMapDefaultCmd             = ""
+	configMapDefaultProgInterval    = 5 * time.Second
+	configMapDefaultDcpProgInterval = 1
+	configMapDefaultNumProcess      = 1
 )
+
+// Regex to scrape the progress output of the `dcp` command. Example output:
+// Copied 1.000 GiB (10%) in 1.001 secs (4.174 GiB/s) 9 secs left ..."
+var progressRe = regexp.MustCompile(`Copied\s\d+\.\d+\s\S{3}\s\((\d{2,3})%\)\sin.+\n`)
 
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
@@ -80,8 +87,6 @@ type DataMovementReconciler struct {
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	contexts sync.Map
 }
-
-type DMConfigMapData map[string]string
 
 // Keep track of the context and its cancel function so that we can track
 // and cancel data movement operations in progress
@@ -104,10 +109,6 @@ func newInvalidError(format string, a ...any) *invalidError {
 func (i *invalidError) Error() string { return i.err.Error() }
 func (i *invalidError) Unwrap() error { return i.err }
 
-// Regex to scrape the progress output of the `dcp` command. Example output:
-// Copied 1.000 GiB (10%) in 1.001 secs (4.174 GiB/s) 9 secs left ..."
-var progressRe = regexp.MustCompile(`Copied\s(\d+\.\d+)\s(\S{3})\s\((\d{2,3})%\)\sin`)
-
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
@@ -117,7 +118,7 @@ var progressRe = regexp.MustCompile(`Copied\s(\d+\.\d+)\s(\S{3})\s\((\d{2,3})%\)
 //+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;update
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -217,18 +218,26 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, handleInvalidError(err)
 	}
 
+	// Expand the context with cancel and store it in the map so the cancel function can be used in
+	// another reconciler loop. Also add NamespacedName so we can retrieve the resource.
+	ctxCancel, cancel := context.WithCancel(ctx)
+	r.contexts.Store(dm.Name, dataMovementCancelContext{
+		ctx:    ctxCancel,
+		cancel: cancel,
+	})
+
 	// Pull configurable values from the ConfigMap
-	var dmCmd string
-	var progressCollectInterval time.Duration
-	var numProcesses int
 	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Name: DMConfigMapName, Namespace: DMConfigMapNamespace}, configMap); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
 		log.Info("Config map not found - requeueing")
-		return ctrl.Result{Requeue: true}, nil
-	} else {
-		log.Info("Config map found:", "configMap", configMap, "data", configMap.Data)
-		dmCmd, progressCollectInterval, numProcesses = parseConfigMapValues(*configMap, len(hosts))
+		return ctrl.Result{}, err
 	}
+	log.Info("Config map found:", "configMap", configMap, "data", configMap.Data)
+	dmCmd, progressCollectInterval, dcpProgressInterval, numProcesses := parseConfigMapValues(*configMap)
+
+	// Set the command and arguments according to the values specified by the config map
+	cmdStr, cmdArgs := getCmdAndArgs(dmCmd, numProcesses, dcpProgressInterval, hosts, dm)
+	cmd := exec.CommandContext(ctxCancel, cmdStr, cmdArgs...)
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
@@ -236,45 +245,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 	dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
 	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{}
+	cmdStatus.Command = cmd.String()
+	log.Info("Running Command", "cmd", cmdStatus.Command)
 
 	if err := r.Status().Update(ctx, dm); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Expand the context with cancel and store it in the map so the cancel
-	// function can be used in another reconciler loop. Also add NamespacedName
-	// so we can retrieve the resource.
-	ctxCancel, cancel := context.WithCancel(ctx)
-	r.contexts.Store(dm.Name, dataMovementCancelContext{
-		ctx:    ctxCancel,
-		cancel: cancel,
-	})
-
 	// Execute the go routine to perform the data movement
 	go func() {
-		var cmd *exec.Cmd
-
-		// Allow the data movement command to be overridden via the configmapa
-		// for testing purposes
-		if dmCmd != "" {
-			cmdList := strings.Split(dmCmd, " ")
-			cmd = exec.CommandContext(ctxCancel, cmdList[0], cmdList[1:]...)
-			// Otherwise use the actual `mpirun dcp` command
-		} else {
-			// TODO: UserId/GroupId
-			cmd = exec.CommandContext(ctxCancel,
-				"mpirun",
-				"--allow-run-as-root",
-				"-np", fmt.Sprintf("%d", numProcesses), // # TODO: Might want to adjust this if running on a rabbit node
-				"--host", strings.Join(hosts, ","),
-				// Dump progress every second to ensure progress collection has
-				// something to collect even if the interval is not 1 second.
-				"dcp", "--progress", "1", dm.Spec.Source.Path, dm.Spec.Destination.Path,
-			)
-		}
-		cmdStatus.Command = cmd.String()
-		log.Info("Running Command", "cmd", cmdStatus.Command)
-
 		// Use a MultiWriter so that we can parse the output and save the full output at the end
 		var combinedOutBuf, parseBuf bytes.Buffer
 		cmd.Stdout = io.MultiWriter(os.Stdout, &parseBuf, &combinedOutBuf)
@@ -287,10 +266,16 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Start the data movement command
 		cmd.Start()
 
-		// While the command is running, capture and process the output. Read
-		// lines until EOF to ensure we have the latest output. Then use the
-		// last regex match to obtain the most recent progress.
+		// While the command is running, capture and process the output. Read lines until EOF to
+		// ensure we have the latest output. Then use the last regex match to obtain the most recent
+		// progress.
 		go func() {
+			// If progress collection interval is >= 1s, otherwise skip this if
+			if !progressCollectionEnabled(progressCollectInterval) {
+				log.Info("Skipping progress collection - collection interval is less than 1s", "collectInterval", progressCollectInterval)
+				return
+			}
+
 			var progressInt32 *int32
 			var elapsed metav1.Duration
 			elapsed.Duration = 0
@@ -322,7 +307,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 					mostRecent := groups[len(groups)-1]
 
 					// Get the progress and convert to int
-					progress, err := strconv.Atoi(mostRecent[3])
+					progress, err := strconv.Atoi(mostRecent[1])
 					if err == nil {
 						// Initialize the pointer if we haven't done so already.
 						// We don't want to do this above since we do not want an
@@ -331,38 +316,34 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 							progressInt32 = new(int32)
 						}
 						*progressInt32 = int32(progress)
+
+						// Update the CommandStatus in the DM resource
+						err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+							dm := &nnfv1alpha1.NnfDataMovement{}
+							if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
+								return client.IgnoreNotFound(err)
+							}
+
+							cmdStatus.ProgressPercentage = progressInt32
+							cmdStatus.LastMessage = mostRecent[0]
+							cmdStatus.LastMessageTime = progressNow
+							cmdStatus.ElapsedTime = elapsed
+
+							if dm.Status.CommandStatus == nil {
+								dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
+							}
+							cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
+
+							log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
+							return r.Status().Update(ctx, dm)
+						})
+
+						if err != nil {
+							log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
+						}
 					} else {
 						log.Error(err, "failed to parse progress output", "progressMatch", mostRecent)
 					}
-				}
-
-				// Update the CommandStatus in the DM resource
-				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					dm := &nnfv1alpha1.NnfDataMovement{}
-					if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-						return client.IgnoreNotFound(err)
-					}
-
-					// Update progress if we have one
-					if progressInt32 != nil {
-						cmdStatus.ProgressPercentage = progressInt32
-					}
-					// Update the output and times regardless
-					cmdStatus.LastMessage = progressOutput
-					cmdStatus.LastMessageTime = progressNow
-					cmdStatus.ElapsedTime = elapsed
-
-					if dm.Status.CommandStatus == nil {
-						dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
-					}
-					cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
-
-					log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
-					return r.Status().Update(ctx, dm)
-				})
-
-				if err != nil {
-					log.Error(err, "failed to update CommandStatus with Progress", "CommandStatus", cmdStatus)
 				}
 			}
 
@@ -382,8 +363,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}()
 
 		err := cmd.Wait()
-		chCommandDone <- true // tell the process goroutine to stop parsing output
-		<-chProgressDone      // wait for process goroutine to stop parsing final output
+
+		// If enabled, wait for final progress collection
+		if progressCollectionEnabled(progressCollectInterval) {
+			chCommandDone <- true // tell the process goroutine to stop parsing output
+			<-chProgressDone      // wait for process goroutine to stop parsing final output
+		}
 
 		// Command is finished, update status
 		now := metav1.NowMicro()
@@ -430,36 +415,80 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
+// Build the command and arguments based on the values we get from the config map
+func getCmdAndArgs(cmCommand string, cmNumProcesses int, progressInterval int, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, []string) {
+	var cmd string
+	var args []string
+
+	// Allow the data movement command to be overridden via the config map for testing purposes
+	if len(cmCommand) > 0 {
+		cmdList := strings.Split(cmCommand, " ")
+		cmd = cmdList[0]
+		args = cmdList[1:]
+	} else {
+		numProcesses := len(hosts)
+
+		// If data movement is on the rabbit namespace, use the config map value
+		if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
+			numProcesses = cmNumProcesses
+		}
+
+		cmd = "mpirun"
+		args = []string{
+			"--allow-run-as-root", // TODO: UserId/GroupId
+			"-np", fmt.Sprintf("%d", numProcesses),
+			"--host", strings.Join(hosts, ","),
+			"dcp",
+			"--progress", fmt.Sprintf("%d", progressInterval),
+			dm.Spec.Source.Path, dm.Spec.Destination.Path,
+		}
+	}
+
+	return cmd, args
+}
+
 // Read the DM ConfigMap and attempt to parse the values out of it. If
 // everything is parsable, return the values. Otherwise use the defaults.
 //
-// Returns Data Movement Command, Collect Interval, NumProcesses
-func parseConfigMapValues(configMap corev1.ConfigMap, numHosts int) (string, time.Duration, int) {
-	dmCmd := DMConfigDefaultCmd
-	progressCollectInterval := DMConfigDefaultProgInterval
-	numProcesses := numHosts
+// Returns Data Movement Command, Collect Interval, DCP progress output interval, NumProcesses
+func parseConfigMapValues(configMap corev1.ConfigMap) (string, time.Duration, int, int) {
 	var err error
+	dmCmd := configMapDefaultCmd
+	progressCollectInterval := configMapDefaultProgInterval
+	dcpProgressInterval := configMapDefaultDcpProgInterval
+	numProcesses := configMapDefaultNumProcess
 
-	// Data Movement Command
-	if configMap.Data[DMConfigKeyCmd] != "" {
-		dmCmd = configMap.Data[DMConfigKeyCmd]
+	// Data Movement Command (string)
+	if len(configMap.Data[configMapKeyCmd]) > 0 {
+		dmCmd = configMap.Data[configMapKeyCmd]
 	}
 
-	// Data Movement Progress Collection Interval
-	if configMap.Data[DMConfigKeyProgInterval] != "" {
-		if progressCollectInterval, err = time.ParseDuration(configMap.Data[DMConfigKeyProgInterval]); err != nil {
-			progressCollectInterval = DMConfigDefaultProgInterval
+	// Data Movement Progress Collection Interval (duration string, e.g. 5s)
+	if len(configMap.Data[configMapKeyProgInterval]) > 0 {
+		if progressCollectInterval, err = time.ParseDuration(configMap.Data[configMapKeyProgInterval]); err != nil {
+			progressCollectInterval = configMapDefaultProgInterval
 		}
 	}
 
-	// Data Movement NumProcesses
-	if configMap.Data[DMConfigKeyNumProcesses] != "" {
-		if numProcesses, err = strconv.Atoi(configMap.Data[DMConfigKeyNumProcesses]); err != nil {
-			numProcesses = numHosts
+	// DCP Progress Output Interval (int, in seconds)
+	if len(configMap.Data[configMapKeyDcpProgInterval]) > 0 {
+		if dcpProgressInterval, err = strconv.Atoi(configMap.Data[configMapKeyDcpProgInterval]); err != nil {
+			dcpProgressInterval = configMapDefaultDcpProgInterval
 		}
 	}
 
-	return dmCmd, progressCollectInterval, numProcesses
+	// Data Movement NumProcesses (int)
+	if len(configMap.Data[configMapKeyNumProcesses]) > 0 {
+		if numProcesses, err = strconv.Atoi(configMap.Data[configMapKeyNumProcesses]); err != nil {
+			numProcesses = configMapDefaultNumProcess
+		}
+	}
+
+	return dmCmd, progressCollectInterval, dcpProgressInterval, numProcesses
+}
+
+func progressCollectionEnabled(collectInterval time.Duration) bool {
+	return collectInterval >= 1*time.Second
 }
 
 func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
