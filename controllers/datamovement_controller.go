@@ -70,7 +70,7 @@ const (
 	// DM ConfigMap Default Values
 	configMapDefaultCmd             = ""
 	configMapDefaultProgInterval    = 5 * time.Second
-	configMapDefaultDcpProgInterval = 1
+	configMapDefaultDcpProgInterval = 1 * time.Second
 	configMapDefaultNumProcess      = 1
 )
 
@@ -472,7 +472,7 @@ func parseConfigMapValues(configMap corev1.ConfigMap) (string, time.Duration, in
 
 	// DCP Progress Output Interval (int, in seconds)
 	if len(configMap.Data[configMapKeyDcpProgInterval]) > 0 {
-		if dcpProgressInterval, err = strconv.Atoi(configMap.Data[configMapKeyDcpProgInterval]); err != nil {
+		if dcpProgressInterval, err = time.ParseDuration(configMap.Data[configMapKeyDcpProgInterval]); err != nil {
 			dcpProgressInterval = configMapDefaultDcpProgInterval
 		}
 	}
@@ -484,7 +484,11 @@ func parseConfigMapValues(configMap corev1.ConfigMap) (string, time.Duration, in
 		}
 	}
 
-	return dmCmd, progressCollectInterval, dcpProgressInterval, numProcesses
+	// dcp progress needs to be in seconds - round and cast to int
+	dcpProgressInterval = dcpProgressInterval.Round(1 * time.Second)
+	dcpProgressIntervalInt := int(dcpProgressInterval / time.Second)
+
+	return dmCmd, progressCollectInterval, dcpProgressIntervalInt, numProcesses
 }
 
 func progressCollectionEnabled(collectInterval time.Duration) bool {

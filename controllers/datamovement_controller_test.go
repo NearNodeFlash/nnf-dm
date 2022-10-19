@@ -311,10 +311,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 	Context("when the dm config map has specified a valid dcpProgressInterval", func() {
 		BeforeEach(func() {
 			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyDcpProgInterval] = "7"
+			cmData[configMapKeyDcpProgInterval] = "7.12s"
 		})
 
-		It("should use that number for the dcp --progress option", func() {
+		It("should use that number for the dcp --progress option after rounding", func() {
 			Eventually(func(g Gomega) string {
 				cmd := ""
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
