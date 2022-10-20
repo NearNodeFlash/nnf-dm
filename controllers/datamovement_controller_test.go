@@ -89,7 +89,6 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		cmData[configMapKeyProgInterval] = "1s"
 		cmData[configMapKeyDcpProgInterval] = "1s"
 		cmData[configMapKeyNumProcesses] = ""
-		os.Unsetenv("NNF_NODE_NAME")
 	})
 
 	JustBeforeEach(func() {
@@ -212,6 +211,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
 				"mpirun --allow-run-as-root -np 17 --host localhost dcp --progress 1 %s %s", srcPath, destPath)))
+		})
+
+		AfterEach(func() {
+			os.Unsetenv("NNF_NODE_NAME")
 		})
 	})
 
