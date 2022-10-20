@@ -82,7 +82,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		// Set default values
 		dmCancel = false
 		createCm = true
-		cmData[configMapKeyCmd] = "sleep 1"
+		// Use a command that will pass instead of using the default of mpirun - which will fail.
+		// This is to ensure that our tests are less noisy on the output, as the mpirun will produce
+		// an error in the output.
+		cmData[configMapKeyCmd] = "true"
 		cmData[configMapKeyProgInterval] = "1s"
 		cmData[configMapKeyDcpProgInterval] = "1s"
 		cmData[configMapKeyNumProcesses] = ""
@@ -94,18 +97,18 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		testLabel := fmt.Sprintf("%s-%s", testLabelKey, uuid.NewString())
 
 		// Create CM and verify label
-		cm = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      configMapName,
-				Namespace: configMapNamespace,
-				Labels: map[string]string{
-					testLabelKey: testLabel,
-				},
-			},
-			Data: cmData,
-		}
-
 		if createCm {
+			cm = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: configMapNamespace,
+					Labels: map[string]string{
+						testLabelKey: testLabel,
+					},
+				},
+				Data: cmData,
+			}
+
 			Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
 			Eventually(func(g Gomega) string {
 				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
@@ -145,16 +148,20 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	AfterEach(func() {
 		// Remove datamovement
-		k8sClient.Delete(context.TODO(), dm)
-		Eventually(func() error {
-			return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)
-		}).ShouldNot(Succeed())
+		if dm != nil {
+			Expect(k8sClient.Delete(context.TODO(), dm)).To(Succeed())
+			Eventually(func() error {
+				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)
+			}).ShouldNot(Succeed())
+		}
 
 		// Remove configmap
-		k8sClient.Delete(context.TODO(), cm)
-		Eventually(func() error {
-			return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)
-		}).ShouldNot(Succeed())
+		if createCm {
+			Expect(k8sClient.Delete(context.TODO(), cm)).To(Succeed())
+			Eventually(func() error {
+				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)
+			}).ShouldNot(Succeed())
+		}
 
 		// Delete tmpdir and its contents
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
@@ -443,6 +450,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)
 				return controllerutil.ContainsFinalizer(dm, finalizer)
 			}).Should(BeFalse())
+
+			dm = nil
 		})
 	})
 
