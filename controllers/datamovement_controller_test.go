@@ -84,7 +84,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		createCm = true
 		cmData[configMapKeyCmd] = "sleep 1"
 		cmData[configMapKeyProgInterval] = "1s"
-		cmData[configMapKeyDcpProgInterval] = "1"
+		cmData[configMapKeyDcpProgInterval] = "1s"
 		cmData[configMapKeyNumProcesses] = ""
 		os.Unsetenv("NNF_NODE_NAME")
 	})
@@ -93,6 +93,27 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		const testLabelKey = "dm-test"
 		testLabel := fmt.Sprintf("%s-%s", testLabelKey, uuid.NewString())
 
+		// Create CM and verify label
+		cm = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configMapName,
+				Namespace: configMapNamespace,
+				Labels: map[string]string{
+					testLabelKey: testLabel,
+				},
+			},
+			Data: cmData,
+		}
+
+		if createCm {
+			Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
+			Eventually(func(g Gomega) string {
+				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				return cm.Labels[testLabelKey]
+			}).Should(Equal(testLabel))
+		}
+
+		// Create DM and verify label
 		dm = &nnfv1alpha1.NnfDataMovement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "dm-test",
@@ -114,27 +135,6 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			},
 		}
 
-		cm = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      configMapName,
-				Namespace: configMapNamespace,
-				Labels: map[string]string{
-					testLabelKey: testLabel,
-				},
-			},
-			Data: cmData,
-		}
-
-		// Create CM and verify label
-		if createCm {
-			Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
-			Eventually(func(g Gomega) string {
-				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-				return cm.Labels[testLabelKey]
-			}).Should(Equal(testLabel))
-		}
-
-		// Create DM and verify label
 		Expect(k8sClient.Create(context.TODO(), dm)).To(Succeed())
 		Eventually(func(g Gomega) string {
 			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
@@ -251,10 +251,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			cmData[configMapKeyProgInterval] = "25s"
 		})
 
-		It("parseConfigMapValues should return that value", func() {
+		It("getCollectionInterval should return that value", func() {
 			configMap := &corev1.ConfigMap{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-			_, dmProgressInterval, _, _ := parseConfigMapValues(*configMap)
+			dmProgressInterval := getCollectionInterval(configMap)
 			Expect(dmProgressInterval).To(Equal(25 * time.Second))
 		})
 	})
@@ -264,10 +264,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			cmData[configMapKeyProgInterval] = "aafdafdsa"
 		})
 
-		It("parseConfigMapValues should return the default value", func() {
+		It("getCollectionInterval should return the default value", func() {
 			configMap := &corev1.ConfigMap{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-			_, dmProgressInterval, _, _ := parseConfigMapValues(*configMap)
+			dmProgressInterval := getCollectionInterval(configMap)
 			Expect(dmProgressInterval).To(Equal(configMapDefaultProgInterval))
 		})
 	})
@@ -277,10 +277,10 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			cmData[configMapKeyProgInterval] = ""
 		})
 
-		It("parseConfigMapValues should return the default value", func() {
+		It("getCollectionInterval should return the default value", func() {
 			configMap := &corev1.ConfigMap{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-			_, dmProgressInterval, _, _ := parseConfigMapValues(*configMap)
+			dmProgressInterval := getCollectionInterval(configMap)
 			Expect(dmProgressInterval).To(Equal(configMapDefaultProgInterval))
 		})
 	})
@@ -532,6 +532,31 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			GinkgoWriter.Printf("VERIFY: LastMessage: %s\n", dm.Status.CommandStatus.LastMessage)
 			GinkgoWriter.Printf("VERIFY: LastMessageTime: %v\n", dm.Status.CommandStatus.LastMessageTime)
 			GinkgoWriter.Printf("VERIFY: ElapsedTime: %v\n", dm.Status.CommandStatus.ElapsedTime)
+		})
+	})
+
+	Context("when there are multiple lines of progress output to be read", func() {
+		BeforeEach(func() {
+			scriptFilePath := createFakeProgressScript()
+			_, err := os.Stat(scriptFilePath)
+			Expect(err).ToNot(HaveOccurred())
+
+			cmData[configMapKeyCmd] = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
+			cmData[configMapKeyProgInterval] = "1s"
+		})
+
+		It("LastMessage should not include multiple lines of output", func() {
+			Consistently(func(g Gomega) string {
+				lastMessage := ""
+				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+				if dm.Status.CommandStatus != nil {
+					lastMessage = dm.Status.CommandStatus.LastMessage
+				}
+				return lastMessage
+			}).ShouldNot(SatisfyAll(
+				BeEmpty(),
+				ContainSubstring("\n"),
+			))
 		})
 	})
 

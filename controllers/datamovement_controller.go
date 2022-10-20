@@ -76,7 +76,7 @@ const (
 
 // Regex to scrape the progress output of the `dcp` command. Example output:
 // Copied 1.000 GiB (10%) in 1.001 secs (4.174 GiB/s) 9 secs left ..."
-var progressRe = regexp.MustCompile(`Copied\s\d+\.\d+\s\S{3}\s\((\d{2,3})%\)\sin.+\n`)
+var progressRe = regexp.MustCompile(`Copied.+\(([[:digit:]]{1,3})%\)`)
 
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
@@ -232,8 +232,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Config map not found - requeueing")
 		return ctrl.Result{}, err
 	}
-	log.Info("Config map found:", "configMap", configMap, "data", configMap.Data)
-	dmCmd, progressCollectInterval, dcpProgressInterval, numProcesses := parseConfigMapValues(*configMap)
+	log.Info("Config map found", "data", configMap.Data)
+
+	dmCmd := getCommand(configMap)
+	progressCollectInterval := getCollectionInterval(configMap)
+	dcpProgressInterval := getDcpProgressInterval(configMap)
+	numProcesses := getNumProcesses(configMap)
 
 	// Set the command and arguments according to the values specified by the config map
 	cmdStr, cmdArgs := getCmdAndArgs(dmCmd, numProcesses, dcpProgressInterval, hosts, dm)
@@ -243,11 +247,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
 	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
-	dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
 	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
+	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
 
+	// TODO: Do we need to do a RetryOnConflict here?
 	if err := r.Status().Update(ctx, dm); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -269,98 +274,82 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// While the command is running, capture and process the output. Read lines until EOF to
 		// ensure we have the latest output. Then use the last regex match to obtain the most recent
 		// progress.
-		go func() {
-			// If progress collection interval is >= 1s, otherwise skip this if
-			if !progressCollectionEnabled(progressCollectInterval) {
-				log.Info("Skipping progress collection - collection interval is less than 1s", "collectInterval", progressCollectInterval)
-				return
-			}
+		if progressCollectionEnabled(progressCollectInterval) {
+			go func() {
+				var elapsed metav1.Duration
+				elapsed.Duration = 0
+				progressStart := metav1.NowMicro()
 
-			var progressInt32 *int32
-			var elapsed metav1.Duration
-			elapsed.Duration = 0
-			progressStart := metav1.NowMicro()
+				// Perform the actual collection and update logic
+				parseAndUpdateProgress := func() {
 
-			// Perform the actual collection and update logic
-			parseAndUpdateProgress := func() {
-				progressOutput := ""
+					// Read all lines of output until EOF
+					for {
+						line, err := parseBuf.ReadString('\n')
+						if err == io.EOF {
+							break
+						} else if err != nil {
+							log.Error(err, "failed to read progress output")
+						}
 
-				// Read all lines of output until EOF
+						// If it's a progress line, grab the percentage
+						match := progressRe.FindStringSubmatch(line)
+						if len(match) > 0 {
+							progress, err := strconv.Atoi(match[1])
+							if err != nil {
+								log.Error(err, "failed to parse progress output", "match", match)
+								return
+							}
+							progressInt32 := int32(progress)
+							cmdStatus.ProgressPercentage = &progressInt32
+						}
+
+						// Always update LastMessage and timing
+						cmdStatus.LastMessage = line
+						progressNow := metav1.NowMicro()
+						elapsed.Duration = progressNow.Time.Sub(progressStart.Time)
+						cmdStatus.LastMessageTime = progressNow
+						cmdStatus.ElapsedTime = elapsed
+					}
+
+					// Update the CommandStatus in the DM resource after we parsed all the lines
+					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						dm := &nnfv1alpha1.NnfDataMovement{}
+						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
+							return client.IgnoreNotFound(err)
+						}
+
+						if dm.Status.CommandStatus == nil {
+							dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
+						}
+						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
+
+						log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
+						return r.Status().Update(ctx, dm)
+					})
+
+					if err != nil {
+						log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
+					}
+				}
+
+				// Main Progress Collection Loop
 				for {
-					line, err := parseBuf.ReadString('\n')
-					if err == io.EOF {
-						break
-					} else if err != nil {
-						log.Error(err, "failed to read progress output")
-					}
-					progressOutput += line
-				}
-
-				// Get the times now before we start the parsing
-				progressNow := metav1.NowMicro()
-				elapsed.Duration = progressNow.Time.Sub(progressStart.Time)
-
-				// Find all matching progress matches but we only care about the
-				// last (most recent one)
-				groups := progressRe.FindAllStringSubmatch(progressOutput, -1)
-				if len(groups) > 0 {
-					mostRecent := groups[len(groups)-1]
-
-					// Get the progress and convert to int
-					progress, err := strconv.Atoi(mostRecent[1])
-					if err == nil {
-						// Initialize the pointer if we haven't done so already.
-						// We don't want to do this above since we do not want an
-						// initial value of 0 unless we actually have a progress
-						if progressInt32 == nil {
-							progressInt32 = new(int32)
-						}
-						*progressInt32 = int32(progress)
-
-						// Update the CommandStatus in the DM resource
-						err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-							dm := &nnfv1alpha1.NnfDataMovement{}
-							if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-								return client.IgnoreNotFound(err)
-							}
-
-							cmdStatus.ProgressPercentage = progressInt32
-							cmdStatus.LastMessage = mostRecent[0]
-							cmdStatus.LastMessageTime = progressNow
-							cmdStatus.ElapsedTime = elapsed
-
-							if dm.Status.CommandStatus == nil {
-								dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
-							}
-							cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
-
-							log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
-							return r.Status().Update(ctx, dm)
-						})
-
-						if err != nil {
-							log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
-						}
-					} else {
-						log.Error(err, "failed to parse progress output", "progressMatch", mostRecent)
+					select {
+					// Now that we're done, parse whatever output is left
+					case <-chCommandDone:
+						parseAndUpdateProgress()
+						chProgressDone <- true
+						return
+					// Collect Progress output on every interval
+					case <-time.After(progressCollectInterval):
+						parseAndUpdateProgress()
 					}
 				}
-			}
-
-			// Main Progress Collection Loop
-			for {
-				select {
-				// Now that we're done, parse whatever output is left
-				case <-chCommandDone:
-					parseAndUpdateProgress()
-					chProgressDone <- true
-					return
-				// Collect Progress output on every interval
-				case <-time.After(progressCollectInterval):
-					parseAndUpdateProgress()
-				}
-			}
-		}()
+			}()
+		} else {
+			log.Info("Skipping progress collection - collection interval is less than 1s", "collectInterval", progressCollectInterval)
+		}
 
 		err := cmd.Wait()
 
@@ -447,48 +436,53 @@ func getCmdAndArgs(cmCommand string, cmNumProcesses int, progressInterval int, h
 	return cmd, args
 }
 
-// Read the DM ConfigMap and attempt to parse the values out of it. If
-// everything is parsable, return the values. Otherwise use the defaults.
-//
-// Returns Data Movement Command, Collect Interval, DCP progress output interval, NumProcesses
-func parseConfigMapValues(configMap corev1.ConfigMap) (string, time.Duration, int, int) {
-	var err error
-	dmCmd := configMapDefaultCmd
-	progressCollectInterval := configMapDefaultProgInterval
-	dcpProgressInterval := configMapDefaultDcpProgInterval
-	numProcesses := configMapDefaultNumProcess
+func getCommand(config *corev1.ConfigMap) string {
+	cmd := configMapDefaultCmd
 
-	// Data Movement Command (string)
-	if len(configMap.Data[configMapKeyCmd]) > 0 {
-		dmCmd = configMap.Data[configMapKeyCmd]
+	if len(config.Data[configMapKeyCmd]) > 0 {
+		cmd = config.Data[configMapKeyCmd]
 	}
 
-	// Data Movement Progress Collection Interval (duration string, e.g. 5s)
-	if len(configMap.Data[configMapKeyProgInterval]) > 0 {
-		if progressCollectInterval, err = time.ParseDuration(configMap.Data[configMapKeyProgInterval]); err != nil {
-			progressCollectInterval = configMapDefaultProgInterval
+	return cmd
+}
+
+func getCollectionInterval(config *corev1.ConfigMap) time.Duration {
+	collectionInterval := configMapDefaultProgInterval
+
+	if len(config.Data[configMapKeyProgInterval]) > 0 {
+		if parsedInterval, err := time.ParseDuration(config.Data[configMapKeyProgInterval]); err == nil {
+			collectionInterval = parsedInterval
 		}
 	}
+
+	return collectionInterval
+}
+
+func getDcpProgressInterval(config *corev1.ConfigMap) int {
+	progressInterval := configMapDefaultDcpProgInterval
 
 	// DCP Progress Output Interval (int, in seconds)
-	if len(configMap.Data[configMapKeyDcpProgInterval]) > 0 {
-		if dcpProgressInterval, err = time.ParseDuration(configMap.Data[configMapKeyDcpProgInterval]); err != nil {
-			dcpProgressInterval = configMapDefaultDcpProgInterval
-		}
-	}
-
-	// Data Movement NumProcesses (int)
-	if len(configMap.Data[configMapKeyNumProcesses]) > 0 {
-		if numProcesses, err = strconv.Atoi(configMap.Data[configMapKeyNumProcesses]); err != nil {
-			numProcesses = configMapDefaultNumProcess
+	if len(config.Data[configMapKeyDcpProgInterval]) > 0 {
+		if parsedInterval, err := time.ParseDuration(config.Data[configMapKeyDcpProgInterval]); err == nil {
+			progressInterval = parsedInterval
 		}
 	}
 
 	// dcp progress needs to be in seconds - round and cast to int
-	dcpProgressInterval = dcpProgressInterval.Round(1 * time.Second)
-	dcpProgressIntervalInt := int(dcpProgressInterval / time.Second)
+	progressInterval = progressInterval.Round(1 * time.Second)
+	return int(progressInterval / time.Second)
+}
 
-	return dmCmd, progressCollectInterval, dcpProgressIntervalInt, numProcesses
+func getNumProcesses(config *corev1.ConfigMap) int {
+	numProcesses := configMapDefaultNumProcess
+
+	if len(config.Data[configMapKeyNumProcesses]) > 0 {
+		if parsedNum, err := strconv.Atoi(config.Data[configMapKeyNumProcesses]); err == nil {
+			numProcesses = parsedNum
+		}
+	}
+
+	return numProcesses
 }
 
 func progressCollectionEnabled(collectInterval time.Duration) bool {
