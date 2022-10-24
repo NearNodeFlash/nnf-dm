@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -35,29 +35,31 @@ KUSTOMIZE=$2
 IMG=$3
 
 case $CMD in
-    deploy)
-        $(cd config/manager && $KUSTOMIZE edit set image controller="$IMG")
+deploy)
+    $(cd config/manager && $KUSTOMIZE edit set image controller="$IMG")
 
-        $KUSTOMIZE build config/default | kubectl apply -f - || true
+    $KUSTOMIZE build config/default | kubectl apply -f - || true
+    $KUSTOMIZE build config/dm_config | kubectl create -f - || true
 
-        # Sometimes the deployment of the DataMovementManager occurs to quickly for k8s to digest the CRD
-        # Retry the deployment if this is the case. It seems to be fast enough where we can just
-        # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
-        echo "Waiting for DataMovementManager resource to become ready"
-        while : ; do
-            [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
-            $KUSTOMIZE build config/default | kubectl apply -f -
-            break
-        done
-        ;;
-    undeploy)
-        # When the DataMovementManager CRD gets deleted all related resource are also
-        # removed, so the delete will always fail. We ignore all errors at our
-        # own risk.
-        $KUSTOMIZE build config/default | kubectl delete -f - || true
-        ;;
-    *)
-        usage
-        exit 1
-        ;;
+    # Sometimes the deployment of the DataMovementManager occurs to quickly for k8s to digest the CRD
+    # Retry the deployment if this is the case. It seems to be fast enough where we can just
+    # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
+    echo "Waiting for DataMovementManager resource to become ready"
+    while :; do
+        [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
+        $KUSTOMIZE build config/default | kubectl apply -f -
+        break
+    done
+    ;;
+undeploy)
+    # When the DataMovementManager CRD gets deleted all related resource are also
+    # removed, so the delete will always fail. We ignore all errors at our
+    # own risk.
+    $KUSTOMIZE build config/default | kubectl delete -f - || true
+    $KUSTOMIZE build config/dm_config | kubectl delete -f - || true
+    ;;
+*)
+    usage
+    exit 1
+    ;;
 esac
