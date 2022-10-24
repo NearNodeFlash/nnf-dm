@@ -49,12 +49,12 @@ var progressOutputScript string
 var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 	var dm *nnfv1alpha1.NnfDataMovement
 	var cm *corev1.ConfigMap
-	var cmData = make(map[string]string)
 	createCm := true
 	var tmpDir string
 	var srcPath string
 	var destPath string
-	dmCancel := false
+	const testLabelKey = "dm-test"
+	var testLabel string
 
 	createFakeProgressScript := func() string {
 		f, err := os.CreateTemp(tmpDir, "fakeProgressOutput-*.sh")
@@ -73,49 +73,34 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	BeforeEach(func() {
 		var err error
+		createCm = true
+		testLabel = fmt.Sprintf("%s-%s", testLabelKey, uuid.NewString())
+
 		tmpDir, err = os.MkdirTemp("/tmp", "dm-test")
 		Expect(err).ToNot(HaveOccurred())
 
 		srcPath = filepath.Join(tmpDir, "src")
 		destPath = filepath.Join(tmpDir, "dest")
 
-		// Set default values
-		dmCancel = false
-		createCm = true
-		// Use a command that will pass instead of using the default of mpirun - which will fail.
-		// This is to ensure that our tests are less noisy on the output, as the mpirun will produce
-		// an error in the output.
-		cmData[configMapKeyCmd] = "true"
-		cmData[configMapKeyProgInterval] = "1s"
-		cmData[configMapKeyDcpProgInterval] = "1s"
-		cmData[configMapKeyNumProcesses] = ""
-	})
-
-	JustBeforeEach(func() {
-		const testLabelKey = "dm-test"
-		testLabel := fmt.Sprintf("%s-%s", testLabelKey, uuid.NewString())
-
-		// Create CM and verify label
-		if createCm {
-			cm = &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      configMapName,
-					Namespace: configMapNamespace,
-					Labels: map[string]string{
-						testLabelKey: testLabel,
-					},
+		cm = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configMapName,
+				Namespace: configMapNamespace,
+				Labels: map[string]string{
+					testLabelKey: testLabel,
 				},
-				Data: cmData,
-			}
-
-			Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
-			Eventually(func(g Gomega) string {
-				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-				return cm.Labels[testLabelKey]
-			}).Should(Equal(testLabel))
+			},
+			Data: map[string]string{
+				// Use a command that will pass instead of using the default of mpirun - which will fail.
+				// This is to ensure that our tests are less noisy on the output, as the mpirun will produce
+				// an error in the output.
+				configMapKeyCmd:             "true",
+				configMapKeyProgInterval:    "1s",
+				configMapKeyDcpProgInterval: "1s",
+				configMapKeyNumProcesses:    "",
+			},
 		}
 
-		// Create DM and verify label
 		dm = &nnfv1alpha1.NnfDataMovement{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "dm-test",
@@ -133,10 +118,22 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				},
 				UserId:  uint32(os.Geteuid()),
 				GroupId: uint32(os.Getegid()),
-				Cancel:  dmCancel,
+				Cancel:  false,
 			},
 		}
+	})
 
+	JustBeforeEach(func() {
+		// Create CM and verify label
+		if createCm {
+			Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
+			Eventually(func(g Gomega) string {
+				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
+				return cm.Labels[testLabelKey]
+			}).Should(Equal(testLabel))
+		}
+
+		// Create DM and verify label
 		Expect(k8sClient.Create(context.TODO(), dm)).To(Succeed())
 		Eventually(func(g Gomega) string {
 			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
@@ -180,7 +177,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm configmap has specified a dmCommand", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = "ls -l"
+			cm.Data[configMapKeyCmd] = "/bin/ls -l"
 		})
 		It("should use that command instead of the default mpirun", func() {
 			Eventually(func(g Gomega) string {
@@ -190,14 +187,14 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 					cmd = dm.Status.CommandStatus.Command
 				}
 				return cmd
-			}).Should(Equal("/bin/" + cmData[configMapKeyCmd]))
+			}).Should(Equal(cm.Data[configMapKeyCmd]))
 		})
 	})
 
 	Context("when the dm config map has specified a valid dmNumProcesses and the dm namespace matches NNF_NODE_NAME", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyNumProcesses] = "17"
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyNumProcesses] = "17"
 			os.Setenv("NNF_NODE_NAME", "default") // normally this isn't default, but we just want it to match
 		})
 
@@ -220,8 +217,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a valid dmNumProcesses and the dm namespace does not match NNF_NODE_NAME", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyNumProcesses] = "17"
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyNumProcesses] = "17"
 		})
 
 		It("should use len(hosts) (1) for the -np flag", func() {
@@ -239,8 +236,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a invalid dmNumProcesses", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyNumProcesses] = "aa"
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyNumProcesses] = "aa"
 		})
 
 		It("should use the default number for -np flag", func() {
@@ -258,7 +255,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a valid dmProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyProgInterval] = "25s"
+			cm.Data[configMapKeyProgInterval] = "25s"
 		})
 
 		It("getCollectionInterval should return that value", func() {
@@ -271,7 +268,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a invalid dmProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyProgInterval] = "aafdafdsa"
+			cm.Data[configMapKeyProgInterval] = "aafdafdsa"
 		})
 
 		It("getCollectionInterval should return the default value", func() {
@@ -284,7 +281,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a empty dmProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyProgInterval] = ""
+			cm.Data[configMapKeyProgInterval] = ""
 		})
 
 		It("getCollectionInterval should return the default value", func() {
@@ -297,8 +294,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a dmProgressInterval of less than 1s", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = "sleep .5"
-			cmData[configMapKeyProgInterval] = "500ms"
+			cm.Data[configMapKeyCmd] = "sleep .5"
+			cm.Data[configMapKeyProgInterval] = "500ms"
 		})
 
 		It("the data movement should skip progress collection", func() {
@@ -320,8 +317,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified a valid dcpProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyDcpProgInterval] = "7.12s"
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyDcpProgInterval] = "7.12s"
 		})
 
 		It("should use that number for the dcp --progress option after rounding", func() {
@@ -339,8 +336,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified an invalid dcpProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyDcpProgInterval] = "aaa"
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyDcpProgInterval] = "aaa"
 		})
 
 		It("should use the default number for the dcp --progress option", func() {
@@ -358,8 +355,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when the dm config map has specified an empty dcpProgressInterval", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = ""
-			cmData[configMapKeyDcpProgInterval] = ""
+			cm.Data[configMapKeyCmd] = ""
+			cm.Data[configMapKeyDcpProgInterval] = ""
 		})
 
 		It("should use the default number for the dcp --progress option", func() {
@@ -390,7 +387,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when a data movement command fails", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = "false"
+			cm.Data[configMapKeyCmd] = "false"
 		})
 		It("should have a State/Status of 'Finished'/'Failed'", func() {
 			Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
@@ -408,8 +405,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 		BeforeEach(func() {
 			// Set cancel on creation so that data movement doesn't start
-			dmCancel = true
-			cmData[configMapKeyCmd] = "" // try to use mpirun dcp, it will fail
+			dm.Spec.Cancel = true
+			cm.Data[configMapKeyCmd] = "" // try to use mpirun dcp, it will fail
 		})
 
 		It("should have a State/Status of 'Finished'/'Cancelled' and StartTime/EndTime should be set to now", func() {
@@ -469,7 +466,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			commandWithArgs = fmt.Sprintf("/bin/bash %s %d %f", scriptFilePath, commandDuration, commandIntervalInSec)
-			cmData[configMapKeyCmd] = commandWithArgs
+			cm.Data[configMapKeyCmd] = commandWithArgs
 		})
 
 		It("should update progress by parsing the output of the command", func() {
@@ -553,8 +550,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 			_, err := os.Stat(scriptFilePath)
 			Expect(err).ToNot(HaveOccurred())
 
-			cmData[configMapKeyCmd] = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
-			cmData[configMapKeyProgInterval] = "1s"
+			cm.Data[configMapKeyCmd] = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
+			cm.Data[configMapKeyProgInterval] = "1s"
 		})
 
 		It("LastMessage should not include multiple lines of output", func() {
@@ -574,7 +571,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	Context("when a data movement operation is cancelled", func() {
 		BeforeEach(func() {
-			cmData[configMapKeyCmd] = "sleep 5"
+			cm.Data[configMapKeyCmd] = "sleep 5"
 		})
 		It("should have a state and status of 'Finished' and 'Cancelled'", func() {
 			By("ensuring the data movement started")

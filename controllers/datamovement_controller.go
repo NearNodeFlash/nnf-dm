@@ -252,7 +252,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
 
-	// TODO: Do we need to do a RetryOnConflict here?
 	if err := r.Status().Update(ctx, dm); err != nil {
 		return ctrl.Result{}, err
 	}
