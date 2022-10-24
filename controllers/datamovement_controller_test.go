@@ -253,44 +253,20 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 		})
 	})
 
-	Context("when the dm config map has specified a valid dmProgressInterval", func() {
-		BeforeEach(func() {
-			cm.Data[configMapKeyProgInterval] = "25s"
-		})
-
-		It("getCollectionInterval should return that value", func() {
+	DescribeTable("Parsing values from the dm config map for dmProgressInterval",
+		func(durStr string, dur time.Duration) {
 			configMap := &corev1.ConfigMap{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
+			// For this test, we don't have a direct way to verify the progress interval, so use getCollectionInterval directly
+			// instead of verifying full DM behavior.
+			configMap.Data[configMapKeyProgInterval] = durStr
 			dmProgressInterval := getCollectionInterval(configMap)
-			Expect(dmProgressInterval).To(Equal(25 * time.Second))
-		})
-	})
-
-	Context("when the dm config map has specified a invalid dmProgressInterval", func() {
-		BeforeEach(func() {
-			cm.Data[configMapKeyProgInterval] = "aafdafdsa"
-		})
-
-		It("getCollectionInterval should return the default value", func() {
-			configMap := &corev1.ConfigMap{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-			dmProgressInterval := getCollectionInterval(configMap)
-			Expect(dmProgressInterval).To(Equal(configMapDefaultProgInterval))
-		})
-	})
-
-	Context("when the dm config map has specified a empty dmProgressInterval", func() {
-		BeforeEach(func() {
-			cm.Data[configMapKeyProgInterval] = ""
-		})
-
-		It("getCollectionInterval should return the default value", func() {
-			configMap := &corev1.ConfigMap{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-			dmProgressInterval := getCollectionInterval(configMap)
-			Expect(dmProgressInterval).To(Equal(configMapDefaultProgInterval))
-		})
-	})
+			Expect(dmProgressInterval).To(Equal(dur))
+		},
+		Entry("when dmProgressInterval is valid", "25s", 25*time.Second),
+		Entry("when dmProgressInterval is invalid", "aafdafdsa", configMapDefaultProgInterval),
+		Entry("when dmProgressInterval is empty", "", configMapDefaultProgInterval),
+	)
 
 	Context("when the dm config map has specified a dmProgressInterval of less than 1s", func() {
 		BeforeEach(func() {
