@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
         grpc::CreateChannel("unix:///tmp/nnf.sock", grpc::InsecureChannelCredentials()));
 
     std::string uid;
-    
+
     DataMovementWorkflow workflow;
     workflow.set_name("YOUR-WORKFLOW-NAME");
     workflow.set_namespace_("YOUR-WORKFLOW-NAMESPACE");
@@ -63,13 +63,14 @@ int main(int argc, char** argv) {
         ClientContext context;
 
         DataMovementCreateRequest createRequest;
-        createRequest.set_allocated_workflow(&workflow);
+        createRequest.set_allocated_workflow(new DataMovementWorkflow(workflow));
         createRequest.set_source("YOUR-SOURCE");
         createRequest.set_destination("YOUR-DESTINATION");
 
         DataMovementCreateResponse createResponse;
 
         Status status = client.stub_->Create(&context, createRequest, &createResponse);
+
         if (!status.ok()) {
             std::cout << "Create RPC FAILED: " << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -86,17 +87,18 @@ int main(int argc, char** argv) {
 
         uid = createResponse.uid();
     }
-    
+
     {
         ClientContext context;
 
         DataMovementStatusRequest statusRequest;
-        statusRequest.set_allocated_workflow(&workflow);
+        statusRequest.set_allocated_workflow(new DataMovementWorkflow(workflow));
         statusRequest.set_uid(uid);
 
         DataMovementStatusResponse statusResponse;
 
         Status status = client.stub_->Status(&context, statusRequest, &statusResponse);
+
         if (!status.ok()) {
             std::cout << "Status RPC FAILED: " << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
@@ -116,12 +118,13 @@ int main(int argc, char** argv) {
         ClientContext context;
 
         DataMovementDeleteRequest deleteRequest;
-        deleteRequest.set_allocated_workflow(&workflow);
+        deleteRequest.set_allocated_workflow(new DataMovementWorkflow(workflow));
         deleteRequest.set_uid(uid);
 
         DataMovementDeleteResponse deleteResponse;
 
         Status status = client.stub_->Delete(&context, deleteRequest, &deleteResponse);
+
         if (!status.ok()) {
             std::cout << "Delete RPC FAILED: " << status.error_code() << ": " << status.error_message() << std::endl;
             return 1;
