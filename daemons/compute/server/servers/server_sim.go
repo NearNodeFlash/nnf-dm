@@ -22,20 +22,29 @@ package server
 import (
 	"context"
 	"fmt"
+	"time"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 	"github.com/google/uuid"
 )
 
+// For a StatusResponse, how many times should we return RUNNING before COMPLETE
+const statusResponseRunningCount = 1
+
 // Simulated server implements a simple Data Mover Server that accepts and completes all data movemement requests.
 type simulatedServer struct {
 	pb.UnimplementedDataMoverServer
 
-	requests map[uuid.UUID]interface{}
+	requests map[uuid.UUID]requestData
+}
+
+type requestData struct {
+	// Keep track of how many status responses we've sent to facilitate sending RUNNING before COMPLETE
+	statusResponseCount int
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
-	return &simulatedServer{requests: make(map[uuid.UUID]interface{})}, nil
+	return &simulatedServer{requests: make(map[uuid.UUID]requestData)}, nil
 }
 
 func (s *simulatedServer) StartManager() error {
@@ -45,7 +54,7 @@ func (s *simulatedServer) StartManager() error {
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 
-	s.requests[uid] = nil
+	s.requests[uid] = requestData{statusResponseCount: 0}
 
 	return &pb.DataMovementCreateResponse{Uid: uid.String()}, nil
 }
@@ -54,25 +63,49 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 	uid, err := uuid.Parse(req.Uid)
 	if err != nil {
 		return &pb.DataMovementStatusResponse{
-			State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
-			Status:  pb.DataMovementStatusResponse_INVALID,
-			Message: fmt.Sprintf("Request %s is invalid", req.Uid),
+			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
+			Status:        pb.DataMovementStatusResponse_INVALID,
+			Message:       fmt.Sprintf("Request %s is invalid", req.Uid),
+			CommandStatus: nil,
 		}, nil
 	}
 
-	if _, ok := s.requests[uid]; !ok {
+	reqData, ok := s.requests[uid]
+	if !ok {
 		return &pb.DataMovementStatusResponse{
-			State:   pb.DataMovementStatusResponse_UNKNOWN_STATE,
-			Status:  pb.DataMovementStatusResponse_NOT_FOUND,
-			Message: fmt.Sprintf("Request %s not found", req.Uid),
+			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
+			Status:        pb.DataMovementStatusResponse_NOT_FOUND,
+			Message:       fmt.Sprintf("Request %s not found", req.Uid),
+			CommandStatus: nil,
 		}, nil
 	}
 
-	return &pb.DataMovementStatusResponse{
-		State:   pb.DataMovementStatusResponse_COMPLETED,
-		Status:  pb.DataMovementStatusResponse_SUCCESS,
-		Message: fmt.Sprintf("Request %s completed successfully", req.Uid),
-	}, nil
+	resp := pb.DataMovementStatusResponse{}
+	resp.CommandStatus = &pb.DataMovementCommandStatus{}
+	cmd := "mpirun -np 1 dcp --progress 1 src dest"
+
+	// Send RUNNING status first, then COMPLETED
+	if reqData.statusResponseCount < statusResponseRunningCount {
+		resp.State = pb.DataMovementStatusResponse_RUNNING
+		resp.CommandStatus.Command = cmd
+		resp.CommandStatus.Progress = 50
+		resp.CommandStatus.ElapsedTime = (3*time.Second + 139*time.Millisecond).String()
+		resp.CommandStatus.LastMessage = "Copied 5.000 GiB (50%) in 3.139 secs (1.480 GiB/s) 1 secs left ..."
+		resp.CommandStatus.LastMessageTime = time.Now().Local().String()
+		reqData.statusResponseCount += 1
+		s.requests[uid] = reqData
+	} else {
+		resp.State = pb.DataMovementStatusResponse_COMPLETED
+		resp.Status = pb.DataMovementStatusResponse_SUCCESS
+		resp.Message = fmt.Sprintf("Request %s completed successfully", req.Uid)
+		resp.CommandStatus.Command = cmd
+		resp.CommandStatus.Progress = 100
+		resp.CommandStatus.ElapsedTime = (6*time.Second + 755*time.Millisecond).String()
+		resp.CommandStatus.LastMessage = "Copied 10.000 GiB (100%) in 6.755 secs (1.480 GiB/s) done"
+		resp.CommandStatus.LastMessageTime = time.Now().String()
+	}
+
+	return &resp, nil
 }
 
 func (s *simulatedServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRequest) (*pb.DataMovementDeleteResponse, error) {
