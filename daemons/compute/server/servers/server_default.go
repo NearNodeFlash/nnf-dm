@@ -22,10 +22,10 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -111,7 +111,7 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			return nil, fmt.Errorf("nnf data movement service token not defined")
 		}
 
-		token, err := ioutil.ReadFile(opts.tokenFile)
+		token, err := os.ReadFile(opts.tokenFile)
 		if err != nil {
 			return nil, fmt.Errorf("nnf data movement service token failed to read")
 		}
@@ -179,7 +179,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(ce event.CreateEvent) bool { return false },
 		UpdateFunc: func(ue event.UpdateEvent) bool {
-			if initiator, _ := ue.ObjectNew.GetLabels()[dmctrl.InitiatorLabel]; initiator == s.name {
+			if initiator := ue.ObjectNew.GetLabels()[dmctrl.InitiatorLabel]; initiator == s.name {
 				return true
 			}
 			return false
@@ -480,7 +480,29 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 			fmt.Errorf("failed to decode returned status")
 	}
 
-	return &pb.DataMovementStatusResponse{State: state, Status: status, Message: dm.Status.Message}, nil
+	cmdStatus := pb.DataMovementCommandStatus{}
+	if dm.Status.CommandStatus != nil {
+		cmdStatus.Command = dm.Status.CommandStatus.Command
+		cmdStatus.LastMessage = dm.Status.CommandStatus.LastMessage
+
+		if dm.Status.CommandStatus.ElapsedTime.Duration > 0 {
+			d := dm.Status.CommandStatus.ElapsedTime.Truncate(time.Millisecond)
+			cmdStatus.ElapsedTime = d.String()
+		}
+		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.UTC().String()
+		}
+		if dm.Status.CommandStatus.ProgressPercentage != nil {
+			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
+		}
+	}
+
+	return &pb.DataMovementStatusResponse{
+		State:         state,
+		Status:        status,
+		Message:       dm.Status.Message,
+		CommandStatus: &cmdStatus,
+	}, nil
 }
 
 func (s *defaultServer) notifyCompletion(name string) {
@@ -505,7 +527,7 @@ func (s *defaultServer) waitForCompletionOrTimeout(req *pb.DataMovementStatusReq
 	go func() {
 
 		s.cond.L.Lock()
-		for true {
+		for {
 			if _, found := s.completions[req.Uid]; found || timeout {
 				break
 			}

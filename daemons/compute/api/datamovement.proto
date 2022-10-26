@@ -53,6 +53,20 @@ message DataMovementWorkflow {
     string name = 1;
     string namespace = 2;
 }
+
+// Data Movement workflows contain a CommandStatus object in the Status object. This information
+// relays the current state of the data movement progress. It includes the command, the progress
+// percentage (e.g. 0-100%), elapsed time of the data movement (duration string, e.g. 5s), the last
+// received message from the data movment command, and the time of that last message.
+message DataMovementCommandStatus {
+    string command = 1;
+    int32 progress = 2;
+    string elapsedTime = 3;
+    string lastMessage = 4;
+    string lastMessageTime = 5;
+
+}
+
 // The data movement create request message containing the source and destination files or directories. The
 // NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
 // a new data movement request where the copy is simulated and not executed
@@ -109,6 +123,7 @@ message DataMovementStatusResponse {
     }
     Status status = 2;
     string message = 3;
+    DataMovementCommandStatus commandStatus = 4;
 }
 
 // The data movement delete request permits users to delete a completed data movement request (any request with a 

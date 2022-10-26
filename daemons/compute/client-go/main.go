@@ -106,14 +106,14 @@ func main() {
 		for {
 			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, uid, *maxWaitTime)
 			if err != nil {
-				log.Fatalf("failed to get dat movement status: %v", err)
+				log.Fatalf("failed to get data movement status: %v", err)
 			}
 
 			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
 				log.Fatalf("data movement status failed: %+v", statusResponse)
 			}
 
-			log.Printf("Data movement status %+v", statusResponse)
+			log.Printf("Data movement status: %+v", statusResponse)
 			if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
 				break
 			}

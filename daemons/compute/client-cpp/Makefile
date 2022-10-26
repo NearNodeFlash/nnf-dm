@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HOST_SYTEM = $(shell uname | cut -f 1 -d_)
+HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
 SYSTEM ?= $(HOST_SYSTEM)
 
 CXX = g++
@@ -45,7 +45,7 @@ client : datamovement.pb.o datamovement.grpc.pb.o client.o
 
 .PRECIOUS : %.grpc.pb.cc
 %.grpc.pb.cc : %.proto
-	$(PROTOC) --proto_path=$(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
+	$(PROTOC) --proto_path=$(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGINPATH) $<
 
 .PRECIOUS : %.pb.cc
 %.pb.cc : %.proto
