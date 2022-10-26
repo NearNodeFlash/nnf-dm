@@ -22,7 +22,7 @@ To generate the gRPC client interfaces from our .proto service definition, use t
 Ensure you are in the `client-cpp/cmake/build` directory before running the following `make`:
 
 ```shell
-make datamovement.grpc.pb.o
+make
 ```
 
 Running this command generate the following files in your current directory:

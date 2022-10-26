@@ -28,15 +28,23 @@ import (
 	"github.com/google/uuid"
 )
 
+// For a StatusResponse, how many times should we return RUNNING before COMPLETE
+const statusResponseRunningCount = 1
+
 // Simulated server implements a simple Data Mover Server that accepts and completes all data movemement requests.
 type simulatedServer struct {
 	pb.UnimplementedDataMoverServer
 
-	requests map[uuid.UUID]interface{}
+	requests map[uuid.UUID]requestData
+}
+
+type requestData struct {
+	// Keep track of how many status responses we've sent to facilitate sending RUNNING before COMPLETE
+	statusResponseCount int
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
-	return &simulatedServer{requests: make(map[uuid.UUID]interface{})}, nil
+	return &simulatedServer{requests: make(map[uuid.UUID]requestData)}, nil
 }
 
 func (s *simulatedServer) StartManager() error {
@@ -46,17 +54,14 @@ func (s *simulatedServer) StartManager() error {
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 
-	s.requests[uid] = nil
+	s.requests[uid] = requestData{statusResponseCount: 0}
 
 	return &pb.DataMovementCreateResponse{Uid: uid.String()}, nil
 }
 
-var statusCount int = 1
-
 func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatusRequest) (*pb.DataMovementStatusResponse, error) {
 	uid, err := uuid.Parse(req.Uid)
 	if err != nil {
-		statusCount = 1
 		return &pb.DataMovementStatusResponse{
 			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
 			Status:        pb.DataMovementStatusResponse_INVALID,
@@ -65,8 +70,8 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		}, nil
 	}
 
-	if _, ok := s.requests[uid]; !ok {
-		statusCount = 1
+	reqData, ok := s.requests[uid]
+	if !ok {
 		return &pb.DataMovementStatusResponse{
 			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
 			Status:        pb.DataMovementStatusResponse_NOT_FOUND,
@@ -79,15 +84,16 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 	resp.CommandStatus = &pb.DataMovementCommandStatus{}
 	cmd := "mpirun -np 1 dcp --progress 1 src dest"
 
-	// Send a RUNNING status first, then a COMPLETED
-	if statusCount < 2 {
+	// Send RUNNING status first, then COMPLETED
+	if reqData.statusResponseCount < statusResponseRunningCount {
 		resp.State = pb.DataMovementStatusResponse_RUNNING
 		resp.CommandStatus.Command = cmd
 		resp.CommandStatus.Progress = 50
 		resp.CommandStatus.ElapsedTime = (3*time.Second + 139*time.Millisecond).String()
 		resp.CommandStatus.LastMessage = "Copied 5.000 GiB (50%) in 3.139 secs (1.480 GiB/s) 1 secs left ..."
 		resp.CommandStatus.LastMessageTime = time.Now().Local().String()
-		statusCount += 1
+		reqData.statusResponseCount += 1
+		s.requests[uid] = reqData
 	} else {
 		resp.State = pb.DataMovementStatusResponse_COMPLETED
 		resp.Status = pb.DataMovementStatusResponse_SUCCESS
@@ -97,7 +103,6 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		resp.CommandStatus.ElapsedTime = (6*time.Second + 755*time.Millisecond).String()
 		resp.CommandStatus.LastMessage = "Copied 10.000 GiB (100%) in 6.755 secs (1.480 GiB/s) done"
 		resp.CommandStatus.LastMessageTime = time.Now().String()
-		statusCount = 1
 	}
 
 	return &resp, nil
