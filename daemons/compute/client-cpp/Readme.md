@@ -15,17 +15,15 @@ cd cmake/build
 cmake -DCMAKE_PREFIX_PATH=$MY_INSTALL_DIR ../..
 ```
 
-### Generating client code
+### Generating client code and interfaces
 
-To generate the gRPC client interfaces from our .proto service definition, use the `protoc` protocol buffer compiler with the gRPC C++ plugin.
-
-Ensure you are in the `client-cpp/cmake/build` directory before running the following `make`:
+Ensure you are in the `client-cpp/cmake/build/` directory before running the following `make`:
 
 ```shell
 make
 ```
 
-Running this command generate the following files in your current directory:
+Running this command will generate the following files in the `client-cpp/cmake/build/` directory:
 
 - `datamovement.pb.h`, the header which declares your generated message classes
 - `datamovement.pb.cc`, which contains the implementation of your message classes
