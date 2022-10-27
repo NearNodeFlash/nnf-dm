@@ -28,8 +28,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// For a StatusResponse, how many times should we return RUNNING before COMPLETE
-const statusResponseRunningCount = 1
+const (
+	// For a StatusResponse, how many times should we return RUNNING before COMPLETE
+	statusResponseRunningCount = 1
+
+	// For a StatusResponse, how many times should we return CANCELLING before COMPLETE
+	statusResponseCancellingCount = 1
+)
 
 // Simulated server implements a simple Data Mover Server that accepts and completes all data movemement requests.
 type simulatedServer struct {
@@ -41,6 +46,7 @@ type simulatedServer struct {
 type requestData struct {
 	// Keep track of how many status responses we've sent to facilitate sending RUNNING before COMPLETE
 	statusResponseCount int
+	cancelResponseCount int
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
@@ -54,7 +60,7 @@ func (s *simulatedServer) StartManager() error {
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 
-	s.requests[uid] = requestData{statusResponseCount: 0}
+	s.requests[uid] = requestData{statusResponseCount: 0, cancelResponseCount: 0}
 
 	return &pb.DataMovementCreateResponse{Uid: uid.String()}, nil
 }
@@ -84,8 +90,15 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 	resp.CommandStatus = &pb.DataMovementCommandStatus{}
 	cmd := "mpirun -np 1 dcp --progress 1 src dest"
 
-	// Send RUNNING status first, then COMPLETED
-	if reqData.statusResponseCount < statusResponseRunningCount {
+	// If a request was cancelled, send a CANCELLING response first, then COMPLETE
+	if reqData.cancelResponseCount > 0 && reqData.cancelResponseCount <= statusResponseCancellingCount {
+		resp.State = pb.DataMovementStatusResponse_CANCELLING
+		reqData.cancelResponseCount += 1
+	} else if reqData.cancelResponseCount > statusResponseCancellingCount {
+		resp.State = pb.DataMovementStatusResponse_COMPLETED
+		resp.Status = pb.DataMovementStatusResponse_CANCELLED
+		// Otherwise, send RUNNING status first, then COMPLETED
+	} else if reqData.statusResponseCount < statusResponseRunningCount {
 		resp.State = pb.DataMovementStatusResponse_RUNNING
 		resp.CommandStatus.Command = cmd
 		resp.CommandStatus.Progress = 50
@@ -93,7 +106,6 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		resp.CommandStatus.LastMessage = "Copied 5.000 GiB (50%) in 3.139 secs (1.480 GiB/s) 1 secs left ..."
 		resp.CommandStatus.LastMessageTime = time.Now().Local().String()
 		reqData.statusResponseCount += 1
-		s.requests[uid] = reqData
 	} else {
 		resp.State = pb.DataMovementStatusResponse_COMPLETED
 		resp.Status = pb.DataMovementStatusResponse_SUCCESS
@@ -104,6 +116,8 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		resp.CommandStatus.LastMessage = "Copied 10.000 GiB (100%) in 6.755 secs (1.480 GiB/s) done"
 		resp.CommandStatus.LastMessageTime = time.Now().String()
 	}
+
+	s.requests[uid] = reqData
 
 	return &resp, nil
 }
@@ -155,12 +169,17 @@ func (s *simulatedServer) Cancel(ctx context.Context, req *pb.DataMovementCancel
 		}, nil
 	}
 
-	if _, ok := s.requests[uid]; !ok {
+	reqData, ok := s.requests[uid]
+	if !ok {
 		return &pb.DataMovementCancelResponse{
 			Status:  pb.DataMovementCancelResponse_NOT_FOUND,
 			Message: fmt.Sprintf("Request %s not found", uid),
 		}, nil
 	}
+
+	// Set the count so we can use Status to get cancel statuses
+	reqData.cancelResponseCount = 1
+	s.requests[uid] = reqData
 
 	return &pb.DataMovementCancelResponse{
 		Status:  pb.DataMovementCancelResponse_SUCCESS,

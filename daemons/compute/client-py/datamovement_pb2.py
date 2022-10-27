@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x64\x61tamovement.proto\x12\x0c\x64\x61tamovement\"7\n\x14\x44\x61taMovementWorkflow\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t\"\x81\x01\n\x19\x44\x61taMovementCommandStatus\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\t\x12\x10\n\x08progress\x18\x02 \x01(\x05\x12\x13\n\x0b\x65lapsedTime\x18\x03 \x01(\t\x12\x13\n\x0blastMessage\x18\x04 \x01(\t\x12\x17\n\x0flastMessageTime\x18\x05 \x01(\t\"\x86\x01\n\x19\x44\x61taMovementCreateRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0e\n\x06source\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x03 \x01(\t\x12\x0e\n\x06\x64ryrun\x18\x04 \x01(\x08\"\xab\x01\n\x1a\x44\x61taMovementCreateResponse\x12\x0b\n\x03uid\x18\x01 \x01(\t\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementCreateResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\".\n\x06Status\x12\x0b\n\x07SUCCESS\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\x12\x0b\n\x07INVALID\x10\x02\"s\n\x19\x44\x61taMovementStatusRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\x12\x13\n\x0bmaxWaitTime\x18\x03 \x01(\x03\"\xa2\x03\n\x1a\x44\x61taMovementStatusResponse\x12=\n\x05state\x18\x01 \x01(\x0e\x32..datamovement.DataMovementStatusResponse.State\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementStatusResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\x12>\n\rcommandStatus\x18\x04 \x01(\x0b\x32\'.datamovement.DataMovementCommandStatus\"Q\n\x05State\x12\x0b\n\x07PENDING\x10\x00\x12\x0c\n\x08STARTING\x10\x01\x12\x0b\n\x07RUNNING\x10\x02\x12\r\n\tCOMPLETED\x10\x03\x12\x11\n\rUNKNOWN_STATE\x10\x04\"`\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\r\n\tCANCELLED\x10\x04\x12\x12\n\x0eUNKNOWN_STATUS\x10\x05\"^\n\x19\x44\x61taMovementDeleteRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\"\xba\x01\n\x1a\x44\x61taMovementDeleteResponse\x12?\n\x06status\x18\x01 \x01(\x0e\x32/.datamovement.DataMovementDeleteResponse.Status\x12\x0f\n\x07message\x18\x02 \x01(\t\"J\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x41\x43TIVE\x10\x03\x12\x0b\n\x07UNKNOWN\x10\x04\"O\n\x17\x44\x61taMovementListRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\"(\n\x18\x44\x61taMovementListResponse\x12\x0c\n\x04uids\x18\x01 \x03(\t\"^\n\x19\x44\x61taMovementCancelRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\"\xad\x01\n\x1a\x44\x61taMovementCancelResponse\x12?\n\x06status\x18\x01 \x01(\x0e\x32/.datamovement.DataMovementCancelResponse.Status\x12\x0f\n\x07message\x18\x02 \x01(\t\"=\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x32\xe0\x03\n\tDataMover\x12]\n\x06\x43reate\x12\'.datamovement.DataMovementCreateRequest\x1a(.datamovement.DataMovementCreateResponse\"\x00\x12]\n\x06Status\x12\'.datamovement.DataMovementStatusRequest\x1a(.datamovement.DataMovementStatusResponse\"\x00\x12]\n\x06\x44\x65lete\x12\'.datamovement.DataMovementDeleteRequest\x1a(.datamovement.DataMovementDeleteResponse\"\x00\x12W\n\x04List\x12%.datamovement.DataMovementListRequest\x1a&.datamovement.DataMovementListResponse\"\x00\x12]\n\x06\x43\x61ncel\x12\'.datamovement.DataMovementCancelRequest\x1a(.datamovement.DataMovementCancelResponse\"\x00\x42W\n\x1d\x63om.hpe.cray.nnf.datamovementB\x11\x44\x61taMovementProtoP\x01Z!nnf.cray.hpe.com/datamovement/apib\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x64\x61tamovement.proto\x12\x0c\x64\x61tamovement\"7\n\x14\x44\x61taMovementWorkflow\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t\"\x81\x01\n\x19\x44\x61taMovementCommandStatus\x12\x0f\n\x07\x63ommand\x18\x01 \x01(\t\x12\x10\n\x08progress\x18\x02 \x01(\x05\x12\x13\n\x0b\x65lapsedTime\x18\x03 \x01(\t\x12\x13\n\x0blastMessage\x18\x04 \x01(\t\x12\x17\n\x0flastMessageTime\x18\x05 \x01(\t\"\x86\x01\n\x19\x44\x61taMovementCreateRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0e\n\x06source\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65stination\x18\x03 \x01(\t\x12\x0e\n\x06\x64ryrun\x18\x04 \x01(\x08\"\xab\x01\n\x1a\x44\x61taMovementCreateResponse\x12\x0b\n\x03uid\x18\x01 \x01(\t\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementCreateResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\".\n\x06Status\x12\x0b\n\x07SUCCESS\x10\x00\x12\n\n\x06\x46\x41ILED\x10\x01\x12\x0b\n\x07INVALID\x10\x02\"s\n\x19\x44\x61taMovementStatusRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\x12\x13\n\x0bmaxWaitTime\x18\x03 \x01(\x03\"\xb2\x03\n\x1a\x44\x61taMovementStatusResponse\x12=\n\x05state\x18\x01 \x01(\x0e\x32..datamovement.DataMovementStatusResponse.State\x12?\n\x06status\x18\x02 \x01(\x0e\x32/.datamovement.DataMovementStatusResponse.Status\x12\x0f\n\x07message\x18\x03 \x01(\t\x12>\n\rcommandStatus\x18\x04 \x01(\x0b\x32\'.datamovement.DataMovementCommandStatus\"a\n\x05State\x12\x0b\n\x07PENDING\x10\x00\x12\x0c\n\x08STARTING\x10\x01\x12\x0b\n\x07RUNNING\x10\x02\x12\r\n\tCOMPLETED\x10\x03\x12\x0e\n\nCANCELLING\x10\x04\x12\x11\n\rUNKNOWN_STATE\x10\x05\"`\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\r\n\tCANCELLED\x10\x04\x12\x12\n\x0eUNKNOWN_STATUS\x10\x05\"^\n\x19\x44\x61taMovementDeleteRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\"\xba\x01\n\x1a\x44\x61taMovementDeleteResponse\x12?\n\x06status\x18\x01 \x01(\x0e\x32/.datamovement.DataMovementDeleteResponse.Status\x12\x0f\n\x07message\x18\x02 \x01(\t\"J\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x41\x43TIVE\x10\x03\x12\x0b\n\x07UNKNOWN\x10\x04\"O\n\x17\x44\x61taMovementListRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\"(\n\x18\x44\x61taMovementListResponse\x12\x0c\n\x04uids\x18\x01 \x03(\t\"^\n\x19\x44\x61taMovementCancelRequest\x12\x34\n\x08workflow\x18\x01 \x01(\x0b\x32\".datamovement.DataMovementWorkflow\x12\x0b\n\x03uid\x18\x02 \x01(\t\"\xad\x01\n\x1a\x44\x61taMovementCancelResponse\x12?\n\x06status\x18\x01 \x01(\x0e\x32/.datamovement.DataMovementCancelResponse.Status\x12\x0f\n\x07message\x18\x02 \x01(\t\"=\n\x06Status\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tNOT_FOUND\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x32\xe0\x03\n\tDataMover\x12]\n\x06\x43reate\x12\'.datamovement.DataMovementCreateRequest\x1a(.datamovement.DataMovementCreateResponse\"\x00\x12]\n\x06Status\x12\'.datamovement.DataMovementStatusRequest\x1a(.datamovement.DataMovementStatusResponse\"\x00\x12]\n\x06\x44\x65lete\x12\'.datamovement.DataMovementDeleteRequest\x1a(.datamovement.DataMovementDeleteResponse\"\x00\x12W\n\x04List\x12%.datamovement.DataMovementListRequest\x1a&.datamovement.DataMovementListResponse\"\x00\x12]\n\x06\x43\x61ncel\x12\'.datamovement.DataMovementCancelRequest\x1a(.datamovement.DataMovementCancelResponse\"\x00\x42W\n\x1d\x63om.hpe.cray.nnf.datamovementB\x11\x44\x61taMovementProtoP\x01Z!nnf.cray.hpe.com/datamovement/apib\x06proto3')
 
 
 
@@ -137,27 +137,27 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _DATAMOVEMENTSTATUSREQUEST._serialized_start=536
   _DATAMOVEMENTSTATUSREQUEST._serialized_end=651
   _DATAMOVEMENTSTATUSRESPONSE._serialized_start=654
-  _DATAMOVEMENTSTATUSRESPONSE._serialized_end=1072
+  _DATAMOVEMENTSTATUSRESPONSE._serialized_end=1088
   _DATAMOVEMENTSTATUSRESPONSE_STATE._serialized_start=893
-  _DATAMOVEMENTSTATUSRESPONSE_STATE._serialized_end=974
-  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_start=976
-  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_end=1072
-  _DATAMOVEMENTDELETEREQUEST._serialized_start=1074
-  _DATAMOVEMENTDELETEREQUEST._serialized_end=1168
-  _DATAMOVEMENTDELETERESPONSE._serialized_start=1171
-  _DATAMOVEMENTDELETERESPONSE._serialized_end=1357
-  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_start=1283
-  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_end=1357
-  _DATAMOVEMENTLISTREQUEST._serialized_start=1359
-  _DATAMOVEMENTLISTREQUEST._serialized_end=1438
-  _DATAMOVEMENTLISTRESPONSE._serialized_start=1440
-  _DATAMOVEMENTLISTRESPONSE._serialized_end=1480
-  _DATAMOVEMENTCANCELREQUEST._serialized_start=1482
-  _DATAMOVEMENTCANCELREQUEST._serialized_end=1576
-  _DATAMOVEMENTCANCELRESPONSE._serialized_start=1579
-  _DATAMOVEMENTCANCELRESPONSE._serialized_end=1752
-  _DATAMOVEMENTCANCELRESPONSE_STATUS._serialized_start=976
-  _DATAMOVEMENTCANCELRESPONSE_STATUS._serialized_end=1037
-  _DATAMOVER._serialized_start=1755
-  _DATAMOVER._serialized_end=2235
+  _DATAMOVEMENTSTATUSRESPONSE_STATE._serialized_end=990
+  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_start=992
+  _DATAMOVEMENTSTATUSRESPONSE_STATUS._serialized_end=1088
+  _DATAMOVEMENTDELETEREQUEST._serialized_start=1090
+  _DATAMOVEMENTDELETEREQUEST._serialized_end=1184
+  _DATAMOVEMENTDELETERESPONSE._serialized_start=1187
+  _DATAMOVEMENTDELETERESPONSE._serialized_end=1373
+  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_start=1299
+  _DATAMOVEMENTDELETERESPONSE_STATUS._serialized_end=1373
+  _DATAMOVEMENTLISTREQUEST._serialized_start=1375
+  _DATAMOVEMENTLISTREQUEST._serialized_end=1454
+  _DATAMOVEMENTLISTRESPONSE._serialized_start=1456
+  _DATAMOVEMENTLISTRESPONSE._serialized_end=1496
+  _DATAMOVEMENTCANCELREQUEST._serialized_start=1498
+  _DATAMOVEMENTCANCELREQUEST._serialized_end=1592
+  _DATAMOVEMENTCANCELRESPONSE._serialized_start=1595
+  _DATAMOVEMENTCANCELRESPONSE._serialized_end=1768
+  _DATAMOVEMENTCANCELRESPONSE_STATUS._serialized_start=992
+  _DATAMOVEMENTCANCELRESPONSE_STATUS._serialized_end=1053
+  _DATAMOVER._serialized_start=1771
+  _DATAMOVER._serialized_end=2251
 # @@protoc_insertion_point(module_scope)

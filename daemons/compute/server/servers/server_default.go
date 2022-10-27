@@ -463,6 +463,10 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 			fmt.Errorf("failed to decode returned state")
 	}
 
+	if state != pb.DataMovementStatusResponse_COMPLETED && dm.Spec.Cancel {
+		state = pb.DataMovementStatusResponse_CANCELLING
+	}
+
 	statusMap := map[string]pb.DataMovementStatusResponse_Status{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
 		nnfv1alpha1.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,

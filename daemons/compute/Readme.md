@@ -142,6 +142,7 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 | 1 | Starting | The request was created and is in the act of starting |
 | 2 | Running | The data movement request is actively running |
 | 3 | Completed | The data movement request has completed |
+| 4 | Cancelling | The data movement request has started the cancellation process |
 
 #### Status Response `Status`
 
@@ -183,9 +184,13 @@ requests that match both `namespace` and `workflow`.
 ## Cancel a data movement request
 
 Data movement requests can be cancelled after creation of a data movement request. Cancel Responses
-will be sent back after the Cancellation has been successfully (or unsuccessfully) initiated. The user
-can then use a Status Request to verify the end result of the data movement request to ensure the
-cancellation was successful.
+will be sent back after the Cancellation has been successfully (or unsuccessfully) initiated. The
+user can then poll with a Status Request to verify the end result of the data movement request to
+ensure the cancellation was successful.
+
+While the data movement is being cancelled, a Status Response will report a state of `Cancelling`
+until the Cancellation is complete. At that time, a state of `Completed` with a status of
+`Cancelled` will be returned. See the Status Response section above.
 
 ### Cancel Request
 

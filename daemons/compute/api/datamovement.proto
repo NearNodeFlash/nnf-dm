@@ -109,7 +109,8 @@ message DataMovementStatusResponse {
         STARTING = 1;
         RUNNING = 2;
         COMPLETED = 3;
-        UNKNOWN_STATE = 4;
+        CANCELLING = 4;
+        UNKNOWN_STATE = 5;
     }
     State state = 1;
 
