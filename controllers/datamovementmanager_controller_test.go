@@ -141,12 +141,19 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		lustre := &lusv1alpha1.LustreFileSystem{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
-				Namespace: dmv1alpha1.DataMovementNamespace,
+				Namespace: corev1.NamespaceDefault,
 			},
 			Spec: lusv1alpha1.LustreFileSystemSpec{
 				Name:      "global",
 				MgsNids:   "127.0.0.1@tcp",
 				MountRoot: "/mnt/global",
+				Namespaces: map[string]lusv1alpha1.LustreFileSystemNamespaceSpec{
+					dmv1alpha1.DataMovementNamespace: {
+						Modes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteMany,
+						},
+					},
+				},
 			},
 		}
 

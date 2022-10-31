@@ -155,7 +155,8 @@ type managerController struct{}
 
 func (*managerController) GetType() string { return ManagerController }
 func (*managerController) SetOptions(opts *ctrl.Options) {
-	opts.Namespace = dmv1alpha1.DataMovementNamespace
+	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace}
+	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
 }
 
 func (c *managerController) SetupReconcilers(mgr manager.Manager) (err error) {

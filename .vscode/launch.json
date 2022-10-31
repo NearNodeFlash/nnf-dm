@@ -38,24 +38,6 @@
             ]
         },
         {
-            "name": "Test Current File (Nate)",
-            "type": "go",
-            "request": "launch",
-            "mode": "test",
-            "program": "${relativeFileDirname}",
-            "args": [
-                "-ginkgo.v",
-                "-ginkgo.progress",
-                "-ginkgo.fail-fast",
-            ],
-            "env": {
-                "KUBEBUILDER_ASSETS": "/Users/roiger/Library/Application Support/io.kubebuilder.envtest/k8s/1.22.1-darwin-amd64",
-                "GOMEGA_DEFAULT_EVENTUALLY_TIMEOUT": "10m",
-                "GOMEGA_DEFAULT_EVENTUALLY_POLLING_INTERVAL": "500ms",
-            },
-            "showLog": true
-        },
-        {
             "name": "Debug Example C++ Library Client",
             "type": "cppdbg",
             "request": "launch",
