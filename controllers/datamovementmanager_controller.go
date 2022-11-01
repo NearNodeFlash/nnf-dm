@@ -49,8 +49,6 @@ import (
 	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
-
-	lus "github.com/NearNodeFlash/lustre-fs-operator/controllers"
 )
 
 const (
@@ -414,7 +412,7 @@ func setupLustreVolumes(ctx context.Context, manager *dmv1alpha1.DataMovementMan
 			Name: fs.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: fs.Name + lus.PersistentVolumeClaimSuffix,
+					ClaimName: fs.PersistentVolumeClaimName(manager.Namespace, corev1.ReadWriteMany),
 				},
 			},
 		}
