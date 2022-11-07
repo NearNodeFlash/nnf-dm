@@ -428,7 +428,8 @@ func getCmdAndArgs(cmCommand string, cmNumProcesses int, progressInterval int, h
 			"--host", strings.Join(hosts, ","),
 			"dcp",
 			"--progress", fmt.Sprintf("%d", progressInterval),
-			fmt.Sprintf("-U %d -G %d", dm.Spec.UserId, dm.Spec.GroupId),
+			"--uid", fmt.Sprintf("%d", dm.Spec.UserId),
+			"--gid", fmt.Sprintf("%d", dm.Spec.GroupId),
 			dm.Spec.Source.Path, dm.Spec.Destination.Path,
 		}
 	}

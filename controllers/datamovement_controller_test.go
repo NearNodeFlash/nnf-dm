@@ -207,7 +207,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 17 --host localhost dcp --progress 1 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 17 --host localhost dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 
 		AfterEach(func() {
@@ -230,7 +230,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 	})
 
@@ -249,7 +249,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 	})
 
@@ -306,7 +306,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 7 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 7 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 	})
 
@@ -325,7 +325,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 	})
 
@@ -344,7 +344,7 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U 0 -G 0 %s %s", srcPath, destPath)))
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
 		})
 	})
 
@@ -592,26 +592,8 @@ var _ = Describe("Data Movement Test" /*Ordered, (Ginkgo v2)*/, func() {
 				}
 				return cmd
 			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U %d -G %d %s %s",
+				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 --uid %d --gid %d %s %s",
 				expectedUid, expectedGid, srcPath, destPath)))
-		})
-	})
-
-	Context("when the data movement operation has uid and gid set to 0", func() {
-		BeforeEach(func() {
-			cm.Data[configMapKeyCmd] = ""
-		})
-		It("should have -U and -G in the data movement dcp command", func() {
-			Eventually(func(g Gomega) string {
-				cmd := ""
-				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-				if dm.Status.CommandStatus != nil {
-					cmd = dm.Status.CommandStatus.Command
-				}
-				return cmd
-			}).Should(Equal(fmt.Sprintf(
-				"mpirun --allow-run-as-root -np 1 --host localhost dcp --progress 1 -U %d -G %d %s %s",
-				0, 0, srcPath, destPath)))
 		})
 	})
 })
