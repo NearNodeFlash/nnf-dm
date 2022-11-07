@@ -93,6 +93,11 @@ func (service *Service) Manage() (string, error) {
 		return fmt.Sprintf("Failed to listen at socket %s", *socketAddr), err
 	}
 
+	// Set socket permissions so non-root users can communicate
+	if err = os.Chmod(*socketAddr, 0766); err != nil {
+		return fmt.Sprintf("Failed to set permissions on socket %s", *socketAddr), err
+	}
+
 	go service.Run(server, listener)
 
 	for {
