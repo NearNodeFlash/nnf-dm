@@ -423,11 +423,13 @@ func getCmdAndArgs(cmCommand string, cmNumProcesses int, progressInterval int, h
 
 		cmd = "mpirun"
 		args = []string{
-			"--allow-run-as-root", // TODO: UserId/GroupId
+			"--allow-run-as-root", // required to be able to set dcp uid/gid
 			"-np", fmt.Sprintf("%d", numProcesses),
 			"--host", strings.Join(hosts, ","),
 			"dcp",
 			"--progress", fmt.Sprintf("%d", progressInterval),
+			"--uid", fmt.Sprintf("%d", dm.Spec.UserId),
+			"--gid", fmt.Sprintf("%d", dm.Spec.GroupId),
 			dm.Spec.Source.Path, dm.Spec.Destination.Path,
 		}
 	}

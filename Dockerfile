@@ -51,7 +51,7 @@ ENV CGO_ENABLED=0
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM ghcr.io/nearnodeflash/nnf-mfu:latest
+FROM ghcr.io/nearnodeflash/nnf-mfu:82aa3c4b6655433dacbe3294ad359161c62219c6
 
 RUN apt update
 
