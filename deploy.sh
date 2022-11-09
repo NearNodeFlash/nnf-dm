@@ -55,8 +55,8 @@ undeploy)
     # When the DataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
-    $KUSTOMIZE build config/default | kubectl delete -f - || true
-    $KUSTOMIZE build config/dm_config | kubectl delete -f - || true
+    $KUSTOMIZE build config/default | kubectl delete --ignore-not-found -f -
+    $KUSTOMIZE build config/dm_config | kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage
