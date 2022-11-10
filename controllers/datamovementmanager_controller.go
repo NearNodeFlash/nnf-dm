@@ -103,7 +103,7 @@ type DataMovementManagerReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
 
 // Data Movement Manager watches LustreFileSystems to ensure the volume mounts on the worker nodes are current
-//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -126,19 +126,23 @@ func (r *DataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 
 	if err := r.createSecretIfNecessary(ctx, manager); err != nil {
-		return errorHandler(err, "Create Secret")
+		return errorHandler(err, "create Secret")
 	}
 
 	if err := r.createOrUpdateDeploymentIfNecessary(ctx, manager); err != nil {
-		return errorHandler(err, "Create Deployment")
+		return errorHandler(err, "create or update Deployment")
 	}
 
 	if err := r.createOrUpdateServiceIfNecessary(ctx, manager); err != nil {
-		return errorHandler(err, "Create Or Update Service")
+		return errorHandler(err, "create or update Service")
+	}
+
+	if err := r.updateLustreFileSystemsIfNecessary(ctx, manager); err != nil {
+		return errorHandler(err, "update LustreFileSystems")
 	}
 
 	if err := r.createOrUpdateDaemonSetIfNecessary(ctx, manager); err != nil {
-		return errorHandler(err, "Create Or Update DaemonSet")
+		return errorHandler(err, "create or update DaemonSet")
 	}
 
 	manager.Status.Ready = true
@@ -155,11 +159,11 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 	newSecret := func() (*corev1.Secret, error) {
 		privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
-			return nil, fmt.Errorf("Generating private key failed: %w", err)
+			return nil, fmt.Errorf("generating private key failed: %w", err)
 		}
 		privateDER, err := x509.MarshalECPrivateKey(privateKey)
 		if err != nil {
-			return nil, fmt.Errorf("Converting private key to DER format failed: %w", err)
+			return nil, fmt.Errorf("converting private key to DER format failed: %w", err)
 		}
 
 		privatePEM := pem.EncodeToMemory(&pem.Block{
@@ -169,7 +173,7 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 
 		publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("Generating public key failed: %w", err)
+			return nil, fmt.Errorf("generating public key failed: %w", err)
 		}
 
 		secret := &corev1.Secret{
@@ -185,7 +189,7 @@ func (r *DataMovementManagerReconciler) createSecretIfNecessary(ctx context.Cont
 		}
 
 		if err := ctrl.SetControllerReference(manager, secret, r.Scheme); err != nil {
-			return nil, fmt.Errorf("Setting Secret controller reference failed: %w", err)
+			return nil, fmt.Errorf("setting Secret controller reference failed: %w", err)
 		}
 
 		return secret, nil
@@ -219,7 +223,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx 
 
 	base := &appsv1.Deployment{}
 	if err := r.Get(ctx, client.ObjectKeyFromObject(manager), base); err != nil {
-		return fmt.Errorf("Retrieving base deployment failed %w", err)
+		return fmt.Errorf("retrieving base deployment failed %w", err)
 	}
 
 	deployment := &appsv1.Deployment{
@@ -257,7 +261,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx 
 		setupSSHAuthVolumes(manager, podSpec)
 
 		if err := ctrl.SetControllerReference(manager, deployment, r.Scheme); err != nil {
-			return fmt.Errorf("Setting Deployment controller reference failed: %w", err)
+			return fmt.Errorf("setting Deployment controller reference failed: %w", err)
 		}
 
 		return nil
@@ -295,7 +299,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx con
 		service.Spec.ClusterIP = corev1.ClusterIPNone
 
 		if err := ctrl.SetControllerReference(manager, service, r.Scheme); err != nil {
-			return fmt.Errorf("Setting Service controller reference failed: %w", err)
+			return fmt.Errorf("setting Service controller reference failed: %w", err)
 		}
 
 		return nil
@@ -315,12 +319,43 @@ func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx con
 	return nil
 }
 
+func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
+	log := log.FromContext(ctx)
+
+	filesystems := &lusv1alpha1.LustreFileSystemList{}
+	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
+		return fmt.Errorf("list lustre file systems failed: %w", err)
+	}
+
+	for _, lustre := range filesystems.Items {
+		_, found := lustre.Spec.Namespaces[manager.Namespace]
+		if !found {
+
+			if lustre.Spec.Namespaces == nil {
+				lustre.Spec.Namespaces = make(map[string]lusv1alpha1.LustreFileSystemNamespaceSpec)
+			}
+
+			lustre.Spec.Namespaces[manager.Namespace] = lusv1alpha1.LustreFileSystemNamespaceSpec{
+				Modes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			}
+
+			if err := r.Update(ctx, &lustre); err != nil {
+				return err
+			}
+
+			log.Info("Updated LustreFileSystem", "object", client.ObjectKeyFromObject(&lustre).String(), "namespace", manager.Namespace)
+		}
+	}
+
+	return nil
+}
+
 func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	filesystems := &lusv1alpha1.LustreFileSystemList{}
 	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
-		return fmt.Errorf("List lustre file systems failed: %w", err)
+		return fmt.Errorf("list lustre file systems failed: %w", err)
 	}
 
 	log.Info("LustreFileSystems", "count", len(filesystems.Items))
@@ -355,7 +390,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx c
 		}
 
 		if err := ctrl.SetControllerReference(manager, ds, r.Scheme); err != nil {
-			return fmt.Errorf("Setting DaemonSet controller reference failed: %w", err)
+			return fmt.Errorf("setting DaemonSet controller reference failed: %w", err)
 		}
 
 		return nil
@@ -458,7 +493,7 @@ func findManagerContainer(podSpec *corev1.PodSpec) (*corev1.Container, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Could not locate manager container in pod spec")
+	return nil, fmt.Errorf("could not locate manager container in pod spec")
 }
 
 // SetupWithManager sets up the controller with the Manager.
