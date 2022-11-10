@@ -86,6 +86,8 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - dm.cray.hpe.com
