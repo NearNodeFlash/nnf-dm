@@ -330,7 +330,6 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 	for _, lustre := range filesystems.Items {
 		_, found := lustre.Spec.Namespaces[manager.Namespace]
 		if !found {
-			log.Info("Updating Lustre File System", "object", client.ObjectKeyFromObject(&lustre))
 
 			if lustre.Spec.Namespaces == nil {
 				lustre.Spec.Namespaces = make(map[string]lusv1alpha1.LustreFileSystemNamespaceSpec)
@@ -340,7 +339,11 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 				Modes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			}
 
-			return r.Update(ctx, &lustre)
+			if err := r.Update(ctx, &lustre); err != nil {
+				return err
+			}
+
+			log.Info("Updated LustreFileSystem", "object", client.ObjectKeyFromObject(&lustre).String(), "namespace", manager.Namespace)
 		}
 	}
 
