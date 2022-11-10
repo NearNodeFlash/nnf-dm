@@ -332,6 +332,10 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 		if !found {
 			log.Info("Updating Lustre File System", "object", client.ObjectKeyFromObject(&lustre))
 
+			if lustre.Spec.Namespaces == nil {
+				lustre.Spec.Namespaces = make(map[string]lusv1alpha1.LustreFileSystemNamespaceSpec)
+			}
+
 			lustre.Spec.Namespaces[manager.Namespace] = lusv1alpha1.LustreFileSystemNamespaceSpec{
 				Modes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			}
