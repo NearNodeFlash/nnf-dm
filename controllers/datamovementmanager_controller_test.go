@@ -147,17 +147,17 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 				Name:      "global",
 				MgsNids:   "127.0.0.1@tcp",
 				MountRoot: "/mnt/global",
-				Namespaces: map[string]lusv1alpha1.LustreFileSystemNamespaceSpec{
-					dmv1alpha1.DataMovementNamespace: {
-						Modes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteMany,
-						},
-					},
-				},
 			},
 		}
 
 		Expect(k8sClient.Create(context.TODO(), lustre)).Should(Succeed())
+
+		By("Expect namespace is added to lustre volume")
+
+		Eventually(func(g Gomega) lusv1alpha1.LustreFileSystemNamespaceSpec {
+			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
+			return lustre.Spec.Namespaces[mgr.Namespace]
+		}).ShouldNot(BeNil())
 
 		By("The Volume appears in the daemon set")
 
