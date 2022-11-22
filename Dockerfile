@@ -51,7 +51,7 @@ ENV CGO_ENABLED=0
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM ghcr.io/nearnodeflash/nnf-mfu:82aa3c4b6655433dacbe3294ad359161c62219c6
+FROM ghcr.io/nearnodeflash/nnf-mfu:latest
 
 RUN apt update
 
@@ -60,7 +60,7 @@ RUN apt install -y openmpi-bin
 # TODO Remove this
 RUN apt install -y bash
 
-# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile; 
+# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
 # do not change them unless you know what it is you are doing
 ARG port=2222
 RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
