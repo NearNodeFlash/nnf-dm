@@ -135,7 +135,8 @@ class StatusResponse {
             STATE_STARTING = 1,
             STATE_RUNNING = 2,
             STATE_COMPLETED = 3,
-            STATE_UNKNOWN = 4,
+            STATE_CANCELLING = 4,
+            STATE_UNKNOWN = 5,
         };
 
         enum Status {
