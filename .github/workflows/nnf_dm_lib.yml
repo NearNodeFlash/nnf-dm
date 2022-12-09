@@ -1,0 +1,14 @@
+name: NNF-DM Library Build
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/nearnodeflash/grpc-cxx:latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build nnf-dm lib-cpp
+        run: |
+          cd daemons/compute/lib-cpp
+          cmake -D CMAKE_INSTALL_PREFIX=/opt/grpc .
+          make
