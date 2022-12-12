@@ -89,19 +89,32 @@ type defaultServer struct {
 	completions map[string]struct{}
 }
 
+// Ensure permissions are granted to access the system configuration; this is done so the NNF
+// Node Name can be found given a Node Name.
+//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=systemconfigurations,verbs=get;list;watch
+
 func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
 	var config *rest.Config
 	var err error
 
+	if len(opts.name) == 0 {
+		log.Println("Using system hostname")
+
+		opts.name, err = os.Hostname()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if len(opts.host) == 0 && len(opts.port) == 0 {
-		log.Printf("Using kubeconfig rest configuration")
+		log.Println("Using kubeconfig rest configuration")
 		config, err = ctrl.GetConfig()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		log.Printf("Using default rest configuration")
+		log.Println("Using default rest configuration")
 
 		if len(opts.host) == 0 || len(opts.port) == 0 {
 			return nil, fmt.Errorf("kubernetes service host/port not defined")
@@ -138,6 +151,41 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 	client, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, err
+	}
+
+	if len(opts.nodeName) == 0 {
+		log.Println("Using System Configuration to find NNF Node Name")
+
+		if len(opts.sysConfig) == 0 {
+			return nil, fmt.Errorf("system configuration name not defined")
+		}
+
+		systemConfig := &dwsv1alpha1.SystemConfiguration{}
+		if err := client.Get(context.TODO(), types.NamespacedName{Name: opts.sysConfig, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
+			return nil, fmt.Errorf("failed to retrieve system configuration: %w", err)
+		}
+
+		log.Println("Looking for Storage Node with access to Node", opts.name)
+		storageNode := func() *dwsv1alpha1.SystemConfigurationStorageNode {
+			for _, storageNode := range systemConfig.Spec.StorageNodes {
+				for _, computeNode := range storageNode.ComputesAccess {
+					if computeNode.Name == opts.name {
+						return &storageNode
+					}
+				}
+			}
+
+			return nil
+		}()
+
+		if storageNode == nil {
+			return nil, fmt.Errorf("storage node not found in system configuration")
+		}
+
+		// TODO: Should we check the storageNode.Type == "Rabbit" ???
+
+		log.Println("Found Storage Node", storageNode.Name)
+		opts.nodeName = storageNode.Name
 	}
 
 	return &defaultServer{

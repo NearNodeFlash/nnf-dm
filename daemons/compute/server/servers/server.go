@@ -34,6 +34,7 @@ type ServerOptions struct {
 
 	name      string
 	nodeName  string
+	sysConfig string
 	simulated bool
 }
 
@@ -54,6 +55,7 @@ func GetOptions() (*ServerOptions, error) {
 	flag.StringVar(&opts.nodeName, "nnf-node-name", opts.nodeName, "NNF node name that should handle the data movement request")
 	flag.StringVar(&opts.tokenFile, "service-token-file", opts.tokenFile, "Path to the NNF data movement service token")
 	flag.StringVar(&opts.certFile, "service-cert-file", opts.certFile, "Path to the NNF data movement service certificate")
+	flag.StringVar(&opts.sysConfig, "sys-config", "default", "Name of the system configuration containing this compute resource")
 	flag.BoolVar(&opts.simulated, "simulated", opts.simulated, "Run in simulation mode where no requests are sent to the server")
 	flag.Parse()
 	return &opts, nil
