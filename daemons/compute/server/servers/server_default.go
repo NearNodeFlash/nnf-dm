@@ -183,7 +183,7 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 		}
 
 		if storageNode.Type != "Rabbit" {
-			return nil, fmt.Errorf("storage node type '%s' not supported", storageNode.Type)
+			return nil, fmt.Errorf("storage node type '%s' not supported. Must be 'Rabbit'", storageNode.Type)
 		}
 
 		log.Println("Found Storage Node", storageNode.Name)
