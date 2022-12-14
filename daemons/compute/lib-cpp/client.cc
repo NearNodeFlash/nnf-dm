@@ -215,11 +215,12 @@ StatusResponse::~StatusResponse() {
 }
 
 StatusResponse::State StatusResponse::state() {
-    CHECK_ENUM_EQUALITY(StatusResponse::STATE_PENDING,   datamovement::DataMovementStatusResponse_State_PENDING);
-    CHECK_ENUM_EQUALITY(StatusResponse::STATE_STARTING,  datamovement::DataMovementStatusResponse_State_STARTING);
-    CHECK_ENUM_EQUALITY(StatusResponse::STATE_RUNNING,   datamovement::DataMovementStatusResponse_State_RUNNING);
-    CHECK_ENUM_EQUALITY(StatusResponse::STATE_COMPLETED, datamovement::DataMovementStatusResponse_State_COMPLETED);
-    CHECK_ENUM_EQUALITY(StatusResponse::STATE_UNKNOWN,   datamovement::DataMovementStatusResponse_State_UNKNOWN_STATE);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_PENDING,    datamovement::DataMovementStatusResponse_State_PENDING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_STARTING,   datamovement::DataMovementStatusResponse_State_STARTING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_RUNNING,    datamovement::DataMovementStatusResponse_State_RUNNING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_COMPLETED,  datamovement::DataMovementStatusResponse_State_COMPLETED);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_CANCELLING, datamovement::DataMovementStatusResponse_State_CANCELLING);
+    CHECK_ENUM_EQUALITY(StatusResponse::STATE_UNKNOWN,    datamovement::DataMovementStatusResponse_State_UNKNOWN_STATE);
 
     auto state = static_cast<datamovement::DataMovementStatusResponse *>(data_)->state();
     return static_cast<StatusResponse::State>(state);
