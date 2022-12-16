@@ -121,6 +121,8 @@ container-unit-test: ## Run tests inside a container image
 	$(DOCKER) run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 ##@ Build
+build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
+	GOOS=linux GOARCH=amd64 go build -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go

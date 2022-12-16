@@ -21,7 +21,7 @@ Near Node Flash data movement through the data movement API.
 %setup -q
 
 %build
-GOOS=linux GOARCH=amd64 go build -o bin/nnf-dm
+make build-daemon
 
 %install
 mkdir -p %{buildroot}/usr/bin/
