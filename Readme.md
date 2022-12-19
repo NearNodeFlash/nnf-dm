@@ -32,3 +32,4 @@ operator-sdk create api --group dm --version v1alpha1 --kind DataMovement --reso
 operator-sdk create api --group dm --version v1alpha1 --kind DataMovementManager --resource --controller
 
 ```
+
