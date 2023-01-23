@@ -62,7 +62,7 @@ RUN apt install -y bash
 
 # The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
 # do not change them unless you know what it is you are doing
-ARG port=2222
+ARG port=22
 RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
     && sed -i "s/[ #]\(.*Port \).*/ \1$port/g" /etc/ssh/ssh_config \
     && echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
