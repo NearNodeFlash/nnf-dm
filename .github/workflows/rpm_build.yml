@@ -2,7 +2,7 @@ name: RPM Build
 on: push
 
 jobs:
-  build:
+  rpm_build:
     runs-on: ubuntu-latest
     container:
       image: centos:8
