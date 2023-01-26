@@ -22,11 +22,17 @@ option java_multiple_files = true;
 option java_package = "com.hpe.cray.nnf.datamovement";
 option java_outer_classname = "DataMovementProto";
 
+import "google/protobuf/empty.proto";
+
 package datamovement;
 
 // DataMover service definition describes the API for perform data movement
 // for NNF storage. 
 service DataMover {
+    // Version sends a request to the data movement daemon and returns a response containing
+    // details on the current build version and supported API versions.
+    rpc Version (google.protobuf.Empty) returns (DataMovementVersionResponse) {}
+
     // Create sends a new data movement request identified by source and destination fields. It returns
     // a response containing a unique identifier which can be used to query the status of the request.
     rpc Create (DataMovementCreateRequest) returns (DataMovementCreateResponse) {}
@@ -45,6 +51,13 @@ service DataMover {
     // Cancel will attempt to stop a data movement request. It accepts a unique identifier
     // that identifies the request and returns the status of the cancel operation.
     rpc Cancel (DataMovementCancelRequest) returns (DataMovementCancelResponse) {}
+}
+
+// The data movement version response returns information on the running data movement daemon. This includes
+// the build version and a list of supported API versions.
+message DataMovementVersionResponse {
+    string version = 1;
+    repeated string apiVersions = 2;
 }
 
 // Data Movement workflow message contains identifying information for the workflow initiating the data movement

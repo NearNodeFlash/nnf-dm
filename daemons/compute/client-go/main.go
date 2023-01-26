@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 )
@@ -47,19 +48,6 @@ func main() {
 
 	flag.Parse()
 
-	if len(*workflow) == 0 {
-		log.Printf("workflow name required")
-		os.Exit(1)
-	}
-	if len(*source) == 0 || len(*destination) == 0 {
-		log.Printf("source and destination required")
-		os.Exit(1)
-	}
-	if *count <= 0 {
-		log.Printf("count must be >= 1")
-		os.Exit(1)
-	}
-
 	socketAddr := "unix://" + *socket
 
 	log.Printf("Connecting to %s", socketAddr)
@@ -73,6 +61,27 @@ func main() {
 	defer cancel()
 
 	c := pb.NewDataMoverClient(conn)
+
+	versionResponse, err := versionRequest(ctx, c)
+	if err != nil {
+		log.Fatalf("could not retrieve version information: %v", err)
+	}
+
+	log.Printf("Data Mover Version: %s\n", versionResponse.GetVersion())
+	log.Printf("Data Mover Supported API Versions: %v\n", versionResponse.GetApiVersions())
+
+	if len(*workflow) == 0 {
+		log.Printf("workflow name required")
+		os.Exit(1)
+	}
+	if len(*source) == 0 || len(*destination) == 0 {
+		log.Printf("source and destination required")
+		os.Exit(1)
+	}
+	if *count <= 0 {
+		log.Printf("count must be >= 1")
+		os.Exit(1)
+	}
 
 	for i := 0; i < *count; i++ {
 		log.Printf("Creating request %d of %d...", i+1, *count)
@@ -159,6 +168,16 @@ func main() {
 		}
 		log.Printf("List of Data movement requests: %s", strings.Join(listResponse.GetUids(), ", "))
 	}
+}
+
+func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMovementVersionResponse, error) {
+	rsp, err := client.Version(ctx, &emptypb.Empty{})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp, nil
 }
 
 func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (*pb.DataMovementCreateResponse, error) {

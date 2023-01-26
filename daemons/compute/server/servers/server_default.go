@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/types/known/emptypb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,6 +269,13 @@ func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
+	return &pb.DataMovementVersionResponse{
+		Version:     version,
+		ApiVersions: apiVersions,
+	}, nil
 }
 
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {

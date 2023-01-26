@@ -48,6 +48,20 @@ DataMoverClient::~DataMoverClient() {
     delete static_cast<DataMoverClientInternal *>(data_);
 }
 
+RPCStatus DataMoverClient::Version(VersionResponse *response) {
+    auto client = static_cast<DataMoverClientInternal *>(data_);
+
+    auto request_ = ::google::protobuf::Empty();
+
+    grpc::ClientContext context;
+    grpc::Status status = client->stub_->Version(&context,
+        request_,
+        static_cast<datamovement::DataMovementVersionResponse *>(response->data_)
+    );
+    
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
+}
+
 RPCStatus DataMoverClient::Create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response) {
     auto client = static_cast<DataMoverClientInternal *>(data_);
 
@@ -153,6 +167,32 @@ Workflow::Workflow(std::string name, std::string namespace_) :
     name_(name),
     namespace_(namespace_)
 { }
+
+VersionResponse::VersionResponse() {
+    auto response = new datamovement::DataMovementVersionResponse();
+    data_ = static_cast<void *>(response);
+}
+
+VersionResponse::~VersionResponse() {
+    delete static_cast<datamovement::DataMovementVersionResponse *>(data_);
+}
+
+std::string VersionResponse::version() {
+    return static_cast<datamovement::DataMovementVersionResponse *>(data_)->version();
+}
+
+std::vector<std::string> VersionResponse::apiversions() {
+    auto response = static_cast<datamovement::DataMovementVersionResponse *>(data_);
+
+    auto apiVersions = std::vector<std::string>();
+    apiVersions.reserve(response->apiversions_size());
+
+    for (auto& v : response->apiversions()) {
+        apiVersions.push_back(v);
+    }
+
+    return apiVersions;
+}
 
 CreateRequest::CreateRequest(std::string source, std::string destination) {
     auto request = new datamovement::DataMovementCreateRequest();

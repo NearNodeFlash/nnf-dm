@@ -30,6 +30,25 @@ int main(int argc, char** argv) {
 
     DataMoverClient client("unix:///tmp/nnf.sock");
 
+    {
+        // Retrieve the version information
+
+        VersionResponse versionResponse;
+
+        RPCStatus status = client.Version(&versionResponse);
+        if (!status.ok()) {
+            std::cout << "Version RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
+            return 1;
+        }
+
+        std::cout << "Data Movement Version: " << versionResponse.version() << std::endl;
+        std::cout << "Supported API Versions:" << std::endl;
+        for (auto version : versionResponse.apiversions()) {
+            std::cout << "\t" << version << std::endl;
+        }
+
+    }
+
     // Allocate a workflow that will be used by all requests
     Workflow workflow("YOUR-WORKFLOW_NAME", "YOUR-WORKFLOW-NAMESPACE");
 
@@ -41,7 +60,7 @@ int main(int argc, char** argv) {
 
         RPCStatus status = client.Create(workflow, createRequest, &createResponse);
         if (!status.ok()) {
-            std::cout << "Create RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
+            std::cout << "Create RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 
@@ -62,7 +81,7 @@ int main(int argc, char** argv) {
 
         RPCStatus status = client.List(workflow, listRequest, &listResponse);
         if (!status.ok()) {
-            std::cout << "List RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
+            std::cout << "List RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 
@@ -79,7 +98,7 @@ int main(int argc, char** argv) {
 RequestStatus:
         RPCStatus status = client.Status(workflow, statusRequest, &statusResponse);
         if (!status.ok()) {
-            std::cout << "Status RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
+            std::cout << "Status RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 
@@ -113,7 +132,7 @@ RequestStatus:
 
         RPCStatus status = client.Cancel(workflow, cancelRequest, &cancelResponse);
         if (!status.ok()) {
-            std::cout << "Cancle RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
+            std::cout << "Cancle RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 
@@ -133,7 +152,7 @@ RequestStatus:
 
         RPCStatus status = client.Delete(workflow, deleteRequest, &deleteResponse);
         if (!status.ok()) {
-            std::cout << "Delete RPC FAILED" << status.error_code() << ": " << status.error_message() << std::endl;
+            std::cout << "Delete RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 

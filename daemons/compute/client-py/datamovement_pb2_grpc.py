@@ -3,6 +3,7 @@
 import grpc
 
 import datamovement_pb2 as datamovement__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class DataMoverStub(object):
@@ -16,6 +17,11 @@ class DataMoverStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Version = channel.unary_unary(
+                '/datamovement.DataMover/Version',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementVersionResponse.FromString,
+                )
         self.Create = channel.unary_unary(
                 '/datamovement.DataMover/Create',
                 request_serializer=datamovement__pb2.DataMovementCreateRequest.SerializeToString,
@@ -47,6 +53,14 @@ class DataMoverServicer(object):
     """DataMover service definition describes the API for perform data movement
     for NNF storage. 
     """
+
+    def Version(self, request, context):
+        """Version sends a request to the data movement daemon and returns a response containing
+        details on the current build version and supported API versions.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def Create(self, request, context):
         """Create sends a new data movement request identified by source and destination fields. It returns
@@ -90,6 +104,11 @@ class DataMoverServicer(object):
 
 def add_DataMoverServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Version': grpc.unary_unary_rpc_method_handler(
+                    servicer.Version,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=datamovement__pb2.DataMovementVersionResponse.SerializeToString,
+            ),
             'Create': grpc.unary_unary_rpc_method_handler(
                     servicer.Create,
                     request_deserializer=datamovement__pb2.DataMovementCreateRequest.FromString,
@@ -126,6 +145,23 @@ class DataMover(object):
     """DataMover service definition describes the API for perform data movement
     for NNF storage. 
     """
+
+    @staticmethod
+    def Version(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Version',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            datamovement__pb2.DataMovementVersionResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def Create(request,

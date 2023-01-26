@@ -7,6 +7,141 @@
 #endif
 
 #include "datamovement.pb-c.h"
+void   datamovement__data_movement_version_response__init
+                     (Datamovement__DataMovementVersionResponse         *message)
+{
+  static const Datamovement__DataMovementVersionResponse init_value = DATAMOVEMENT__DATA_MOVEMENT_VERSION_RESPONSE__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_version_response__get_packed_size
+                     (const Datamovement__DataMovementVersionResponse *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_version_response__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_version_response__pack
+                     (const Datamovement__DataMovementVersionResponse *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_version_response__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_version_response__pack_to_buffer
+                     (const Datamovement__DataMovementVersionResponse *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_version_response__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementVersionResponse *
+       datamovement__data_movement_version_response__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementVersionResponse *)
+     protobuf_c_message_unpack (&datamovement__data_movement_version_response__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_version_response__free_unpacked
+                     (Datamovement__DataMovementVersionResponse *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_version_response__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   datamovement__data_movement_workflow__init
+                     (Datamovement__DataMovementWorkflow         *message)
+{
+  static const Datamovement__DataMovementWorkflow init_value = DATAMOVEMENT__DATA_MOVEMENT_WORKFLOW__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_workflow__get_packed_size
+                     (const Datamovement__DataMovementWorkflow *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_workflow__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_workflow__pack
+                     (const Datamovement__DataMovementWorkflow *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_workflow__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_workflow__pack_to_buffer
+                     (const Datamovement__DataMovementWorkflow *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_workflow__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementWorkflow *
+       datamovement__data_movement_workflow__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementWorkflow *)
+     protobuf_c_message_unpack (&datamovement__data_movement_workflow__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_workflow__free_unpacked
+                     (Datamovement__DataMovementWorkflow *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_workflow__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   datamovement__data_movement_command_status__init
+                     (Datamovement__DataMovementCommandStatus         *message)
+{
+  static const Datamovement__DataMovementCommandStatus init_value = DATAMOVEMENT__DATA_MOVEMENT_COMMAND_STATUS__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_command_status__get_packed_size
+                     (const Datamovement__DataMovementCommandStatus *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_command_status__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_command_status__pack
+                     (const Datamovement__DataMovementCommandStatus *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_command_status__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_command_status__pack_to_buffer
+                     (const Datamovement__DataMovementCommandStatus *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_command_status__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementCommandStatus *
+       datamovement__data_movement_command_status__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementCommandStatus *)
+     protobuf_c_message_unpack (&datamovement__data_movement_command_status__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_command_status__free_unpacked
+                     (Datamovement__DataMovementCommandStatus *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_command_status__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   datamovement__data_movement_create_request__init
                      (Datamovement__DataMovementCreateRequest         *message)
 {
@@ -277,15 +412,246 @@ void   datamovement__data_movement_delete_response__free_unpacked
   assert(message->base.descriptor == &datamovement__data_movement_delete_response__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
-static const ProtobufCFieldDescriptor datamovement__data_movement_create_request__field_descriptors[5] =
+void   datamovement__data_movement_list_request__init
+                     (Datamovement__DataMovementListRequest         *message)
+{
+  static const Datamovement__DataMovementListRequest init_value = DATAMOVEMENT__DATA_MOVEMENT_LIST_REQUEST__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_list_request__get_packed_size
+                     (const Datamovement__DataMovementListRequest *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_request__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_list_request__pack
+                     (const Datamovement__DataMovementListRequest *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_request__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_list_request__pack_to_buffer
+                     (const Datamovement__DataMovementListRequest *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_request__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementListRequest *
+       datamovement__data_movement_list_request__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementListRequest *)
+     protobuf_c_message_unpack (&datamovement__data_movement_list_request__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_list_request__free_unpacked
+                     (Datamovement__DataMovementListRequest *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_list_request__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   datamovement__data_movement_list_response__init
+                     (Datamovement__DataMovementListResponse         *message)
+{
+  static const Datamovement__DataMovementListResponse init_value = DATAMOVEMENT__DATA_MOVEMENT_LIST_RESPONSE__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_list_response__get_packed_size
+                     (const Datamovement__DataMovementListResponse *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_response__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_list_response__pack
+                     (const Datamovement__DataMovementListResponse *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_response__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_list_response__pack_to_buffer
+                     (const Datamovement__DataMovementListResponse *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_list_response__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementListResponse *
+       datamovement__data_movement_list_response__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementListResponse *)
+     protobuf_c_message_unpack (&datamovement__data_movement_list_response__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_list_response__free_unpacked
+                     (Datamovement__DataMovementListResponse *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_list_response__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   datamovement__data_movement_cancel_request__init
+                     (Datamovement__DataMovementCancelRequest         *message)
+{
+  static const Datamovement__DataMovementCancelRequest init_value = DATAMOVEMENT__DATA_MOVEMENT_CANCEL_REQUEST__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_cancel_request__get_packed_size
+                     (const Datamovement__DataMovementCancelRequest *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_request__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_cancel_request__pack
+                     (const Datamovement__DataMovementCancelRequest *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_request__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_cancel_request__pack_to_buffer
+                     (const Datamovement__DataMovementCancelRequest *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_request__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementCancelRequest *
+       datamovement__data_movement_cancel_request__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementCancelRequest *)
+     protobuf_c_message_unpack (&datamovement__data_movement_cancel_request__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_cancel_request__free_unpacked
+                     (Datamovement__DataMovementCancelRequest *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_request__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   datamovement__data_movement_cancel_response__init
+                     (Datamovement__DataMovementCancelResponse         *message)
+{
+  static const Datamovement__DataMovementCancelResponse init_value = DATAMOVEMENT__DATA_MOVEMENT_CANCEL_RESPONSE__INIT;
+  *message = init_value;
+}
+size_t datamovement__data_movement_cancel_response__get_packed_size
+                     (const Datamovement__DataMovementCancelResponse *message)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_response__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t datamovement__data_movement_cancel_response__pack
+                     (const Datamovement__DataMovementCancelResponse *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_response__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t datamovement__data_movement_cancel_response__pack_to_buffer
+                     (const Datamovement__DataMovementCancelResponse *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_response__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Datamovement__DataMovementCancelResponse *
+       datamovement__data_movement_cancel_response__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Datamovement__DataMovementCancelResponse *)
+     protobuf_c_message_unpack (&datamovement__data_movement_cancel_response__descriptor,
+                                allocator, len, data);
+}
+void   datamovement__data_movement_cancel_response__free_unpacked
+                     (Datamovement__DataMovementCancelResponse *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &datamovement__data_movement_cancel_response__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+static const ProtobufCFieldDescriptor datamovement__data_movement_version_response__field_descriptors[2] =
 {
   {
-    "workflow",
-    3,
+    "version",
+    1,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
-    offsetof(Datamovement__DataMovementCreateRequest, workflow),
+    offsetof(Datamovement__DataMovementVersionResponse, version),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "apiVersions",
+    2,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_INT32,
+    offsetof(Datamovement__DataMovementVersionResponse, n_apiversions),
+    offsetof(Datamovement__DataMovementVersionResponse, apiversions),
+    NULL,
+    NULL,
+    0 | PROTOBUF_C_FIELD_FLAG_PACKED,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_version_response__field_indices_by_name[] = {
+  1,   /* field[1] = apiVersions */
+  0,   /* field[0] = version */
+};
+static const ProtobufCIntRange datamovement__data_movement_version_response__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_version_response__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementVersionResponse",
+  "DataMovementVersionResponse",
+  "Datamovement__DataMovementVersionResponse",
+  "datamovement",
+  sizeof(Datamovement__DataMovementVersionResponse),
+  2,
+  datamovement__data_movement_version_response__field_descriptors,
+  datamovement__data_movement_version_response__field_indices_by_name,
+  1,  datamovement__data_movement_version_response__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_version_response__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_workflow__field_descriptors[2] =
+{
+  {
+    "name",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementWorkflow, name),
     NULL,
     &protobuf_c_empty_string,
     0,             /* flags */
@@ -293,19 +659,148 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_create_request
   },
   {
     "namespace",
-    4,
+    2,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
-    offsetof(Datamovement__DataMovementCreateRequest, namespace_),
+    offsetof(Datamovement__DataMovementWorkflow, namespace_),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_workflow__field_indices_by_name[] = {
+  0,   /* field[0] = name */
+  1,   /* field[1] = namespace */
+};
+static const ProtobufCIntRange datamovement__data_movement_workflow__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_workflow__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementWorkflow",
+  "DataMovementWorkflow",
+  "Datamovement__DataMovementWorkflow",
+  "datamovement",
+  sizeof(Datamovement__DataMovementWorkflow),
+  2,
+  datamovement__data_movement_workflow__field_descriptors,
+  datamovement__data_movement_workflow__field_indices_by_name,
+  1,  datamovement__data_movement_workflow__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_workflow__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_command_status__field_descriptors[5] =
+{
+  {
+    "command",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCommandStatus, command),
     NULL,
     &protobuf_c_empty_string,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "source",
+    "progress",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_INT32,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCommandStatus, progress),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "elapsedTime",
+    3,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCommandStatus, elapsedtime),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "lastMessage",
+    4,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCommandStatus, lastmessage),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "lastMessageTime",
     5,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCommandStatus, lastmessagetime),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_command_status__field_indices_by_name[] = {
+  0,   /* field[0] = command */
+  2,   /* field[2] = elapsedTime */
+  3,   /* field[3] = lastMessage */
+  4,   /* field[4] = lastMessageTime */
+  1,   /* field[1] = progress */
+};
+static const ProtobufCIntRange datamovement__data_movement_command_status__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 5 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_command_status__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementCommandStatus",
+  "DataMovementCommandStatus",
+  "Datamovement__DataMovementCommandStatus",
+  "datamovement",
+  sizeof(Datamovement__DataMovementCommandStatus),
+  5,
+  datamovement__data_movement_command_status__field_descriptors,
+  datamovement__data_movement_command_status__field_indices_by_name,
+  1,  datamovement__data_movement_command_status__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_command_status__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_create_request__field_descriptors[4] =
+{
+  {
+    "workflow",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCreateRequest, workflow),
+    &datamovement__data_movement_workflow__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "source",
+    2,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
@@ -317,7 +812,7 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_create_request
   },
   {
     "destination",
-    6,
+    3,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
@@ -329,7 +824,7 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_create_request
   },
   {
     "dryrun",
-    7,
+    4,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BOOL,
     0,   /* quantifier_offset */
@@ -341,16 +836,15 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_create_request
   },
 };
 static const unsigned datamovement__data_movement_create_request__field_indices_by_name[] = {
-  3,   /* field[3] = destination */
-  4,   /* field[4] = dryrun */
-  1,   /* field[1] = namespace */
-  2,   /* field[2] = source */
+  2,   /* field[2] = destination */
+  3,   /* field[3] = dryrun */
+  1,   /* field[1] = source */
   0,   /* field[0] = workflow */
 };
 static const ProtobufCIntRange datamovement__data_movement_create_request__number_ranges[1 + 1] =
 {
-  { 3, 0 },
-  { 0, 5 }
+  { 1, 0 },
+  { 0, 4 }
 };
 const ProtobufCMessageDescriptor datamovement__data_movement_create_request__descriptor =
 {
@@ -360,25 +854,27 @@ const ProtobufCMessageDescriptor datamovement__data_movement_create_request__des
   "Datamovement__DataMovementCreateRequest",
   "datamovement",
   sizeof(Datamovement__DataMovementCreateRequest),
-  5,
+  4,
   datamovement__data_movement_create_request__field_descriptors,
   datamovement__data_movement_create_request__field_indices_by_name,
   1,  datamovement__data_movement_create_request__number_ranges,
   (ProtobufCMessageInit) datamovement__data_movement_create_request__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCEnumValue datamovement__data_movement_create_response__status__enum_values_by_number[2] =
+static const ProtobufCEnumValue datamovement__data_movement_create_response__status__enum_values_by_number[3] =
 {
-  { "CREATED", "DATAMOVEMENT__DATA_MOVEMENT_CREATE_RESPONSE__STATUS__CREATED", 0 },
+  { "SUCCESS", "DATAMOVEMENT__DATA_MOVEMENT_CREATE_RESPONSE__STATUS__SUCCESS", 0 },
   { "FAILED", "DATAMOVEMENT__DATA_MOVEMENT_CREATE_RESPONSE__STATUS__FAILED", 1 },
+  { "INVALID", "DATAMOVEMENT__DATA_MOVEMENT_CREATE_RESPONSE__STATUS__INVALID", 2 },
 };
 static const ProtobufCIntRange datamovement__data_movement_create_response__status__value_ranges[] = {
-{0, 0},{0, 2}
+{0, 0},{0, 3}
 };
-static const ProtobufCEnumValueIndex datamovement__data_movement_create_response__status__enum_values_by_name[2] =
+static const ProtobufCEnumValueIndex datamovement__data_movement_create_response__status__enum_values_by_name[3] =
 {
-  { "CREATED", 0 },
   { "FAILED", 1 },
+  { "INVALID", 2 },
+  { "SUCCESS", 0 },
 };
 const ProtobufCEnumDescriptor datamovement__data_movement_create_response__status__descriptor =
 {
@@ -387,9 +883,9 @@ const ProtobufCEnumDescriptor datamovement__data_movement_create_response__statu
   "Status",
   "Datamovement__DataMovementCreateResponse__Status",
   "datamovement",
-  2,
+  3,
   datamovement__data_movement_create_response__status__enum_values_by_number,
-  2,
+  3,
   datamovement__data_movement_create_response__status__enum_values_by_name,
   1,
   datamovement__data_movement_create_response__status__value_ranges,
@@ -459,11 +955,23 @@ const ProtobufCMessageDescriptor datamovement__data_movement_create_response__de
   (ProtobufCMessageInit) datamovement__data_movement_create_response__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor datamovement__data_movement_status_request__field_descriptors[2] =
+static const ProtobufCFieldDescriptor datamovement__data_movement_status_request__field_descriptors[3] =
 {
   {
-    "uid",
+    "workflow",
     1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementStatusRequest, workflow),
+    &datamovement__data_movement_workflow__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "uid",
+    2,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
@@ -475,7 +983,7 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_status_request
   },
   {
     "maxWaitTime",
-    2,
+    3,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_INT64,
     0,   /* quantifier_offset */
@@ -487,13 +995,14 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_status_request
   },
 };
 static const unsigned datamovement__data_movement_status_request__field_indices_by_name[] = {
-  1,   /* field[1] = maxWaitTime */
-  0,   /* field[0] = uid */
+  2,   /* field[2] = maxWaitTime */
+  1,   /* field[1] = uid */
+  0,   /* field[0] = workflow */
 };
 static const ProtobufCIntRange datamovement__data_movement_status_request__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 2 }
+  { 0, 3 }
 };
 const ProtobufCMessageDescriptor datamovement__data_movement_status_request__descriptor =
 {
@@ -503,31 +1012,33 @@ const ProtobufCMessageDescriptor datamovement__data_movement_status_request__des
   "Datamovement__DataMovementStatusRequest",
   "datamovement",
   sizeof(Datamovement__DataMovementStatusRequest),
-  2,
+  3,
   datamovement__data_movement_status_request__field_descriptors,
   datamovement__data_movement_status_request__field_indices_by_name,
   1,  datamovement__data_movement_status_request__number_ranges,
   (ProtobufCMessageInit) datamovement__data_movement_status_request__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCEnumValue datamovement__data_movement_status_response__state__enum_values_by_number[5] =
+static const ProtobufCEnumValue datamovement__data_movement_status_response__state__enum_values_by_number[6] =
 {
   { "PENDING", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__PENDING", 0 },
   { "STARTING", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__STARTING", 1 },
   { "RUNNING", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__RUNNING", 2 },
   { "COMPLETED", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__COMPLETED", 3 },
-  { "UNKNOWN_STATE", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__UNKNOWN_STATE", 4 },
+  { "CANCELLING", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__CANCELLING", 4 },
+  { "UNKNOWN_STATE", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATE__UNKNOWN_STATE", 5 },
 };
 static const ProtobufCIntRange datamovement__data_movement_status_response__state__value_ranges[] = {
-{0, 0},{0, 5}
+{0, 0},{0, 6}
 };
-static const ProtobufCEnumValueIndex datamovement__data_movement_status_response__state__enum_values_by_name[5] =
+static const ProtobufCEnumValueIndex datamovement__data_movement_status_response__state__enum_values_by_name[6] =
 {
+  { "CANCELLING", 4 },
   { "COMPLETED", 3 },
   { "PENDING", 0 },
   { "RUNNING", 2 },
   { "STARTING", 1 },
-  { "UNKNOWN_STATE", 4 },
+  { "UNKNOWN_STATE", 5 },
 };
 const ProtobufCEnumDescriptor datamovement__data_movement_status_response__state__descriptor =
 {
@@ -536,32 +1047,34 @@ const ProtobufCEnumDescriptor datamovement__data_movement_status_response__state
   "State",
   "Datamovement__DataMovementStatusResponse__State",
   "datamovement",
-  5,
+  6,
   datamovement__data_movement_status_response__state__enum_values_by_number,
-  5,
+  6,
   datamovement__data_movement_status_response__state__enum_values_by_name,
   1,
   datamovement__data_movement_status_response__state__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-static const ProtobufCEnumValue datamovement__data_movement_status_response__status__enum_values_by_number[5] =
+static const ProtobufCEnumValue datamovement__data_movement_status_response__status__enum_values_by_number[6] =
 {
   { "INVALID", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__INVALID", 0 },
   { "NOT_FOUND", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__NOT_FOUND", 1 },
   { "SUCCESS", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__SUCCESS", 2 },
   { "FAILED", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__FAILED", 3 },
-  { "UNKNOWN_STATUS", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__UNKNOWN_STATUS", 4 },
+  { "CANCELLED", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__CANCELLED", 4 },
+  { "UNKNOWN_STATUS", "DATAMOVEMENT__DATA_MOVEMENT_STATUS_RESPONSE__STATUS__UNKNOWN_STATUS", 5 },
 };
 static const ProtobufCIntRange datamovement__data_movement_status_response__status__value_ranges[] = {
-{0, 0},{0, 5}
+{0, 0},{0, 6}
 };
-static const ProtobufCEnumValueIndex datamovement__data_movement_status_response__status__enum_values_by_name[5] =
+static const ProtobufCEnumValueIndex datamovement__data_movement_status_response__status__enum_values_by_name[6] =
 {
+  { "CANCELLED", 4 },
   { "FAILED", 3 },
   { "INVALID", 0 },
   { "NOT_FOUND", 1 },
   { "SUCCESS", 2 },
-  { "UNKNOWN_STATUS", 4 },
+  { "UNKNOWN_STATUS", 5 },
 };
 const ProtobufCEnumDescriptor datamovement__data_movement_status_response__status__descriptor =
 {
@@ -570,15 +1083,15 @@ const ProtobufCEnumDescriptor datamovement__data_movement_status_response__statu
   "Status",
   "Datamovement__DataMovementStatusResponse__Status",
   "datamovement",
-  5,
+  6,
   datamovement__data_movement_status_response__status__enum_values_by_number,
-  5,
+  6,
   datamovement__data_movement_status_response__status__enum_values_by_name,
   1,
   datamovement__data_movement_status_response__status__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-static const ProtobufCFieldDescriptor datamovement__data_movement_status_response__field_descriptors[3] =
+static const ProtobufCFieldDescriptor datamovement__data_movement_status_response__field_descriptors[4] =
 {
   {
     "state",
@@ -616,8 +1129,21 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_status_respons
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "commandStatus",
+    4,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementStatusResponse, commandstatus),
+    &datamovement__data_movement_command_status__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned datamovement__data_movement_status_response__field_indices_by_name[] = {
+  3,   /* field[3] = commandStatus */
   2,   /* field[2] = message */
   0,   /* field[0] = state */
   1,   /* field[1] = status */
@@ -625,7 +1151,7 @@ static const unsigned datamovement__data_movement_status_response__field_indices
 static const ProtobufCIntRange datamovement__data_movement_status_response__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 3 }
+  { 0, 4 }
 };
 const ProtobufCMessageDescriptor datamovement__data_movement_status_response__descriptor =
 {
@@ -635,18 +1161,30 @@ const ProtobufCMessageDescriptor datamovement__data_movement_status_response__de
   "Datamovement__DataMovementStatusResponse",
   "datamovement",
   sizeof(Datamovement__DataMovementStatusResponse),
-  3,
+  4,
   datamovement__data_movement_status_response__field_descriptors,
   datamovement__data_movement_status_response__field_indices_by_name,
   1,  datamovement__data_movement_status_response__number_ranges,
   (ProtobufCMessageInit) datamovement__data_movement_status_response__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor datamovement__data_movement_delete_request__field_descriptors[1] =
+static const ProtobufCFieldDescriptor datamovement__data_movement_delete_request__field_descriptors[2] =
 {
   {
-    "uid",
+    "workflow",
     1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementDeleteRequest, workflow),
+    &datamovement__data_movement_workflow__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "uid",
+    2,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
@@ -658,12 +1196,13 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_delete_request
   },
 };
 static const unsigned datamovement__data_movement_delete_request__field_indices_by_name[] = {
-  0,   /* field[0] = uid */
+  1,   /* field[1] = uid */
+  0,   /* field[0] = workflow */
 };
 static const ProtobufCIntRange datamovement__data_movement_delete_request__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 1 }
+  { 0, 2 }
 };
 const ProtobufCMessageDescriptor datamovement__data_movement_delete_request__descriptor =
 {
@@ -673,7 +1212,7 @@ const ProtobufCMessageDescriptor datamovement__data_movement_delete_request__des
   "Datamovement__DataMovementDeleteRequest",
   "datamovement",
   sizeof(Datamovement__DataMovementDeleteRequest),
-  1,
+  2,
   datamovement__data_movement_delete_request__field_descriptors,
   datamovement__data_movement_delete_request__field_indices_by_name,
   1,  datamovement__data_movement_delete_request__number_ranges,
@@ -684,7 +1223,7 @@ static const ProtobufCEnumValue datamovement__data_movement_delete_response__sta
 {
   { "INVALID", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__INVALID", 0 },
   { "NOT_FOUND", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__NOT_FOUND", 1 },
-  { "DELETED", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__DELETED", 2 },
+  { "SUCCESS", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__SUCCESS", 2 },
   { "ACTIVE", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__ACTIVE", 3 },
   { "UNKNOWN", "DATAMOVEMENT__DATA_MOVEMENT_DELETE_RESPONSE__STATUS__UNKNOWN", 4 },
 };
@@ -694,9 +1233,9 @@ static const ProtobufCIntRange datamovement__data_movement_delete_response__stat
 static const ProtobufCEnumValueIndex datamovement__data_movement_delete_response__status__enum_values_by_name[5] =
 {
   { "ACTIVE", 3 },
-  { "DELETED", 2 },
   { "INVALID", 0 },
   { "NOT_FOUND", 1 },
+  { "SUCCESS", 2 },
   { "UNKNOWN", 4 },
 };
 const ProtobufCEnumDescriptor datamovement__data_movement_delete_response__status__descriptor =
@@ -714,7 +1253,7 @@ const ProtobufCEnumDescriptor datamovement__data_movement_delete_response__statu
   datamovement__data_movement_delete_response__status__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-static const ProtobufCFieldDescriptor datamovement__data_movement_delete_response__field_descriptors[1] =
+static const ProtobufCFieldDescriptor datamovement__data_movement_delete_response__field_descriptors[2] =
 {
   {
     "status",
@@ -728,14 +1267,27 @@ static const ProtobufCFieldDescriptor datamovement__data_movement_delete_respons
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "message",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementDeleteResponse, message),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned datamovement__data_movement_delete_response__field_indices_by_name[] = {
+  1,   /* field[1] = message */
   0,   /* field[0] = status */
 };
 static const ProtobufCIntRange datamovement__data_movement_delete_response__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 1 }
+  { 0, 2 }
 };
 const ProtobufCMessageDescriptor datamovement__data_movement_delete_response__descriptor =
 {
@@ -745,23 +1297,239 @@ const ProtobufCMessageDescriptor datamovement__data_movement_delete_response__de
   "Datamovement__DataMovementDeleteResponse",
   "datamovement",
   sizeof(Datamovement__DataMovementDeleteResponse),
-  1,
+  2,
   datamovement__data_movement_delete_response__field_descriptors,
   datamovement__data_movement_delete_response__field_indices_by_name,
   1,  datamovement__data_movement_delete_response__number_ranges,
   (ProtobufCMessageInit) datamovement__data_movement_delete_response__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCMethodDescriptor datamovement__data_mover__method_descriptors[3] =
+static const ProtobufCFieldDescriptor datamovement__data_movement_list_request__field_descriptors[1] =
 {
+  {
+    "workflow",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementListRequest, workflow),
+    &datamovement__data_movement_workflow__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_list_request__field_indices_by_name[] = {
+  0,   /* field[0] = workflow */
+};
+static const ProtobufCIntRange datamovement__data_movement_list_request__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_list_request__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementListRequest",
+  "DataMovementListRequest",
+  "Datamovement__DataMovementListRequest",
+  "datamovement",
+  sizeof(Datamovement__DataMovementListRequest),
+  1,
+  datamovement__data_movement_list_request__field_descriptors,
+  datamovement__data_movement_list_request__field_indices_by_name,
+  1,  datamovement__data_movement_list_request__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_list_request__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_list_response__field_descriptors[1] =
+{
+  {
+    "uids",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_STRING,
+    offsetof(Datamovement__DataMovementListResponse, n_uids),
+    offsetof(Datamovement__DataMovementListResponse, uids),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_list_response__field_indices_by_name[] = {
+  0,   /* field[0] = uids */
+};
+static const ProtobufCIntRange datamovement__data_movement_list_response__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_list_response__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementListResponse",
+  "DataMovementListResponse",
+  "Datamovement__DataMovementListResponse",
+  "datamovement",
+  sizeof(Datamovement__DataMovementListResponse),
+  1,
+  datamovement__data_movement_list_response__field_descriptors,
+  datamovement__data_movement_list_response__field_indices_by_name,
+  1,  datamovement__data_movement_list_response__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_list_response__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_cancel_request__field_descriptors[2] =
+{
+  {
+    "workflow",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCancelRequest, workflow),
+    &datamovement__data_movement_workflow__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "uid",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCancelRequest, uid),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_cancel_request__field_indices_by_name[] = {
+  1,   /* field[1] = uid */
+  0,   /* field[0] = workflow */
+};
+static const ProtobufCIntRange datamovement__data_movement_cancel_request__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_cancel_request__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementCancelRequest",
+  "DataMovementCancelRequest",
+  "Datamovement__DataMovementCancelRequest",
+  "datamovement",
+  sizeof(Datamovement__DataMovementCancelRequest),
+  2,
+  datamovement__data_movement_cancel_request__field_descriptors,
+  datamovement__data_movement_cancel_request__field_indices_by_name,
+  1,  datamovement__data_movement_cancel_request__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_cancel_request__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCEnumValue datamovement__data_movement_cancel_response__status__enum_values_by_number[4] =
+{
+  { "INVALID", "DATAMOVEMENT__DATA_MOVEMENT_CANCEL_RESPONSE__STATUS__INVALID", 0 },
+  { "NOT_FOUND", "DATAMOVEMENT__DATA_MOVEMENT_CANCEL_RESPONSE__STATUS__NOT_FOUND", 1 },
+  { "SUCCESS", "DATAMOVEMENT__DATA_MOVEMENT_CANCEL_RESPONSE__STATUS__SUCCESS", 2 },
+  { "FAILED", "DATAMOVEMENT__DATA_MOVEMENT_CANCEL_RESPONSE__STATUS__FAILED", 3 },
+};
+static const ProtobufCIntRange datamovement__data_movement_cancel_response__status__value_ranges[] = {
+{0, 0},{0, 4}
+};
+static const ProtobufCEnumValueIndex datamovement__data_movement_cancel_response__status__enum_values_by_name[4] =
+{
+  { "FAILED", 3 },
+  { "INVALID", 0 },
+  { "NOT_FOUND", 1 },
+  { "SUCCESS", 2 },
+};
+const ProtobufCEnumDescriptor datamovement__data_movement_cancel_response__status__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementCancelResponse.Status",
+  "Status",
+  "Datamovement__DataMovementCancelResponse__Status",
+  "datamovement",
+  4,
+  datamovement__data_movement_cancel_response__status__enum_values_by_number,
+  4,
+  datamovement__data_movement_cancel_response__status__enum_values_by_name,
+  1,
+  datamovement__data_movement_cancel_response__status__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+static const ProtobufCFieldDescriptor datamovement__data_movement_cancel_response__field_descriptors[2] =
+{
+  {
+    "status",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_ENUM,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCancelResponse, status),
+    &datamovement__data_movement_cancel_response__status__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "message",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Datamovement__DataMovementCancelResponse, message),
+    NULL,
+    &protobuf_c_empty_string,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned datamovement__data_movement_cancel_response__field_indices_by_name[] = {
+  1,   /* field[1] = message */
+  0,   /* field[0] = status */
+};
+static const ProtobufCIntRange datamovement__data_movement_cancel_response__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 2 }
+};
+const ProtobufCMessageDescriptor datamovement__data_movement_cancel_response__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "datamovement.DataMovementCancelResponse",
+  "DataMovementCancelResponse",
+  "Datamovement__DataMovementCancelResponse",
+  "datamovement",
+  sizeof(Datamovement__DataMovementCancelResponse),
+  2,
+  datamovement__data_movement_cancel_response__field_descriptors,
+  datamovement__data_movement_cancel_response__field_indices_by_name,
+  1,  datamovement__data_movement_cancel_response__number_ranges,
+  (ProtobufCMessageInit) datamovement__data_movement_cancel_response__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCMethodDescriptor datamovement__data_mover__method_descriptors[6] =
+{
+  { "Version", &google__protobuf__empty__descriptor, &datamovement__data_movement_version_response__descriptor },
   { "Create", &datamovement__data_movement_create_request__descriptor, &datamovement__data_movement_create_response__descriptor },
   { "Status", &datamovement__data_movement_status_request__descriptor, &datamovement__data_movement_status_response__descriptor },
   { "Delete", &datamovement__data_movement_delete_request__descriptor, &datamovement__data_movement_delete_response__descriptor },
+  { "List", &datamovement__data_movement_list_request__descriptor, &datamovement__data_movement_list_response__descriptor },
+  { "Cancel", &datamovement__data_movement_cancel_request__descriptor, &datamovement__data_movement_cancel_response__descriptor },
 };
 const unsigned datamovement__data_mover__method_indices_by_name[] = {
-  0,        /* Create */
-  2,        /* Delete */
-  1         /* Status */
+  5,        /* Cancel */
+  1,        /* Create */
+  3,        /* Delete */
+  4,        /* List */
+  2,        /* Status */
+  0         /* Version */
 };
 const ProtobufCServiceDescriptor datamovement__data_mover__descriptor =
 {
@@ -770,17 +1538,25 @@ const ProtobufCServiceDescriptor datamovement__data_mover__descriptor =
   "DataMover",
   "Datamovement__DataMover",
   "datamovement",
-  3,
+  6,
   datamovement__data_mover__method_descriptors,
   datamovement__data_mover__method_indices_by_name
 };
+void datamovement__data_mover__version(ProtobufCService *service,
+                                       const Google__Protobuf__Empty *input,
+                                       Datamovement__DataMovementVersionResponse_Closure closure,
+                                       void *closure_data)
+{
+  assert(service->descriptor == &datamovement__data_mover__descriptor);
+  service->invoke(service, 0, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+}
 void datamovement__data_mover__create(ProtobufCService *service,
                                       const Datamovement__DataMovementCreateRequest *input,
                                       Datamovement__DataMovementCreateResponse_Closure closure,
                                       void *closure_data)
 {
   assert(service->descriptor == &datamovement__data_mover__descriptor);
-  service->invoke(service, 0, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+  service->invoke(service, 1, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
 }
 void datamovement__data_mover__status(ProtobufCService *service,
                                       const Datamovement__DataMovementStatusRequest *input,
@@ -788,7 +1564,7 @@ void datamovement__data_mover__status(ProtobufCService *service,
                                       void *closure_data)
 {
   assert(service->descriptor == &datamovement__data_mover__descriptor);
-  service->invoke(service, 1, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+  service->invoke(service, 2, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
 }
 void datamovement__data_mover__delete(ProtobufCService *service,
                                       const Datamovement__DataMovementDeleteRequest *input,
@@ -796,7 +1572,23 @@ void datamovement__data_mover__delete(ProtobufCService *service,
                                       void *closure_data)
 {
   assert(service->descriptor == &datamovement__data_mover__descriptor);
-  service->invoke(service, 2, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+  service->invoke(service, 3, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+}
+void datamovement__data_mover__list(ProtobufCService *service,
+                                    const Datamovement__DataMovementListRequest *input,
+                                    Datamovement__DataMovementListResponse_Closure closure,
+                                    void *closure_data)
+{
+  assert(service->descriptor == &datamovement__data_mover__descriptor);
+  service->invoke(service, 4, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
+}
+void datamovement__data_mover__cancel(ProtobufCService *service,
+                                      const Datamovement__DataMovementCancelRequest *input,
+                                      Datamovement__DataMovementCancelResponse_Closure closure,
+                                      void *closure_data)
+{
+  assert(service->descriptor == &datamovement__data_mover__descriptor);
+  service->invoke(service, 5, (const ProtobufCMessage *) input, (ProtobufCClosure) closure, closure_data);
 }
 void datamovement__data_mover__init (Datamovement__DataMover_Service *service,
                                      Datamovement__DataMover_ServiceDestroy destroy)

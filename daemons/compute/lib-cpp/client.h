@@ -29,6 +29,7 @@ namespace data_movement {
 class RPCStatus;
 class Workflow;
 
+class VersionResponse;
 class CreateRequest;
 class CreateResponse;
 class StatusRequest;
@@ -46,6 +47,7 @@ class DataMoverClient {
         DataMoverClient(const std::string &target);
         ~DataMoverClient();
 
+        RPCStatus Version(VersionResponse *response);
         RPCStatus Create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response);
         RPCStatus Status(const Workflow &workflow, const StatusRequest &request, StatusResponse *response);
         RPCStatus Cancel(const Workflow &workflow, const CancelRequest &request, CancelResponse *response);
@@ -81,6 +83,19 @@ class Workflow {
         std::string namespace_;
 };
 
+class VersionResponse {
+    public:
+        VersionResponse();
+        ~VersionResponse();
+    
+        std::string version();
+        std::vector<std::string> apiversions();
+
+    private:
+        friend DataMoverClient;
+
+        void *data_;
+};
 
 class CreateRequest {
     public:
