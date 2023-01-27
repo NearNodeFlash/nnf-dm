@@ -59,6 +59,7 @@ import (
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 )
 
 var (
@@ -273,8 +274,8 @@ func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
 	return &pb.DataMovementVersionResponse{
-		Version:     version,
-		ApiVersions: apiVersions,
+		Version:     version.BuildVersion(),
+		ApiVersions: version.ApiVersions(),
 	}, nil
 }
 

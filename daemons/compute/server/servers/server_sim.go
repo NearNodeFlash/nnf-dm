@@ -25,6 +25,7 @@ import (
 	"time"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -60,8 +61,8 @@ func (s *simulatedServer) StartManager() error {
 
 func (*simulatedServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
 	return &pb.DataMovementVersionResponse{
-		Version:     version,
-		ApiVersions: apiVersions,
+		Version:     version.BuildVersion(),
+		ApiVersions: version.ApiVersions(),
 	}, nil
 }
 
