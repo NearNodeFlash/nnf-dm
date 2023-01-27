@@ -132,7 +132,7 @@ RequestStatus:
 
         RPCStatus status = client.Cancel(workflow, cancelRequest, &cancelResponse);
         if (!status.ok()) {
-            std::cout << "Cancle RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
+            std::cout << "Cancel RPC FAILED (" << status.error_code() << "): " << status.error_message() << std::endl;
             return 1;
         }
 
