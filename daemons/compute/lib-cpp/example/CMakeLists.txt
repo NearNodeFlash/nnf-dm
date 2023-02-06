@@ -9,5 +9,5 @@ add_executable(client "client.cc")
 target_link_directories(client BEFORE
   PRIVATE ../cmake/build/
 )
-target_link_libraries(client libmylib.dylib)
+target_link_libraries(client libnnfdm.dylib)
 target_include_directories(client PRIVATE ../)

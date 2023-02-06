@@ -25,7 +25,9 @@ import (
 	"time"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -55,6 +57,13 @@ func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
 
 func (s *simulatedServer) StartManager() error {
 	return nil
+}
+
+func (*simulatedServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
+	return &pb.DataMovementVersionResponse{
+		Version:     version.BuildVersion(),
+		ApiVersions: version.ApiVersions(),
+	}, nil
 }
 
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
