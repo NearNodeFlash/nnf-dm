@@ -22,6 +22,7 @@ jobs:
           dnf install -y rpm-build rpmdevtools git make
           dnf module -y install go-toolset 
           rpmdev-setuptree
+          echo $GITHUB_SHA | cut -c1-8 > .commit
           tar -czf /github/home/rpmbuild/SOURCES/nnf-datamovement-1.0.tar.gz --transform 's,^,nnf-datamovement-1.0/,' .
       - name: build rpms
         run: rpmbuild -ba daemons/compute/server/nnf-dm.spec

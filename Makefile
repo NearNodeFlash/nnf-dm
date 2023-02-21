@@ -120,7 +120,7 @@ container-unit-test: .version ## Run tests inside a container image
 
 ##@ Build
 
-build-daemon: COMMIT_HASH = $(shell git rev-parse --short HEAD)
+build-daemon: COMMIT_HASH?=$(shell git rev-parse --short HEAD)
 build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
 build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).commitHash=$(COMMIT_HASH)'" -o bin/nnf-dm daemons/compute/server/main.go

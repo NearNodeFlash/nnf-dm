@@ -21,7 +21,7 @@ Near Node Flash data movement through the data movement API.
 %setup -q
 
 %build
-make build-daemon
+COMMIT_HASH=$(cat .commit) make build-daemon
 
 %install
 mkdir -p %{buildroot}/usr/bin/
