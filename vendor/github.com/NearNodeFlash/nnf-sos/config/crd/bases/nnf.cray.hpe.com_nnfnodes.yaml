@@ -31,6 +31,11 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
+    - description: Parent pod name
+      jsonPath: .spec.pod
+      name: POD
+      priority: 1
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -121,6 +126,10 @@ spec:
                       type: integer
                   type: object
                 type: array
+              fenced:
+                description: Fenced is true when the NNF Node is fenced by the STONITH
+                  agent, and false otherwise.
+                type: boolean
               health:
                 description: NnfResourceHealthType defines the health of an NNF resource.
                 type: string

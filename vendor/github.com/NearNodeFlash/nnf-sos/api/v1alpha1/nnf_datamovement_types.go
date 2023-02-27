@@ -20,6 +20,7 @@
 package v1alpha1
 
 import (
+	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,6 +80,12 @@ type NnfDataMovementCommandStatus struct {
 
 	// ElapsedTime reflects the elapsed time since the underlying data movement command started.
 	ElapsedTime metav1.Duration `json:"elapsedTime,omitempty"`
+
+	// The path of the MPI hostfile used for the data movement command.
+	MPIHostfilePath string `json:"mpiHostfilePath,omitempty"`
+
+	// The contents of the MPI hostfile used for the data movement command.
+	MPIHostfileContents string `json:"mpiHostfileContents,omitempty"`
 
 	// Progress refects the progress of the underlying data movement command as captured from standard output.
 	// A best effort is made to parse the command output as a percentage. If no progress has
@@ -179,13 +186,13 @@ const (
 	DataMovementTeardownStateLabel = "nnf.cray.hpe.com/teardown_state"
 )
 
-func AddDataMovementTeardownStateLabel(object metav1.Object, state string) {
+func AddDataMovementTeardownStateLabel(object metav1.Object, state dwsv1alpha1.WorkflowState) {
 	labels := object.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
-	labels[DataMovementTeardownStateLabel] = state
+	labels[DataMovementTeardownStateLabel] = string(state)
 	object.SetLabels(labels)
 }
 

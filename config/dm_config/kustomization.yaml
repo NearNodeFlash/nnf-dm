@@ -6,6 +6,6 @@ generatorOptions:
 
 configMapGenerator:
   - name: nnf-dm-config
-    namespace: default
+    namespace: nnf-dm-system
     envs:
       - nnf-dm-config.env
