@@ -518,33 +518,46 @@ func getCmdAndArgs(cmCommand string, numProcesses, numHosts int, hostfilePath, m
 // created based on the DM Name. The hostfile is created inside of this directory.
 func createMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
 
-	// $ cat my-hosts
-	// node0 slots=2 max_slots=20
-	// node1 slots=2 max_slots=20
-	// https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
-	contents := ""
-	for _, host := range hosts {
-		hostLine := host
-
-		if slots > -1 {
-			hostLine += fmt.Sprintf(" slots=%d", slots)
-		}
-
-		if maxSlots > -1 {
-			hostLine += fmt.Sprintf(" max_slots=%d", maxSlots)
-		}
-
-		contents += fmt.Sprintln(hostLine)
-	}
-
 	tmpdir := filepath.Join("/tmp", dmName)
-	if err := os.Mkdir(tmpdir, 0755); err != nil {
+	if err := os.MkdirAll(tmpdir, 0755); err != nil {
 		return "", err
 	}
 	hostfilePath := filepath.Join(tmpdir, "hostfile")
 
-	if err := os.WriteFile(hostfilePath, []byte(contents), 0666); err != nil {
+	f, err := os.Create(hostfilePath)
+	if err != nil {
 		return "", err
+	}
+	defer f.Close()
+
+	// $ cat my-hosts
+	// node0 slots=2 max_slots=20
+	// node1 slots=2 max_slots=20
+	// https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+	for _, host := range hosts {
+		_, err := f.WriteString(host)
+		if err != nil {
+			return "", err
+		}
+
+		if slots > -1 {
+			_, err := f.WriteString(fmt.Sprintf(" slots=%d", slots))
+			if err != nil {
+				return "", err
+			}
+		}
+
+		if maxSlots > -1 {
+			_, err := f.WriteString(fmt.Sprintf(" max_slots=%d", maxSlots))
+			if err != nil {
+				return "", err
+			}
+		}
+
+		_, err = f.WriteString("\n")
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return hostfilePath, nil
