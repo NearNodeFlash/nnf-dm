@@ -157,10 +157,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if dm.Status.CommandStatus != nil && len(dm.Status.CommandStatus.MPIHostfilePath) > 0 {
-			os.RemoveAll(filepath.Dir(dm.Status.CommandStatus.MPIHostfilePath))
-		}
-
 		return ctrl.Result{}, nil
 	}
 
@@ -257,22 +253,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Create MPI hostfile only if dmCmd isn't overridden
 	mpiHostfile := ""
-	mpiHostfileContents := ""
 	if dmCmd == configMapDefaultCmd {
 		mpiHostfile, err = createMpiHostfile(dm.Name, hosts, slots, maxSlots)
 		if err != nil {
 			log.Error(err, "error creating MPI hostfile")
 			return ctrl.Result{}, err
 		}
-
-		// Read the hostfile to store the contents in the command status later
-		bytes, err := os.ReadFile(mpiHostfile)
-		if err != nil {
-			log.Error(err, "error reading MPI hostfile")
-			return ctrl.Result{}, err
-		}
-		mpiHostfileContents = string(bytes)
-		log.Info("Hostfile created", "hostfile path", mpiHostfile, "hostfile contents", mpiHostfileContents)
 	}
 	mpiOpts, dcpOpts := getMpiDcpOptions(configMap)
 
@@ -291,11 +277,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
 	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
-	cmdStatus.MPIHostfilePath = mpiHostfile
-	cmdStatus.MPIHostfileContents = mpiHostfileContents
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
-	log.Info("Using hostfile", "file path", mpiHostfile, "contents", cmdStatus.MPIHostfileContents)
 
 	if err := r.Status().Update(ctx, dm); err != nil {
 		return ctrl.Result{}, err
@@ -421,6 +404,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		} else {
 			log.Info("Completed Command", "cmdStatus", cmdStatus)
 		}
+
+		os.RemoveAll(filepath.Dir(mpiHostfile))
 
 		status := dm.Status.DeepCopy()
 

@@ -403,39 +403,6 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
-		Context("when the dm config map has specified MPI slots", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyNumProcesses] = ""
-				cm.Data[configMapKeyMpiSlots] = "4"
-				cm.Data[configMapKeyMpiMaxSlots] = "8"
-			})
-
-			// There are more tests below for the slots/maxSlots in the hostfile itself, but this
-			// verifies the integration between the config map, routine data movement, and the
-			// contents being published.
-			It("the MPI hostfile contents should use slots for each host", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-
-				Eventually(func(g Gomega) string {
-					contents := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						contents = dm.Status.CommandStatus.MPIHostfileContents
-					}
-					return contents
-				}).Should(Equal("localhost slots=4 max_slots=8\n"))
-			})
-		})
-
 		Context("when there is no dm config map", func() {
 			BeforeEach(func() {
 				createCm = false

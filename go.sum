@@ -102,6 +102,8 @@ github.com/NearNodeFlash/nnf-ec v0.0.0-20230221180225-1dce5b1f270f h1:Dr/JRcUA0N
 github.com/NearNodeFlash/nnf-ec v0.0.0-20230221180225-1dce5b1f270f/go.mod h1:s6Gp5d88rhMFcqrkF/Ds8D+n6GMAv9iw004YhAL3Neo=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20221012202709-192706b48299 h1:y7Isj6LA6CFI/JPyeXOwt7ii09PTiVmkx99N09Zwjg4=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20221012202709-192706b48299/go.mod h1:ytCSNDNgPEqNndL042/FeozWIVUixWOD/mmPqhIDYDY=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20230222155613-59e3bc22638a h1:4GTC2q72uJow9C5JpAfh7xjGW1HwlFdEvt++ma51Kz4=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20230222155613-59e3bc22638a/go.mod h1:VWtvXpr3ndLhFnxib7LNvHQb1xPp13vj6Kn0NGslNv0=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20230227170353-585d71d73f83 h1:mfi2xf+BOnUHWvDna9VpMWEm1ZsLxX+lP3s0evj1cAg=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20230227170353-585d71d73f83/go.mod h1:VWtvXpr3ndLhFnxib7LNvHQb1xPp13vj6Kn0NGslNv0=
 github.com/NearNodeFlash/nnf-sos v0.0.0-20230227230025-fa4f33456559 h1:UQwhTzdjCFFqj3S0ljraIJZ9oVB8VcHrJhy7H9M75I8=
