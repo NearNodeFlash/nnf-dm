@@ -285,16 +285,19 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: "Error finding compute mount info: " + err.Error(),
 		}, nil
 	}
 
 	var dm *nnfv1alpha1.NnfDataMovement
+	dmFunc := ""
 	switch computeMountInfo.Type {
 	case "lustre":
 		dm, err = s.createNnfDataMovement(ctx, req, computeMountInfo, computeClientMount)
+		dmFunc = "createNnfDataMovement()"
 	case "gfs2":
 		dm, err = s.createNnfNodeDataMovement(ctx, req, computeMountInfo)
+		dmFunc = "createNnfNodeDataMovement()"
 	default:
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_INVALID,
@@ -305,7 +308,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: fmt.Sprintf("Error during %s: %s", dmFunc, err),
 		}, nil
 	}
 
@@ -339,7 +342,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: "Error creating DataMovement: " + err.Error(),
 		}, nil
 	}
 
