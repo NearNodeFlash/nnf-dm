@@ -1,0 +1,6 @@
+profiles:
+  default:
+      slots: 8
+      maxSlots: 0
+      command: mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
+progressIntervalSeconds: 5

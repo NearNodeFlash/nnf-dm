@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -37,10 +36,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/yaml"
 )
 
 // This is dumped into a temporary file and then ran as a bash script.
@@ -48,11 +47,15 @@ import (
 //go:embed fakeProgressOutput.sh
 var progressOutputScript string
 
+var defaultCommand = "mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST"
+
 var _ = Describe("Data Movement Test", func() {
 
 	Describe("Reconciler Tests", func() {
 		var dm *nnfv1alpha1.NnfDataMovement
 		var cm *corev1.ConfigMap
+		var dmCfg *dmConfig
+		var dmCfgProfile dmConfigProfile
 		createCm := true
 		var tmpDir string
 		var srcPath string
@@ -96,26 +99,16 @@ var _ = Describe("Data Movement Test", func() {
 			}
 			k8sClient.Create(context.TODO(), ns)
 
-			cm = &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      configMapName,
-					Namespace: v1alpha1.DataMovementNamespace,
-					Labels: map[string]string{
-						testLabelKey: testLabel,
+			// Default config map data
+			dmCfg = &dmConfig{
+				Profiles: map[string]dmConfigProfile{
+					"default": {
+						Command: defaultCommand,
 					},
 				},
-				Data: map[string]string{
-					// Use a command that will pass instead of using the default of mpirun - which will fail.
-					// This is to ensure that our tests are less noisy on the output, as the mpirun will produce
-					// an error in the output.
-					configMapKeyCmd:             "true",
-					configMapKeyProgInterval:    "1s",
-					configMapKeyDcpProgInterval: "1s",
-					configMapKeyNumProcesses:    "",
-					configMapKeyMpiMaxSlots:     "",
-					configMapKeyMpiSlots:        "",
-				},
+				ProgressIntervalSeconds: 1,
 			}
+			dmCfgProfile = dmCfg.Profiles[configMapKeyProfileDefault]
 
 			dm = &nnfv1alpha1.NnfDataMovement{
 				ObjectMeta: metav1.ObjectMeta{
@@ -142,6 +135,26 @@ var _ = Describe("Data Movement Test", func() {
 		JustBeforeEach(func() {
 			// Create CM and verify label
 			if createCm {
+				// allow test to override the values in the default cfg profile
+				dmCfg.Profiles[configMapKeyProfileDefault] = dmCfgProfile
+
+				// Convert the config to raw
+				b, err := yaml.Marshal(dmCfg)
+				Expect(err).ToNot(HaveOccurred())
+
+				cm = &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configMapName,
+						Namespace: v1alpha1.DataMovementNamespace,
+						Labels: map[string]string{
+							testLabelKey: testLabel,
+						},
+					},
+					Data: map[string]string{
+						configMapKeyData: string(b),
+					},
+				}
+
 				Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
 				Eventually(func(g Gomega) string {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
@@ -180,6 +193,9 @@ var _ = Describe("Data Movement Test", func() {
 		})
 
 		Context("when a data movement operation succeeds", func() {
+			BeforeEach(func() {
+				dmCfgProfile.Command = "sleep 1"
+			})
 			It("should have a state and status of 'Finished' and 'Success'", func() {
 				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
@@ -191,9 +207,9 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
-		Context("when the dm configmap has specified a dmCommand", func() {
+		Context("when the dm configmap has specified an overrideCmd", func() {
 			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = "/bin/ls -l"
+				dmCfgProfile.Command = "/bin/ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -203,110 +219,14 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(cm.Data[configMapKeyCmd]))
+				}).Should(Equal(dmCfgProfile.Command))
 			})
 		})
-
-		Context("when the dm config map has specified a valid mpiNumProcesses and the dm namespace matches NNF_NODE_NAME", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyNumProcesses] = "17"
-				os.Setenv("NNF_NODE_NAME", "default") // normally this isn't default, but we just want it to match
-			})
-
-			It("should use that number for the -np flag", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 17 dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-
-			AfterEach(func() {
-				os.Unsetenv("NNF_NODE_NAME")
-			})
-		})
-
-		Context("when the dm config map has specified a valid mpiNumProcesses and the dm namespace does not match NNF_NODE_NAME", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyNumProcesses] = "17"
-			})
-
-			It("should use len(hosts) (1) for the -np flag", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		Context("when the dm config map has specified a invalid mpiNumProcesses", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyNumProcesses] = "aa"
-			})
-
-			It("should not use -np flag (default)", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		Context("when the dm config map has specified an empty mpiNumProcesses", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyNumProcesses] = ""
-			})
-
-			It("should not use -np flag (default)", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		DescribeTable("Parsing values from the dm config map for dmProgressInterval",
-			func(durStr string, dur time.Duration) {
-				configMap := &corev1.ConfigMap{}
-				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap)).To(Succeed())
-				// For this test, we don't have a direct way to verify the progress interval, so use getCollectionInterval directly
-				// instead of verifying full DM behavior.
-				configMap.Data[configMapKeyProgInterval] = durStr
-				dmProgressInterval := getCollectionInterval(configMap)
-				Expect(dmProgressInterval).To(Equal(dur))
-			},
-			Entry("when dmProgressInterval is valid", "25s", 25*time.Second),
-			Entry("when dmProgressInterval is invalid", "aafdafdsa", configMapDefaultProgInterval),
-			Entry("when dmProgressInterval is empty", "", configMapDefaultProgInterval),
-		)
 
 		Context("when the dm config map has specified a dmProgressInterval of less than 1s", func() {
 			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = "sleep .5"
-				cm.Data[configMapKeyProgInterval] = "500ms"
+				dmCfgProfile.Command = "sleep .5"
+				dmCfg.ProgressIntervalSeconds = 0
 			})
 
 			It("the data movement should skip progress collection", func() {
@@ -326,83 +246,6 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
-		Context("when the dm config map has specified a valid dcpProgressInterval", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyDcpProgInterval] = "7.12s"
-			})
-
-			It("should use that number for the dcp --progress option after rounding", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 dcp --progress 7 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		Context("when the dm config map has specified an invalid dcpProgressInterval", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyDcpProgInterval] = "aaa"
-			})
-
-			It("should use the default number for the dcp --progress option", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		Context("when the dm config map has specified an empty dcpProgressInterval", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyDcpProgInterval] = ""
-			})
-
-			It("should use the default number for the dcp --progress option", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 dcp --progress 1 --uid 0 --gid 0 %s %s", srcPath, destPath)))
-			})
-		})
-
-		Context("when the dm config map has specified extra mpi/dcp options", func() {
-			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
-				cm.Data[configMapKeyMpiOptions] = "--test1"
-				cm.Data[configMapKeyDcpOptions] = "--test2"
-			})
-
-			It("should use the extra options for mpi and dcp", func() {
-				Eventually(func(g Gomega) string {
-					cmd := ""
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
-					if dm.Status.CommandStatus != nil {
-						cmd = dm.Status.CommandStatus.Command
-					}
-					return cmd
-				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 --test1 dcp --progress 1 --uid 0 --gid 0 --test2 %s %s", srcPath, destPath)))
-			})
-		})
-
 		Context("when there is no dm config map", func() {
 			BeforeEach(func() {
 				createCm = false
@@ -418,7 +261,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when a data movement command fails", func() {
 			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = "false"
+				dmCfgProfile.Command = "false"
 			})
 			It("should have a State/Status of 'Finished'/'Failed'", func() {
 				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
@@ -437,7 +280,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				// Set cancel on creation so that data movement doesn't start
 				dm.Spec.Cancel = true
-				cm.Data[configMapKeyCmd] = "" // try to use mpirun dcp, it will fail
+				dmCfgProfile.Command = "false"
 			})
 
 			It("should have a State/Status of 'Finished'/'Cancelled' and StartTime/EndTime should be set to now", func() {
@@ -497,14 +340,14 @@ var _ = Describe("Data Movement Test", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				commandWithArgs = fmt.Sprintf("/bin/bash %s %d %f", scriptFilePath, commandDuration, commandIntervalInSec)
-				cm.Data[configMapKeyCmd] = commandWithArgs
+				dmCfgProfile.Command = commandWithArgs
 			})
 
 			It("should update progress by parsing the output of the command", func() {
 				startTime := metav1.NowMicro()
 
 				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-				Expect(cm.Data[configMapKeyCmd]).To(Equal(commandWithArgs))
+				Expect(dmCfgProfile.Command).To(Equal(commandWithArgs))
 
 				By("ensuring that we do not have a progress to start")
 				Eventually(func(g Gomega) *int32 {
@@ -581,8 +424,8 @@ var _ = Describe("Data Movement Test", func() {
 				_, err := os.Stat(scriptFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
-				cm.Data[configMapKeyCmd] = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
-				cm.Data[configMapKeyProgInterval] = "1s"
+				dmCfgProfile.Command = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
+				dmCfg.ProgressIntervalSeconds = 1
 			})
 
 			It("LastMessage should not include multiple lines of output", func() {
@@ -602,7 +445,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when a data movement operation is cancelled", func() {
 			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = "sleep 5"
+				dmCfgProfile.Command = "sleep 5"
 			})
 			It("should have a state and status of 'Finished' and 'Cancelled'", func() {
 				By("ensuring the data movement started")
@@ -634,7 +477,6 @@ var _ = Describe("Data Movement Test", func() {
 			expectedUid := uint32(2000)
 
 			BeforeEach(func() {
-				cm.Data[configMapKeyCmd] = ""
 				dm.Spec.GroupId = expectedGid
 				dm.Spec.UserId = expectedUid
 			})
@@ -647,7 +489,7 @@ var _ = Describe("Data Movement Test", func() {
 					}
 					return cmd
 				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) -np 1 dcp --progress 1 --uid %d --gid %d %s %s",
+					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid %d --gid %d %s %s",
 					expectedUid, expectedGid, srcPath, destPath)))
 			})
 		})
@@ -670,102 +512,10 @@ var _ = Describe("Data Movement Test", func() {
 					Expect(err).To(BeNil())
 					Expect(string(contents)).To(Equal(expected))
 				},
-				Entry("with no slots or max_slots", hosts, -1, -1, "node1\nnode2\n"),
-				Entry("with only slots", hosts, 4, -1, "node1 slots=4\nnode2 slots=4\n"),
-				Entry("with only max_slots", hosts, -1, 4, "node1 max_slots=4\nnode2 max_slots=4\n"),
+				Entry("with no slots or max_slots", hosts, 0, 0, "node1\nnode2\n"),
+				Entry("with only slots", hosts, 4, 0, "node1 slots=4\nnode2 slots=4\n"),
+				Entry("with only max_slots", hosts, 0, 4, "node1 max_slots=4\nnode2 max_slots=4\n"),
 				Entry("with both slots and max_slots", hosts, 4, 4, "node1 slots=4 max_slots=4\nnode2 slots=4 max_slots=4\n"),
-			)
-		})
-
-		Context("dmConfigMap Defaults", func() {
-			DescribeTable("slot/maxSlot",
-				func(slots, maxSlots string, expSlots, expMaxSlots int) {
-					cm := &corev1.ConfigMap{
-						Data: map[string]string{
-							configMapKeyMpiSlots:    slots,
-							configMapKeyMpiMaxSlots: maxSlots,
-						},
-					}
-					s, m := getMpiSlots(cm)
-					Expect(s).To(Equal(expSlots))
-					Expect(m).To(Equal(expMaxSlots))
-
-				},
-				Entry("no values supplied - defaults used", "", "", configMapDefaultMpiSlots, configMapDefaultMpiMaxSlots),
-				Entry("values supplied", "8", "16", 8, 16),
-			)
-		})
-
-		Context("DM Command and Arguments", func() {
-			DescribeTable("mpirun -np",
-				func(ns string, np int, expected string) {
-					dm := &nnfv1alpha1.NnfDataMovement{
-						Spec: nnfv1alpha1.NnfDataMovementSpec{
-							Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-								Path: "/src",
-							},
-							Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-								Path: "/dest",
-							},
-							UserId:  9999,
-							GroupId: 9999,
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: ns,
-						},
-					}
-					numHosts := 10
-					progressInt := 1
-					mpiOpts := ""
-					dcpOpts := ""
-					cmd, args := getCmdAndArgs("", np, numHosts, "/tmp/xyz/hostfile", mpiOpts, progressInt, dcpOpts, dm)
-					actual := fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))
-					Expect(actual).To(Equal(expected))
-				},
-				Entry("With -np", "", 8,
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 8 dcp --progress 1 --uid 9999 --gid 9999 /src /dest"),
-				Entry("Without -np", "", -1,
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile dcp --progress 1 --uid 9999 --gid 9999 /src /dest"),
-				Entry("Lustre2Lustre (namespace != rabbit node) should use the len(hosts)", "fake-namespace", -1,
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 dcp --progress 1 --uid 9999 --gid 9999 /src /dest"),
-			)
-
-			DescribeTable("mpirun/dcp extra options",
-				func(mpiOpts, dcpOpts, expected string) {
-					dm := &nnfv1alpha1.NnfDataMovement{
-						Spec: nnfv1alpha1.NnfDataMovementSpec{
-							Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-								Path: "/src",
-							},
-							Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-								Path: "/dest",
-							},
-							UserId:  9999,
-							GroupId: 9999,
-						},
-					}
-					np := 10
-					numHosts := 10
-					progressInt := 1
-					cmd, args := getCmdAndArgs("", np, numHosts, "/tmp/xyz/hostfile", mpiOpts, progressInt, dcpOpts, dm)
-					actual := fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))
-					Expect(actual).To(Equal(expected))
-				},
-				Entry("two mpi opts with args",
-					"--extra x --opts y", "",
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 --extra x --opts y dcp --progress 1 --uid 9999 --gid 9999 /src /dest"),
-				Entry("two dcp opts with args",
-					"", "--more x --opts y",
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 dcp --progress 1 --uid 9999 --gid 9999 --more x --opts y /src /dest"),
-				Entry("one mpi opt with no args",
-					"--one", "",
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 --one dcp --progress 1 --uid 9999 --gid 9999 /src /dest"),
-				Entry("one dcp opt with no args",
-					"", "--two",
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 dcp --progress 1 --uid 9999 --gid 9999 --two /src /dest"),
-				Entry("both mpi and dcp opts",
-					"--one 1", "--two 2",
-					"mpirun --allow-run-as-root --hostfile /tmp/xyz/hostfile -np 10 --one 1 dcp --progress 1 --uid 9999 --gid 9999 --two 2 /src /dest"),
 			)
 		})
 	})
