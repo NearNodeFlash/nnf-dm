@@ -207,6 +207,24 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
+		Context("when a data movement command has no progress output", func() {
+			BeforeEach(func() {
+				dmCfgProfile.Command = "sleep 1"
+			})
+			It("CommandStatus should not have a ProgressPercentage", func() {
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+				Expect(dm.Status.CommandStatus.ProgressPercentage).To(BeNil())
+			})
+		})
+
 		Context("when the dm configmap has specified an overrideCmd", func() {
 			BeforeEach(func() {
 				dmCfgProfile.Command = "/bin/ls -l"

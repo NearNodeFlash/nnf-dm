@@ -238,14 +238,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	configMap := &corev1.ConfigMap{}
 	if err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
 		log.Info("Config map not found - requeueing", "name", configMapName, "namespace", configMapNamespace)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 	log.Info("Config map found", "data", configMap.Data)
 
 	cfg := dmConfig{}
 	if err := yaml.Unmarshal([]byte(configMap.Data[configMapKeyData]), &cfg); err != nil {
 		log.Error(err, "error reading config map data")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 	log.Info("Config map unmarshalled", "config", cfg)
 
@@ -255,14 +255,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Ensure profile exists
 	profile, found := cfg.Profiles[configMapKeyProfileDefault]
 	if !found {
-		return ctrl.Result{}, fmt.Errorf("'%s' profile not found in config map", configMapKeyProfileDefault)
+		return ctrl.Result{}, handleInvalidError(fmt.Errorf(
+			"'%s' profile not found in config map", configMapKeyProfileDefault))
 	}
 	log.Info("Using profile", "name", configMapKeyProfileDefault, "profile", profile)
 
 	cmdArgs, mpiHostfile, err := buildDMCommand(profile, hosts, dm)
 	if err != nil {
 		log.Error(err, "error building DM command")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 
 	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))

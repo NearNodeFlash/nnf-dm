@@ -4,11 +4,11 @@ profiles:
 
   # Default profile that is used for all data movement activity.
   default:
-      # The number of slots to be use in the MPI hostfile. A value less than 1 disables the use
+      # The number of slots specified in the MPI hostfile. A value less than 1 disables the use
       # of slots in the hostfile.
       slots: 8
 
-      # The number of max_slots to be use in the MPI hostfile. A value less than 1 disables the use
+      # The number of max_slots specified in the MPI hostfile. A value less than 1 disables the use
       # of max_slots in the hostfile.
       maxSlots: 0
 
@@ -23,7 +23,7 @@ profiles:
       # default: command: mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
       command: mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
 
-# NnfDataMovement resources have the ability to collect and storage the progress percentage and the
+# NnfDataMovement resources have the ability to collect and store the progress percentage and the
 # last few lines of output in the CommandStatus field. This number is used for the interval to collect
 # the progress data. `dcp --progress N` must be included in the command.
 # A value less than 1 disables this functionality.
