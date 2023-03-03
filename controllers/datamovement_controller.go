@@ -438,8 +438,8 @@ func buildDMCommand(profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.Nnf
 	// Command provided via the configmap
 	providedCmd := profile.Command
 
-	// Create MPI hostfile only if dmCmd isn't overridden
-	if strings.HasPrefix(providedCmd, "mpirun") {
+	// Create MPI hostfile only if included in the provided command
+	if strings.Contains(providedCmd, "$HOSTFILE") {
 		slots := profile.Slots
 		maxSlots := profile.MaxSlots
 

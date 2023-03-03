@@ -223,6 +223,22 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
+		Context("when the dm configmap does not have $HOSTFILE in the command", func() {
+			BeforeEach(func() {
+				dmCfgProfile.Command = "/bin/ls -l"
+			})
+			It("should use that command instead of the default mpirun", func() {
+				Eventually(func(g Gomega) string {
+					cmd := ""
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					if dm.Status.CommandStatus != nil {
+						cmd = dm.Status.CommandStatus.Command
+					}
+					return cmd
+				}).Should(Equal(dmCfgProfile.Command))
+			})
+		})
+
 		Context("when the dm config map has specified a dmProgressInterval of less than 1s", func() {
 			BeforeEach(func() {
 				dmCfgProfile.Command = "sleep .5"
@@ -528,6 +544,54 @@ var _ = Describe("Data Movement Test", func() {
 
 				actual := peekMpiHostfile(hostfilePath)
 				Expect(actual).To(Equal("one slots=16 max_slots=32\n"))
+			})
+		})
+
+		Context("$HOSTFILE creation", func() {
+			hosts := []string{"one", "two", "three"}
+			dm := nnfv1alpha1.NnfDataMovement{
+				Spec: nnfv1alpha1.NnfDataMovementSpec{
+					UserId:  1000,
+					GroupId: 2000,
+					Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+						Path: "/src/",
+					},
+					Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+						Path: "/dest/",
+					},
+				},
+			}
+			When("$HOSTFILE is present", func() {
+				It("should create the hostfile", func() {
+					profile := dmConfigProfile{
+						Command: "mpirun --hostfile $HOSTFILE dcp src dest",
+					}
+
+					cmd, hostfile, err := buildDMCommand(profile, hosts, &dm)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(len(hostfile)).Should((BeNumerically(">", 0)))
+					Expect(cmd).ToNot(BeEmpty())
+					info, err := os.Stat(hostfile)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(info).ToNot(BeNil())
+				})
+
+			})
+			When("$HOSTFILE is not present", func() {
+				It("should not create the hostfile", func() {
+					profile := dmConfigProfile{
+						Command: "mpirun -np 1 dcp src dest",
+					}
+
+					cmd, hostfile, err := buildDMCommand(profile, hosts, &dm)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(len(hostfile)).Should(Equal(0))
+					Expect(cmd).ToNot(BeEmpty())
+					info, err := os.Stat(hostfile)
+					Expect(err).To(HaveOccurred())
+					Expect(info).To(BeNil())
+				})
+
 			})
 		})
 	})
