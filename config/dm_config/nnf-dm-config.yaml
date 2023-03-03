@@ -25,6 +25,6 @@ profiles:
 
 # NnfDataMovement resources have the ability to collect and store the progress percentage and the
 # last few lines of output in the CommandStatus field. This number is used for the interval to collect
-# the progress data. `dcp --progress N` must be included in the command.
-# A value less than 1 disables this functionality.
+# the progress data. `dcp --progress N` must be included in the data movement command in order for
+# progress to be collected. A value less than 1 disables this functionality.
 progressIntervalSeconds: 5
