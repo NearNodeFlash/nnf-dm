@@ -518,5 +518,18 @@ var _ = Describe("Data Movement Test", func() {
 				Entry("with both slots and max_slots", hosts, 4, 4, "node1 slots=4 max_slots=4\nnode2 slots=4 max_slots=4\n"),
 			)
 		})
+
+		Context("peekMpiHostfile", func() {
+			It("should return the first line of the hostfile", func() {
+				hosts := []string{"one", "two", "three"}
+				slots, maxSlots := 16, 32
+				hostfilePath, err := createMpiHostfile("my-dm", hosts, slots, maxSlots)
+				Expect(err).ToNot(HaveOccurred())
+
+				actual := peekMpiHostfile(hostfilePath)
+				Expect(actual).To(Equal("one slots=16 max_slots=32\n"))
+			})
+		})
 	})
+
 })

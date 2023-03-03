@@ -480,8 +480,7 @@ func createMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (stri
 	// node1 slots=2 max_slots=20
 	// https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
 	for _, host := range hosts {
-		_, err := f.WriteString(host)
-		if err != nil {
+		if _, err := f.WriteString(host); err != nil {
 			return "", err
 		}
 
@@ -516,9 +515,12 @@ func peekMpiHostfile(hostfile string) string {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	scanner.Scan()
-	return scanner.Text()
+	str, err := bufio.NewReader(file).ReadString('\n')
+	if err != nil {
+		return ""
+	}
+
+	return str
 }
 
 func progressCollectionEnabled(collectInterval time.Duration) bool {
