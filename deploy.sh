@@ -39,7 +39,6 @@ deploy)
     $(cd config/manager && $KUSTOMIZE edit set image controller="$IMG")
 
     $KUSTOMIZE build config/default | kubectl apply -f - || true
-    $KUSTOMIZE build config/dm_config | kubectl create -f - || true
 
     # Sometimes the deployment of the DataMovementManager occurs to quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
@@ -56,7 +55,6 @@ undeploy)
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
     $KUSTOMIZE build config/default | kubectl delete --ignore-not-found -f -
-    $KUSTOMIZE build config/dm_config | kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage

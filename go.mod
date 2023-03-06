@@ -3,9 +3,9 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20221027172242-11a787dffb4c
+	github.com/HewlettPackard/dws v0.0.0-20230207214424-016335e15075
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20221101145649-697b21833988
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20221012202709-192706b48299
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20230222155613-59e3bc22638a
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.23.0
 	github.com/prometheus/client_golang v1.13.0
@@ -29,7 +29,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/NearNodeFlash/nnf-ec v0.0.0-20220920142937-1080197e523b // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.0-20230221180225-1dce5b1f270f // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -84,7 +84,28 @@ require (
 
 require (
 	cloud.google.com/go/compute v1.10.0 // indirect
+	github.com/HewlettPackard/structex v1.0.2 // indirect
+	github.com/cespare/xxhash v1.1.0 // indirect
+	github.com/dgraph-io/badger/v3 v3.2103.1 // indirect
+	github.com/dgraph-io/ristretto v0.1.0 // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
+	github.com/golang/glog v1.0.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/flatbuffers v2.0.0+incompatible // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/klauspost/compress v1.13.5 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/moby/sys/mountinfo v0.6.2 // indirect
+	github.com/pkg/term v1.1.0 // indirect
+	github.com/rs/cors v1.8.0 // indirect
+	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46 // indirect
+	github.com/sigurn/crc8 v0.0.0-20160107002456-e55481d6f45c // indirect
+	github.com/sigurn/utils v0.0.0-20190728110027-e1fefb11a144 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
+	go.chromium.org/luci v0.0.0-20210915061045-7722a2154c29 // indirect
+	go.opencensus.io v0.23.0 // indirect
+	k8s.io/mount-utils v0.25.2 // indirect
 )
