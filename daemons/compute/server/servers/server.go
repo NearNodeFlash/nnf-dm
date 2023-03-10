@@ -36,6 +36,9 @@ type ServerOptions struct {
 	nodeName  string
 	sysConfig string
 	simulated bool
+
+	k8sQPS   int
+	k8sBurst int
 }
 
 func GetOptions() (*ServerOptions, error) {
@@ -47,6 +50,12 @@ func GetOptions() (*ServerOptions, error) {
 		tokenFile: os.Getenv("NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE"),
 		certFile:  os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CERT_FILE"),
 		simulated: false,
+
+		// These options adjust the client-side rate-limiting for k8s. The new defaults are 50 and
+		// 100 (rather than 5, 10). See more info https://github.com/kubernetes/kubernetes/pull/116121
+		// According to that PR, it appears that client-side rate-limiting is going away.
+		k8sQPS:   50,
+		k8sBurst: 100,
 	}
 
 	flag.StringVar(&opts.host, "kubernetes-service-host", opts.host, "Kubernetes service host address")
@@ -57,6 +66,8 @@ func GetOptions() (*ServerOptions, error) {
 	flag.StringVar(&opts.certFile, "service-cert-file", opts.certFile, "Path to the NNF data movement service certificate")
 	flag.StringVar(&opts.sysConfig, "sys-config", "default", "Name of the system configuration containing this compute resource")
 	flag.BoolVar(&opts.simulated, "simulated", opts.simulated, "Run in simulation mode where no requests are sent to the server")
+	flag.IntVar(&opts.k8sQPS, "kubernetes-qps", opts.k8sQPS, "Kubernetes client queries per second (QPS)")
+	flag.IntVar(&opts.k8sBurst, "kubernetes-burst", opts.k8sBurst, "Kubernetes client additional concurrent calls above QPS")
 	flag.Parse()
 	return &opts, nil
 }

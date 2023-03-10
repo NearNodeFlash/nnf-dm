@@ -22,6 +22,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
@@ -42,13 +43,29 @@ const (
 type simulatedServer struct {
 	pb.UnimplementedDataMoverServer
 
-	requests map[uuid.UUID]requestData
+	requests      map[uuid.UUID]requestData
+	requestsMutex sync.Mutex
 }
 
 type requestData struct {
 	// Keep track of how many status responses we've sent to facilitate sending RUNNING before COMPLETE
 	statusResponseCount int
 	cancelResponseCount int
+}
+
+func (s *simulatedServer) addRequest(uid uuid.UUID, r requestData) {
+	s.requestsMutex.Lock()
+	defer s.requestsMutex.Unlock()
+
+	s.requests[uid] = r
+}
+
+func (s *simulatedServer) getRequest(uid uuid.UUID) (requestData, bool) {
+	s.requestsMutex.Lock()
+	defer s.requestsMutex.Unlock()
+
+	r, ok := s.requests[uid]
+	return r, ok
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
@@ -69,7 +86,7 @@ func (*simulatedServer) Version(context.Context, *emptypb.Empty) (*pb.DataMoveme
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 
-	s.requests[uid] = requestData{statusResponseCount: 0, cancelResponseCount: 0}
+	s.addRequest(uid, requestData{statusResponseCount: 0, cancelResponseCount: 0})
 
 	return &pb.DataMovementCreateResponse{Uid: uid.String()}, nil
 }
@@ -85,7 +102,7 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		}, nil
 	}
 
-	reqData, ok := s.requests[uid]
+	reqData, ok := s.getRequest(uid)
 	if !ok {
 		return &pb.DataMovementStatusResponse{
 			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
@@ -126,7 +143,7 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		resp.CommandStatus.LastMessageTime = time.Now().String()
 	}
 
-	s.requests[uid] = reqData
+	s.addRequest(uid, reqData)
 
 	return &resp, nil
 }
@@ -188,7 +205,7 @@ func (s *simulatedServer) Cancel(ctx context.Context, req *pb.DataMovementCancel
 
 	// Set the count so we can use Status to get cancel statuses
 	reqData.cancelResponseCount = 1
-	s.requests[uid] = reqData
+	s.addRequest(uid, reqData)
 
 	return &pb.DataMovementCancelResponse{
 		Status:  pb.DataMovementCancelResponse_SUCCESS,

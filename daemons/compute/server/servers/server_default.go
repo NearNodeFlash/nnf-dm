@@ -147,6 +147,8 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			TLSClientConfig: tlsClientConfig,
 			BearerToken:     string(token),
 			BearerTokenFile: opts.tokenFile,
+			QPS:             float32(opts.k8sQPS),
+			Burst:           opts.k8sBurst,
 		}
 	}
 
