@@ -350,7 +350,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
-						log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
 						return r.Status().Update(ctx, dm)
 					})
 
