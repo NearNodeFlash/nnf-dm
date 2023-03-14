@@ -286,7 +286,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	go func() {
 		// Use a MultiWriter so that we can parse the output and save the full output at the end
 		var combinedOutBuf, parseBuf bytes.Buffer
-		cmd.Stdout = io.MultiWriter(os.Stdout, &parseBuf, &combinedOutBuf)
+		cmd.Stdout = io.MultiWriter(&parseBuf, &combinedOutBuf)
 		cmd.Stderr = cmd.Stdout // Combine stderr/stdout
 
 		// Use channels to sync progress collection and cmd.Wait().
@@ -350,7 +350,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
-						log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
 						return r.Status().Update(ctx, dm)
 					})
 

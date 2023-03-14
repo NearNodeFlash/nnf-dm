@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -83,55 +84,79 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create all of the requests at once
+	wg := sync.WaitGroup{}
+	lock := sync.Mutex{}
+	responses := make([]*pb.DataMovementCreateResponse, 0)
 	for i := 0; i < *count; i++ {
-		log.Printf("Creating request %d of %d...", i+1, *count)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
 
-		createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
-		if err != nil {
-			log.Fatalf("could not create data movement request: %v", err)
-		}
-
-		if createResponse.GetStatus() != pb.DataMovementCreateResponse_SUCCESS {
-			log.Fatalf("create request failed: %+v", createResponse)
-		}
-
-		log.Printf("Data movement request created: %s", createResponse.GetUid())
-		uid := createResponse.GetUid()
-
-		// Cancel the data movement after specified amount of time
-		if *cancelExpiryTime >= 0 {
-			log.Printf("Waiting %s before cancelling request\n", (*cancelExpiryTime).String())
-			time.Sleep(*cancelExpiryTime)
-
-			log.Printf("Canceling request: %v", uid)
-			cancelResponse, err := cancelRequest(ctx, c, *workflow, *namespace, uid)
+			log.Printf("Creating request %d of %d...", i+1, *count)
+			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
 			if err != nil {
-				log.Fatalf("error initiating data movement cancel request: %v", err)
-			}
-			log.Printf("Data movement request cancel initiated: %v %v", uid, cancelResponse.String())
-		}
-
-		// Poll request to check for completed/cancelled
-		for {
-			statusResponse, err := getStatus(ctx, c, *workflow, *namespace, uid, *maxWaitTime)
-			if err != nil {
-				log.Fatalf("failed to get data movement status: %v", err)
+				log.Fatalf("could not create data movement request: %v", err)
 			}
 
-			if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
-				log.Fatalf("data movement status failed: %+v", statusResponse)
+			lock.Lock()
+			responses = append(responses, createResponse)
+			lock.Unlock()
+
+			if createResponse.GetStatus() != pb.DataMovementCreateResponse_SUCCESS {
+				log.Fatalf("create request failed: %+v", createResponse)
 			}
 
-			log.Printf("Data movement status: %+v", statusResponse)
-			if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
-				break
-			}
-
-			time.Sleep(time.Second)
-		}
-
-		log.Printf("Data movement completed: %s", createResponse.GetUid())
+			log.Printf("Data movement request created: %s", createResponse.GetUid())
+		}(i)
 	}
+
+	wg.Wait()
+
+	for _, resp := range responses {
+		uid := resp.GetUid()
+		wg.Add(1)
+
+		go func(uid string, resp *pb.DataMovementCreateResponse) {
+			defer wg.Done()
+
+			// Cancel the data movement after specified amount of time
+			if *cancelExpiryTime >= 0 {
+				log.Printf("Waiting %s before cancelling request\n", (*cancelExpiryTime).String())
+				time.Sleep(*cancelExpiryTime)
+
+				log.Printf("Canceling request: %v", uid)
+				cancelResponse, err := cancelRequest(ctx, c, *workflow, *namespace, uid)
+				if err != nil {
+					log.Fatalf("error initiating data movement cancel request: %v", err)
+				}
+				log.Printf("Data movement request cancel initiated: %v %v", uid, cancelResponse.String())
+			}
+
+			// Poll request to check for completed/cancelled
+			for {
+				statusResponse, err := getStatus(ctx, c, *workflow, *namespace, uid, *maxWaitTime)
+				if err != nil {
+					log.Fatalf("failed to get data movement status: %v", err)
+				}
+
+				if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
+					log.Fatalf("data movement status failed: %+v", statusResponse)
+				}
+
+				log.Printf("Data movement status: %+v", statusResponse)
+				if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
+					break
+				}
+
+				time.Sleep(time.Second)
+			}
+
+			log.Printf("Data movement completed: %s", resp.GetUid())
+		}(uid, resp)
+	}
+
+	wg.Wait()
 
 	// Get the list of Data Movement Requests
 	listResponse, err := listRequests(ctx, c, *workflow, *namespace)
