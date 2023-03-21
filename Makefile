@@ -111,7 +111,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 		failfast="-ginkgo.fail-fast"; \
 	fi; \
 	set -o errexit; \
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v -ginkgo.progress $$failfast
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v $$failfast
 
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
