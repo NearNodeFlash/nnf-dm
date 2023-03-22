@@ -1,16 +1,16 @@
-# github.com/HewlettPackard/dws v0.0.0-20230224185520-92a8916979a7 => ../dws-5.git
+# github.com/HewlettPackard/dws v0.0.0-20230322150428-080a05f072a6
 ## explicit; go 1.19
 github.com/HewlettPackard/dws/api/v1alpha1
 github.com/HewlettPackard/dws/utils/dwdparse
 github.com/HewlettPackard/dws/utils/updater
-# github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20221101145649-697b21833988 => ../lustre-fs-oper-1.git
+# github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230322153812-315a443f315b
 ## explicit; go 1.19
 github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
-# github.com/NearNodeFlash/nnf-ec v0.0.0-20230308165737-09068457bd09
+# github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d
 ## explicit; go 1.18
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20230301192820-b2c4363218b9 => ../nnf-sos-2.git
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20230322160930-ae4c82643d04
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
@@ -734,6 +734,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/HewlettPackard/dws => ../dws-5.git
-# github.com/NearNodeFlash/lustre-fs-operator => ../lustre-fs-oper-1.git
-# github.com/NearNodeFlash/nnf-sos => ../nnf-sos-2.git
