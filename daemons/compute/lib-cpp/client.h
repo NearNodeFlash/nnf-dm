@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -28,6 +28,7 @@ namespace data_movement {
 
 class RPCStatus;
 class Workflow;
+class CommandStatus;
 
 class VersionResponse;
 class CreateRequest;
@@ -97,9 +98,22 @@ class VersionResponse {
         void *data_;
 };
 
+class CommandStatus {
+    public:
+        CommandStatus(std::string command, int32_t progress, std::string elapsedTime, std::string lastMessage, std::string lastMessageTime);
+        std::string command;
+        int32_t progress;
+        std::string elapsedTime;
+        std::string lastMessage;
+        std::string lastMessageTime;
+
+    private:
+        friend DataMoverClient;
+};
+
 class CreateRequest {
     public:
-        CreateRequest(std::string source, std::string destination);
+        CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions);
         ~CreateRequest();
 
     private:
@@ -166,6 +180,9 @@ class StatusResponse {
         State           state();
         Status          status();
         std::string     message();
+        CommandStatus   commandStatus();
+        std::string     startTime();
+        std::string     endTime();
 
     private:
         friend DataMoverClient;

@@ -341,6 +341,19 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	// controller can identify compute initiated data movements.
 	nnfv1alpha1.AddDataMovementTeardownStateLabel(dm, dwsv1alpha1.StatePostRun)
 
+	// Allow the user to override/supplement certain settings
+	if req.Dryrun || len(req.DcpOptions) > 0 {
+		dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{}
+
+		if req.Dryrun {
+			dm.Spec.UserConfig.Dryrun = true
+		}
+
+		if len(req.DcpOptions) > 0 {
+			dm.Spec.UserConfig.DCPOptions = req.DcpOptions
+		}
+	}
+
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
@@ -443,7 +456,6 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
-			//Dryrun:      req.Dryrun, TODO
 		},
 	}
 
@@ -561,11 +573,20 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 			cmdStatus.ElapsedTime = d.String()
 		}
 		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
-			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.UTC().String()
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.Local().String()
 		}
 		if dm.Status.CommandStatus.ProgressPercentage != nil {
 			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
 		}
+	}
+
+	startTimeStr := ""
+	if !dm.Status.StartTime.IsZero() {
+		startTimeStr = dm.Status.StartTime.Local().String()
+	}
+	endTimeStr := ""
+	if !dm.Status.EndTime.IsZero() {
+		endTimeStr = dm.Status.EndTime.Local().String()
 	}
 
 	return &pb.DataMovementStatusResponse{
@@ -573,6 +594,8 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		Status:        status,
 		Message:       dm.Status.Message,
 		CommandStatus: &cmdStatus,
+		StartTime:     startTimeStr,
+		EndTime:       endTimeStr,
 	}, nil
 }
 

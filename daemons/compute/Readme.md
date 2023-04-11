@@ -14,7 +14,7 @@ Copy the nnf-dm daemon to a suitable location such as `/usr/bin`. After defining
 
 NNF software defines a Kubernetes service account for communicating data movement requests to the kubeapi server. The token file and certificate file can be downloaded by running `cert-load.sh` and verified with `cert-test.sh` The token file and certificate file must be provided to the nnf-dm daemon.
 
-### Customizing the Configuration
+### Customizing the Daemon Configuration
 
 Installing the nnf-dm daemon will create a default configuration located at `/etc/systemd/system/nnf-dm.service`. The default configuration created on installation is sparse as the use of environmental variables is assumed. If desired, one can edit the configuration with the [command line options](#command-line-options). An example is show below.
 
@@ -37,7 +37,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-### Configuration Overrides
+### Daemon Configuration Overrides
 
 systemd can be used to create an override file that is useful for non-standard behavior of the data movement service. Run `systemctl edit nnf-dm` to create or edit the override file.
 
@@ -98,7 +98,8 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 | `workflow` | Workflow | The name and namespace of the initiating workflow |
 | `source` | string | The source file or directory |
 | `destination` | string | The destination file or directory |
-| `dryrun` | bool | If True, the rsync copy operation should evaluate the inputs but not perform the copy |
+| `dryrun` | bool | If True, the data movement command runs `/bin/true` rather than perform actual data movement |
+| `dcpOptions` | string | Additional options to pass to `dcp` (to perform data movement) |
 
 ### Create Response
 
@@ -133,6 +134,8 @@ Each nnf-dm request contains a Workflow message containing the Name and Namespac
 | `status` | Status | Current status of the data movement request |
 | `message` | string | String providing detailed message pertaining to the current state/status of the request |
 | `commandStatus` | CommandStatus | Status of the data movement command. Includes progress, timing, and last message |
+| `startTime` | string | The start time of the data movement operation |
+| `endTime` | string | The end time of the data movement operation |
 
 #### Status Response `State`
 

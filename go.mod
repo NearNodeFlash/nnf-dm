@@ -3,9 +3,9 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.0-20230322150428-080a05f072a6
+	github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230322153812-315a443f315b
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20230322160930-ae4c82643d04
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3
 	github.com/prometheus/client_golang v1.14.0
@@ -69,7 +69,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.26.1 // indirect
 	k8s.io/klog/v2 v2.90.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20230105215759-76fd588bec96 // indirect
+	k8s.io/kube-openapi v0.0.0-20230109183929-3758b55a6596 // indirect
 	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
@@ -82,6 +82,8 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/google/pprof v0.0.0-20221103000818-d260c55eee4c // indirect
 	github.com/kr/pretty v0.3.0 // indirect
+	github.com/kubeflow/common v0.4.6 // indirect
+	github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 )

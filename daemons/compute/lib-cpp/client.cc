@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -168,6 +168,14 @@ Workflow::Workflow(std::string name, std::string namespace_) :
     namespace_(namespace_)
 { }
 
+CommandStatus::CommandStatus(std::string command, int32_t progress, std::string elapsedTime, std::string lastMessage, std::string lastMessageTime) :
+    command(command),
+    progress(progress),
+    elapsedTime(elapsedTime),
+    lastMessage(lastMessage),
+    lastMessageTime(lastMessageTime)
+{ }
+
 VersionResponse::VersionResponse() {
     auto response = new datamovement::DataMovementVersionResponse();
     data_ = static_cast<void *>(response);
@@ -194,11 +202,13 @@ std::vector<std::string> VersionResponse::apiversions() {
     return apiVersions;
 }
 
-CreateRequest::CreateRequest(std::string source, std::string destination) {
+CreateRequest::CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions) {
     auto request = new datamovement::DataMovementCreateRequest();
 
     request->set_source(source);
     request->set_destination(destination);
+    request->set_dryrun(dryrun);
+    request->set_dcpoptions(dcpOptions);
 
     data_ = static_cast<void *>(request);
 }
@@ -280,6 +290,25 @@ StatusResponse::Status StatusResponse::status() {
 
 std::string StatusResponse::message() {
     return static_cast<datamovement::DataMovementStatusResponse *>(data_)->message();
+}
+
+CommandStatus StatusResponse::commandStatus() {
+    auto dmCmdStatus = static_cast<datamovement::DataMovementStatusResponse *>(data_)->commandstatus();
+    auto cmdStatus = new CommandStatus(dmCmdStatus.command(),
+                                 dmCmdStatus.progress(),
+                                 dmCmdStatus.elapsedtime(),
+                                 dmCmdStatus.lastmessage(),
+                                 dmCmdStatus.lastmessagetime());
+
+    return *cmdStatus;
+}
+
+std::string StatusResponse::startTime() {
+    return static_cast<datamovement::DataMovementStatusResponse *>(data_)->starttime();
+}
+
+std::string StatusResponse::endTime() {
+    return static_cast<datamovement::DataMovementStatusResponse *>(data_)->endtime();
 }
 
 CancelRequest::CancelRequest(std::string uid) {
