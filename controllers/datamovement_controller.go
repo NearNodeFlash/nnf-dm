@@ -478,6 +478,9 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 				idx := strings.Index(cmd, dm.Spec.Source.Path)
 				if idx != -1 {
 					cmd = cmd[:idx] + opts + " " + cmd[idx:]
+				} else {
+					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
+						"command", profile.Command, "DCPOptions", opts)
 				}
 			} else {
 				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
