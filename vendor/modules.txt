@@ -1,4 +1,4 @@
-# github.com/HewlettPackard/dws v0.0.0-20230322150428-080a05f072a6
+# github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8
 ## explicit; go 1.19
 github.com/HewlettPackard/dws/api/v1alpha1
 github.com/HewlettPackard/dws/utils/dwdparse
@@ -10,7 +10,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d
 ## explicit; go 1.18
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20230322160930-ae4c82643d04
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
@@ -103,6 +103,12 @@ github.com/josharian/intern
 github.com/json-iterator/go
 # github.com/kr/pretty v0.3.0
 ## explicit; go 1.12
+# github.com/kubeflow/common v0.4.6
+## explicit; go 1.19
+github.com/kubeflow/common/pkg/apis/common/v1
+# github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759
+## explicit; go 1.19
+github.com/kubeflow/mpi-operator/pkg/apis/kubeflow/v2beta1
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
@@ -645,7 +651,7 @@ k8s.io/klog/v2/internal/clock
 k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
-# k8s.io/kube-openapi v0.0.0-20230105215759-76fd588bec96
+# k8s.io/kube-openapi v0.0.0-20230109183929-3758b55a6596
 ## explicit; go 1.18
 k8s.io/kube-openapi/pkg/builder3/util
 k8s.io/kube-openapi/pkg/common

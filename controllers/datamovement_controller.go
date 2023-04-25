@@ -260,13 +260,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log.Info("Using profile", "name", configMapKeyProfileDefault, "profile", profile)
 
-	cmdArgs, mpiHostfile, err := buildDMCommand(profile, hosts, dm)
+	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
 	if err != nil {
 		log.Error(err, "error building DM command")
 		return ctrl.Result{}, handleInvalidError(err)
 	}
+	if len(mpiHostfile) > 0 {
+		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
+	}
 
-	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 	cmd := exec.CommandContext(ctxCancel, cmdArgs[0], cmdArgs[1:]...)
 
 	// Record the start of the data movement operation
@@ -431,9 +433,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func buildDMCommand(profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) ([]string, string, error) {
+func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) ([]string, string, error) {
+	log := log.FromContext(ctx)
 	var hostfile string
 	var err error
+	userConfig := dm.Spec.UserConfig != nil
+
+	// If Dryrun is enabled, just use the "true" command with no hostfile
+	if userConfig && dm.Spec.UserConfig.Dryrun {
+		log.Info("Dry run detected")
+		return []string{"true"}, "", nil
+	}
 
 	// Command provided via the configmap
 	providedCmd := profile.Command
@@ -455,6 +465,29 @@ func buildDMCommand(profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.Nnf
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", dm.Spec.GroupId))
 	cmd = strings.ReplaceAll(cmd, "$SRC", dm.Spec.Source.Path)
 	cmd = strings.ReplaceAll(cmd, "$DEST", dm.Spec.Destination.Path)
+
+	// Allow the user to override settings
+	if userConfig {
+
+		// Add extra DCP options from the user
+		if len(dm.Spec.UserConfig.DCPOptions) > 0 {
+			opts := dm.Spec.UserConfig.DCPOptions
+
+			// Insert the extra dcp options before the src argument
+			if strings.Contains(cmd, "dcp") {
+				idx := strings.Index(cmd, dm.Spec.Source.Path)
+				if idx != -1 {
+					cmd = cmd[:idx] + opts + " " + cmd[idx:]
+				} else {
+					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
+						"command", profile.Command, "DCPOptions", opts)
+				}
+			} else {
+				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
+					"command", profile.Command, "DCPOptions", opts)
+			}
+		}
+	}
 
 	return strings.Split(cmd, " "), hostfile, nil
 }

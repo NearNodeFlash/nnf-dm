@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 
     {
         // Create an offload request
-        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION");
+        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION", false, "");
         CreateResponse createResponse;
 
         RPCStatus status = client.Create(workflow, createRequest, &createResponse);
@@ -115,6 +115,16 @@ RequestStatus:
                 std::cout << "Offload State STATE UNKNOWN: " << statusResponse.state() << " Status: " << statusResponse.status() << std::endl;
                 return 1;
         }
+
+        CommandStatus cmd = statusResponse.commandStatus();
+        std::cout << "Offload Command Status:" << std::endl;
+        std::cout << "  Command: " << cmd.command <<  std::endl;
+        std::cout << "  Progress: " << cmd.progress <<  "%" << std::endl;
+        std::cout << "  ElapsedTime: " << cmd.elapsedTime <<  std::endl;
+        std::cout << "  LastMessage: " << cmd.lastMessage <<  std::endl;
+        std::cout << "  LastMessageTime: " << cmd.lastMessageTime <<  std::endl;
+        std::cout << "Offload StartTime: " << statusResponse.startTime() << std::endl;
+        std::cout << "Offload EndTime: " << statusResponse.endTime() << std::endl;
 
         switch (statusResponse.status()) {
             case StatusResponse::STATUS_SUCCESS:

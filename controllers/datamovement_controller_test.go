@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -585,7 +586,7 @@ var _ = Describe("Data Movement Test", func() {
 						Command: "mpirun --hostfile $HOSTFILE dcp src dest",
 					}
 
-					cmd, hostfile, err := buildDMCommand(profile, hosts, &dm)
+					cmd, hostfile, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(len(hostfile)).Should((BeNumerically(">", 0)))
 					Expect(cmd).ToNot(BeEmpty())
@@ -601,7 +602,7 @@ var _ = Describe("Data Movement Test", func() {
 						Command: "mpirun -np 1 dcp src dest",
 					}
 
-					cmd, hostfile, err := buildDMCommand(profile, hosts, &dm)
+					cmd, hostfile, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(len(hostfile)).Should(Equal(0))
 					Expect(cmd).ToNot(BeEmpty())
@@ -610,6 +611,44 @@ var _ = Describe("Data Movement Test", func() {
 					Expect(info).To(BeNil())
 				})
 
+			})
+		})
+
+		Context("User Config", func() {
+			hosts := []string{"one", "two", "three"}
+			expectedUid := 1000
+			expectedGid := 2000
+			srcPath := "/src/"
+			destPath := "/dest/"
+			dm := nnfv1alpha1.NnfDataMovement{
+				Spec: nnfv1alpha1.NnfDataMovementSpec{
+					UserId:  uint32(expectedUid),
+					GroupId: uint32(expectedGid),
+					Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+						Path: srcPath,
+					},
+					Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+						Path: destPath,
+					},
+				},
+			}
+
+			When("DCPOptions are specified", func() {
+				It("should inject the extra options before the $SRC argument to dcp", func() {
+					profile := dmConfigProfile{
+						Command: defaultCommand,
+					}
+					dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
+						DCPOptions: "--extra opts",
+					}
+					expectedCmdRegex := fmt.Sprintf(
+						"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
+						expectedUid, expectedGid, srcPath, destPath)
+
+					cmd, _, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
+				})
 			})
 		})
 	})

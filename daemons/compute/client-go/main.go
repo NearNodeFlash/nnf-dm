@@ -46,6 +46,7 @@ func main() {
 	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
 	count := flag.Int("count", 1, "number of requests to create")
 	cancelExpiryTime := flag.Duration("cancel", -time.Second, "duration after create to cancel request")
+	dcpOptions := flag.String("dcp-options", "", "extra options to provide to dcp")
 
 	flag.Parse()
 
@@ -94,7 +95,7 @@ func main() {
 			defer wg.Done()
 
 			log.Printf("Creating request %d of %d...", i+1, *count)
-			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun)
+			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions)
 			if err != nil {
 				log.Fatalf("could not create data movement request: %v", err)
 			}
@@ -205,7 +206,7 @@ func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMov
 	return rsp, nil
 }
 
-func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool) (*pb.DataMovementCreateResponse, error) {
+func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool, dcpOptions string) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow: &pb.DataMovementWorkflow{
@@ -215,6 +216,7 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 		Source:      source,
 		Destination: destination,
 		Dryrun:      dryrun,
+		DcpOptions:  dcpOptions,
 	})
 
 	if err != nil {
