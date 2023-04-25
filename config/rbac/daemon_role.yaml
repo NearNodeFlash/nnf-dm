@@ -6,7 +6,7 @@ metadata:
   name: daemon-role
 rules:
 - apiGroups:
-  - cray.hpe.com
+  - lus.cray.hpe.com
   resources:
   - lustrefilesystems
   verbs:
