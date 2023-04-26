@@ -1,4 +1,4 @@
-// Copyright 2022 Hewlett Packard Enterprise Development LP
+// Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 // Other additional copyright holders may be indicated within.
 //
 // The entirety of this work is licensed under the Apache License,
@@ -49,22 +49,17 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataMoverClient interface {
-	// Version sends a request to the data movement daemon and returns a response containing
-	// details on the current build version and supported API versions.
+	// Version sends a request to the data movement daemon and returns a response containing details on the current build version and supported API versions.
 	Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DataMovementVersionResponse, error)
-	// Create sends a new data movement request identified by source and destination fields. It returns
-	// a response containing a unique identifier which can be used to query the status of the request.
+	// Create sends a new data movement request identified by source and destination fields. It returns a response containing a unique identifier which can be used to query the status of the request.
 	Create(ctx context.Context, in *DataMovementCreateRequest, opts ...grpc.CallOption) (*DataMovementCreateResponse, error)
-	// Status requests the status of a previously submitted data movement request. It accepts a unique
-	// identifier that identifies the request and returns a status message.
+	// Status requests the status of a previously submitted data movement request. It accepts a unique identifier that identifies the request and returns a status message.
 	Status(ctx context.Context, in *DataMovementStatusRequest, opts ...grpc.CallOption) (*DataMovementStatusResponse, error)
-	// Delete will attempt to delete a completed data movement request. It accepts a unique identifier
-	// that identifies the request and returns the status of the delete operation.
+	// Delete will attempt to delete a completed data movement request. It accepts a unique identifier that identifies the request and returns the status of the delete operation.
 	Delete(ctx context.Context, in *DataMovementDeleteRequest, opts ...grpc.CallOption) (*DataMovementDeleteResponse, error)
 	// List returns all current data movement requests for a given namespace and workflow.
 	List(ctx context.Context, in *DataMovementListRequest, opts ...grpc.CallOption) (*DataMovementListResponse, error)
-	// Cancel will attempt to stop a data movement request. It accepts a unique identifier
-	// that identifies the request and returns the status of the cancel operation.
+	// Cancel will attempt to stop a data movement request. It accepts a unique identifier that identifies the request and returns the status of the cancel operation.
 	Cancel(ctx context.Context, in *DataMovementCancelRequest, opts ...grpc.CallOption) (*DataMovementCancelResponse, error)
 }
 
@@ -134,22 +129,17 @@ func (c *dataMoverClient) Cancel(ctx context.Context, in *DataMovementCancelRequ
 // All implementations must embed UnimplementedDataMoverServer
 // for forward compatibility
 type DataMoverServer interface {
-	// Version sends a request to the data movement daemon and returns a response containing
-	// details on the current build version and supported API versions.
+	// Version sends a request to the data movement daemon and returns a response containing details on the current build version and supported API versions.
 	Version(context.Context, *emptypb.Empty) (*DataMovementVersionResponse, error)
-	// Create sends a new data movement request identified by source and destination fields. It returns
-	// a response containing a unique identifier which can be used to query the status of the request.
+	// Create sends a new data movement request identified by source and destination fields. It returns a response containing a unique identifier which can be used to query the status of the request.
 	Create(context.Context, *DataMovementCreateRequest) (*DataMovementCreateResponse, error)
-	// Status requests the status of a previously submitted data movement request. It accepts a unique
-	// identifier that identifies the request and returns a status message.
+	// Status requests the status of a previously submitted data movement request. It accepts a unique identifier that identifies the request and returns a status message.
 	Status(context.Context, *DataMovementStatusRequest) (*DataMovementStatusResponse, error)
-	// Delete will attempt to delete a completed data movement request. It accepts a unique identifier
-	// that identifies the request and returns the status of the delete operation.
+	// Delete will attempt to delete a completed data movement request. It accepts a unique identifier that identifies the request and returns the status of the delete operation.
 	Delete(context.Context, *DataMovementDeleteRequest) (*DataMovementDeleteResponse, error)
 	// List returns all current data movement requests for a given namespace and workflow.
 	List(context.Context, *DataMovementListRequest) (*DataMovementListResponse, error)
-	// Cancel will attempt to stop a data movement request. It accepts a unique identifier
-	// that identifies the request and returns the status of the cancel operation.
+	// Cancel will attempt to stop a data movement request. It accepts a unique identifier that identifies the request and returns the status of the cancel operation.
 	Cancel(context.Context, *DataMovementCancelRequest) (*DataMovementCancelResponse, error)
 	mustEmbedUnimplementedDataMoverServer()
 }
