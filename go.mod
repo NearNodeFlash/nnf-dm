@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230322153812-315a443f315b
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230426150127-b7cba32758e5
 	github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3

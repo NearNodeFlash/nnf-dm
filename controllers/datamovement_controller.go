@@ -123,7 +123,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts,verbs=get;list
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts/status,verbs=get;list
-//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
+//+kubebuilder:rbac:groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch

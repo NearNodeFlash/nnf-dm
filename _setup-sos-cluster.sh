@@ -22,11 +22,11 @@
 
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f config/mpi/mpi-operator.yaml
-kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/lus.cray.hpe.com_lustrefilesystems.yaml
 
 echo "$(tput bold)Installing sample LustreFileSystem $(tput sgr 0)"
 cat <<-EOF | kubectl apply -f -
-apiVersion: cray.hpe.com/v1alpha1
+apiVersion: lus.cray.hpe.com/v1alpha1
 kind: LustreFileSystem
 metadata:
   name: lustrefilesystem-sample-maui
@@ -36,4 +36,8 @@ spec:
   mgsNids:
   - 172.0.0.1@tcp
   mountRoot: /lus/maui
+  namespaces:
+    default:
+      modes:
+        - ReadWriteMany
 EOF
