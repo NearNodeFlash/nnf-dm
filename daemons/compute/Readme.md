@@ -1,6 +1,6 @@
 # Data Movement
 
-This readme explains the Data Movement Daemon (nnf-dm) and it's corresponding API (Copy Offload API).
+This readme explains the Data Movement Daemon (nnf-dm) and its corresponding API (Copy Offload API).
 
 There are also some example clients that show how to use the Copy Offload API.
 
