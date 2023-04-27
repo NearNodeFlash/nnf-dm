@@ -1,4 +1,4 @@
-// Copyright 2022 Hewlett Packard Enterprise Development LP
+// Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 // Other additional copyright holders may be indicated within.
 //
 // The entirety of this work is licensed under the Apache License,
@@ -41,9 +41,9 @@ const (
 type DataMovementCreateResponse_Status int32
 
 const (
-	DataMovementCreateResponse_SUCCESS DataMovementCreateResponse_Status = 0
-	DataMovementCreateResponse_FAILED  DataMovementCreateResponse_Status = 1
-	DataMovementCreateResponse_INVALID DataMovementCreateResponse_Status = 2
+	DataMovementCreateResponse_SUCCESS DataMovementCreateResponse_Status = 0 // The data movement resource created successfully
+	DataMovementCreateResponse_FAILED  DataMovementCreateResponse_Status = 1 // The data movement resource failed to create. See `message` field for more information
+	DataMovementCreateResponse_INVALID DataMovementCreateResponse_Status = 2 // Invalid request
 )
 
 // Enum value maps for DataMovementCreateResponse_Status.
@@ -90,12 +90,12 @@ func (DataMovementCreateResponse_Status) EnumDescriptor() ([]byte, []int) {
 type DataMovementStatusResponse_State int32
 
 const (
-	DataMovementStatusResponse_PENDING       DataMovementStatusResponse_State = 0
-	DataMovementStatusResponse_STARTING      DataMovementStatusResponse_State = 1
-	DataMovementStatusResponse_RUNNING       DataMovementStatusResponse_State = 2
-	DataMovementStatusResponse_COMPLETED     DataMovementStatusResponse_State = 3
-	DataMovementStatusResponse_CANCELLING    DataMovementStatusResponse_State = 4
-	DataMovementStatusResponse_UNKNOWN_STATE DataMovementStatusResponse_State = 5
+	DataMovementStatusResponse_PENDING       DataMovementStatusResponse_State = 0 // The request is created but has a pending status
+	DataMovementStatusResponse_STARTING      DataMovementStatusResponse_State = 1 // The request was created and is in the act of starting
+	DataMovementStatusResponse_RUNNING       DataMovementStatusResponse_State = 2 // The data movement request is actively running
+	DataMovementStatusResponse_COMPLETED     DataMovementStatusResponse_State = 3 // The data movement request has completed
+	DataMovementStatusResponse_CANCELLING    DataMovementStatusResponse_State = 4 // The data movement request has started the cancellation process
+	DataMovementStatusResponse_UNKNOWN_STATE DataMovementStatusResponse_State = 5 // Unknown state
 )
 
 // Enum value maps for DataMovementStatusResponse_State.
@@ -148,12 +148,12 @@ func (DataMovementStatusResponse_State) EnumDescriptor() ([]byte, []int) {
 type DataMovementStatusResponse_Status int32
 
 const (
-	DataMovementStatusResponse_INVALID        DataMovementStatusResponse_Status = 0
-	DataMovementStatusResponse_NOT_FOUND      DataMovementStatusResponse_Status = 1
-	DataMovementStatusResponse_SUCCESS        DataMovementStatusResponse_Status = 2
-	DataMovementStatusResponse_FAILED         DataMovementStatusResponse_Status = 3
-	DataMovementStatusResponse_CANCELLED      DataMovementStatusResponse_Status = 4
-	DataMovementStatusResponse_UNKNOWN_STATUS DataMovementStatusResponse_Status = 5
+	DataMovementStatusResponse_INVALID        DataMovementStatusResponse_Status = 0 // The request was found to be invalid. See `message` for details
+	DataMovementStatusResponse_NOT_FOUND      DataMovementStatusResponse_Status = 1 // The request with the supplied UID was not found
+	DataMovementStatusResponse_SUCCESS        DataMovementStatusResponse_Status = 2 // The request completed with success
+	DataMovementStatusResponse_FAILED         DataMovementStatusResponse_Status = 3 // The request failed. See `message` for details
+	DataMovementStatusResponse_CANCELLED      DataMovementStatusResponse_Status = 4 // The request was cancelled
+	DataMovementStatusResponse_UNKNOWN_STATUS DataMovementStatusResponse_Status = 5 // Unknown status
 )
 
 // Enum value maps for DataMovementStatusResponse_Status.
@@ -206,11 +206,11 @@ func (DataMovementStatusResponse_Status) EnumDescriptor() ([]byte, []int) {
 type DataMovementDeleteResponse_Status int32
 
 const (
-	DataMovementDeleteResponse_INVALID   DataMovementDeleteResponse_Status = 0
-	DataMovementDeleteResponse_NOT_FOUND DataMovementDeleteResponse_Status = 1
-	DataMovementDeleteResponse_SUCCESS   DataMovementDeleteResponse_Status = 2
-	DataMovementDeleteResponse_ACTIVE    DataMovementDeleteResponse_Status = 3
-	DataMovementDeleteResponse_UNKNOWN   DataMovementDeleteResponse_Status = 4
+	DataMovementDeleteResponse_INVALID   DataMovementDeleteResponse_Status = 0 // The delete request was found to be invalid
+	DataMovementDeleteResponse_NOT_FOUND DataMovementDeleteResponse_Status = 1 // The request with the supplied UID was not found
+	DataMovementDeleteResponse_SUCCESS   DataMovementDeleteResponse_Status = 2 // The data movement request was deleted successfully
+	DataMovementDeleteResponse_ACTIVE    DataMovementDeleteResponse_Status = 3 // The data movement request is currently active and cannot be deleted
+	DataMovementDeleteResponse_UNKNOWN   DataMovementDeleteResponse_Status = 4 // Unknown status
 )
 
 // Enum value maps for DataMovementDeleteResponse_Status.
@@ -261,10 +261,10 @@ func (DataMovementDeleteResponse_Status) EnumDescriptor() ([]byte, []int) {
 type DataMovementCancelResponse_Status int32
 
 const (
-	DataMovementCancelResponse_INVALID   DataMovementCancelResponse_Status = 0
-	DataMovementCancelResponse_NOT_FOUND DataMovementCancelResponse_Status = 1
-	DataMovementCancelResponse_SUCCESS   DataMovementCancelResponse_Status = 2
-	DataMovementCancelResponse_FAILED    DataMovementCancelResponse_Status = 3
+	DataMovementCancelResponse_INVALID   DataMovementCancelResponse_Status = 0 // The cancel request was found to be invalid
+	DataMovementCancelResponse_NOT_FOUND DataMovementCancelResponse_Status = 1 // The request with the supplied UID was not found
+	DataMovementCancelResponse_SUCCESS   DataMovementCancelResponse_Status = 2 // The data movement request was cancelled successfully
+	DataMovementCancelResponse_FAILED    DataMovementCancelResponse_Status = 3 // The data movement request cannot be canceled
 )
 
 // Enum value maps for DataMovementCancelResponse_Status.
@@ -310,14 +310,15 @@ func (DataMovementCancelResponse_Status) EnumDescriptor() ([]byte, []int) {
 	return file_api_datamovement_proto_rawDescGZIP(), []int{12, 0}
 }
 
-// The data movement version response returns information on the running data movement daemon. This includes
-// the build version and a list of supported API versions.
+// The data movement version response returns information on the running data movement daemon.
 type DataMovementVersionResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Version     string   `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	// Current version of the API.
+	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	// List of supported API versions.
 	ApiVersions []string `protobuf:"bytes,2,rep,name=apiVersions,proto3" json:"apiVersions,omitempty"`
 }
 
@@ -367,14 +368,15 @@ func (x *DataMovementVersionResponse) GetApiVersions() []string {
 	return nil
 }
 
-// Data Movement workflow message contains identifying information for the workflow initiating the data movement
-// operation. This message must be nested in all Request messages.
+// Data Movement workflow message contains identifying information for the workflow initiating the data movement operation. This message must be nested in all Request messages.
 type DataMovementWorkflow struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Name      string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Name of the DWS workflow that is associated with this data movement request
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Namespace of the DWS workflow that is associated with this data movement request
 	Namespace string `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
 }
 
@@ -424,19 +426,21 @@ func (x *DataMovementWorkflow) GetNamespace() string {
 	return ""
 }
 
-// Data Movement workflows contain a CommandStatus object in the Status object. This information
-// relays the current state of the data movement progress. It includes the command, the progress
-// percentage (e.g. 0-100%), elapsed time of the data movement (duration string, e.g. 5s), the last
-// received message from the data movment command, and the time of that last message.
+// Data movement operations contain a CommandStatus in the Status object. This information relays the current state of the data movement progress.
 type DataMovementCommandStatus struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Command         string `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
-	Progress        int32  `protobuf:"varint,2,opt,name=progress,proto3" json:"progress,omitempty"`
-	ElapsedTime     string `protobuf:"bytes,3,opt,name=elapsedTime,proto3" json:"elapsedTime,omitempty"`
-	LastMessage     string `protobuf:"bytes,4,opt,name=lastMessage,proto3" json:"lastMessage,omitempty"`
+	// Command used to perform Data Movement
+	Command string `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	// Progress percentage (0-100%) of the data movement based on the output of `dcp`. `dcp` must be present in the command.
+	Progress int32 `protobuf:"varint,2,opt,name=progress,proto3" json:"progress,omitempty"`
+	// Duration of how long the operation has been running (e.g. 1m30s)
+	ElapsedTime string `protobuf:"bytes,3,opt,name=elapsedTime,proto3" json:"elapsedTime,omitempty"`
+	// The most recent line of output from the data movement command
+	LastMessage string `protobuf:"bytes,4,opt,name=lastMessage,proto3" json:"lastMessage,omitempty"`
+	// The time (local) of lastMessage
 	LastMessageTime string `protobuf:"bytes,5,opt,name=lastMessageTime,proto3" json:"lastMessageTime,omitempty"`
 }
 
@@ -507,20 +511,22 @@ func (x *DataMovementCommandStatus) GetLastMessageTime() string {
 	return ""
 }
 
-// The data movement create request message containing the source and destination files or directories. The
-// NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
-// a new data movement request where the copy is simulated and not executed. dcpOptions allows for
-// adding additional options to the dcp command that performs data movement.
+// Create a Data Movement Request to perform data movement. NNF Data Movement will copy from source to the destination path.
 type DataMovementCreateRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Workflow    *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
-	Source      string                `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	Destination string                `protobuf:"bytes,3,opt,name=destination,proto3" json:"destination,omitempty"`
-	Dryrun      bool                  `protobuf:"varint,4,opt,name=dryrun,proto3" json:"dryrun,omitempty"`
-	DcpOptions  string                `protobuf:"bytes,5,opt,name=dcpOptions,proto3" json:"dcpOptions,omitempty"`
+	// The name and namespace of the initiating workflow
+	Workflow *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
+	// Source file or directory
+	Source string `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	// Destination file or directory
+	Destination string `protobuf:"bytes,3,opt,name=destination,proto3" json:"destination,omitempty"`
+	// If True, the data movement command runs `/bin/true` rather than perform actual data movement
+	Dryrun bool `protobuf:"varint,4,opt,name=dryrun,proto3" json:"dryrun,omitempty"`
+	// Extra options to pass to `dcp` if present in the Data Movement command.
+	DcpOptions string `protobuf:"bytes,5,opt,name=dcpOptions,proto3" json:"dcpOptions,omitempty"`
 }
 
 func (x *DataMovementCreateRequest) Reset() {
@@ -590,17 +596,18 @@ func (x *DataMovementCreateRequest) GetDcpOptions() string {
 	return ""
 }
 
-// The data movement create response message contains a unique identifier amont all data movement requests for
-// the lifetime of the active job. The UID can be used to query for status of the request using the
-// data movement status request message.
+// The Data Movement Create Response to indicate the status of of the Data Movement Request.
 type DataMovementCreateResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Uid     string                            `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
-	Status  DataMovementCreateResponse_Status `protobuf:"varint,2,opt,name=status,proto3,enum=datamovement.DataMovementCreateResponse_Status" json:"status,omitempty"`
-	Message string                            `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	// The unique identifier for the created data movement resource if `Status` is Success
+	Uid string `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	// Status of the DataMovementCreateRequest
+	Status DataMovementCreateResponse_Status `protobuf:"varint,2,opt,name=status,proto3,enum=datamovement.DataMovementCreateResponse_Status" json:"status,omitempty"`
+	// Any extra information supplied with the status
+	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 }
 
 func (x *DataMovementCreateResponse) Reset() {
@@ -656,16 +663,18 @@ func (x *DataMovementCreateResponse) GetMessage() string {
 	return ""
 }
 
-// The data movement status request message permits users to query the status of a previously issued
-// data movement request by specifying the request's unique identifier.
+// The Data Movement Status Request message permits users to query the status of a Data Movement Request.
 type DataMovementStatusRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Workflow    *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
-	Uid         string                `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	MaxWaitTime int64                 `protobuf:"varint,3,opt,name=maxWaitTime,proto3" json:"maxWaitTime,omitempty"`
+	// The name and namespace of the initiating workflow
+	Workflow *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
+	// UID of the Data Movement Request
+	Uid string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	// The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait
+	MaxWaitTime int64 `protobuf:"varint,3,opt,name=maxWaitTime,proto3" json:"maxWaitTime,omitempty"`
 }
 
 func (x *DataMovementStatusRequest) Reset() {
@@ -721,20 +730,24 @@ func (x *DataMovementStatusRequest) GetMaxWaitTime() int64 {
 	return 0
 }
 
-// The data movement status response message defines the current status of a data movement request. The
-// state field describes the current state of the request. The message field contains ancillary information
-// describing the data movement request.
+// The Data Movement Status Response message defines the current status of a data movement request.
 type DataMovementStatusResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	State         DataMovementStatusResponse_State  `protobuf:"varint,1,opt,name=state,proto3,enum=datamovement.DataMovementStatusResponse_State" json:"state,omitempty"`
-	Status        DataMovementStatusResponse_Status `protobuf:"varint,2,opt,name=status,proto3,enum=datamovement.DataMovementStatusResponse_Status" json:"status,omitempty"`
-	Message       string                            `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	CommandStatus *DataMovementCommandStatus        `protobuf:"bytes,4,opt,name=commandStatus,proto3" json:"commandStatus,omitempty"`
-	StartTime     string                            `protobuf:"bytes,5,opt,name=startTime,proto3" json:"startTime,omitempty"`
-	EndTime       string                            `protobuf:"bytes,6,opt,name=endTime,proto3" json:"endTime,omitempty"`
+	// Current state of the Data Movement Request
+	State DataMovementStatusResponse_State `protobuf:"varint,1,opt,name=state,proto3,enum=datamovement.DataMovementStatusResponse_State" json:"state,omitempty"`
+	// Current status of the Data Movement Request
+	Status DataMovementStatusResponse_Status `protobuf:"varint,2,opt,name=status,proto3,enum=datamovement.DataMovementStatusResponse_Status" json:"status,omitempty"`
+	// Any extra information supplied with the state/status
+	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	// Current state/progress of the Data Movement command
+	CommandStatus *DataMovementCommandStatus `protobuf:"bytes,4,opt,name=commandStatus,proto3" json:"commandStatus,omitempty"`
+	// The start time (local) of the data movement operation
+	StartTime string `protobuf:"bytes,5,opt,name=startTime,proto3" json:"startTime,omitempty"`
+	// The end time (local) of the data movement operation
+	EndTime string `protobuf:"bytes,6,opt,name=endTime,proto3" json:"endTime,omitempty"`
 }
 
 func (x *DataMovementStatusResponse) Reset() {
@@ -811,15 +824,16 @@ func (x *DataMovementStatusResponse) GetEndTime() string {
 	return ""
 }
 
-// The data movement delete request permits users to delete a completed data movement request (any request with a
-// status of COMPLETED) by specifying the request's unique identifier.
+// The Data Movement Delete Request permits users to delete a completed data movement request (any request with a status of COMPLETED).
 type DataMovementDeleteRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The name and namespace of the initiating workflow
 	Workflow *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
-	Uid      string                `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	// The unique identifier for the data movement resource
+	Uid string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
 }
 
 func (x *DataMovementDeleteRequest) Reset() {
@@ -868,14 +882,16 @@ func (x *DataMovementDeleteRequest) GetUid() string {
 	return ""
 }
 
-// The data movement delete response returns the status of the delete operation.
+// The Data Movement Delete Response returns the status of the delete operation.
 type DataMovementDeleteResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Status  DataMovementDeleteResponse_Status `protobuf:"varint,1,opt,name=status,proto3,enum=datamovement.DataMovementDeleteResponse_Status" json:"status,omitempty"`
-	Message string                            `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Status of the Data Movement Delete Request
+	Status DataMovementDeleteResponse_Status `protobuf:"varint,1,opt,name=status,proto3,enum=datamovement.DataMovementDeleteResponse_Status" json:"status,omitempty"`
+	// Any extra information supplied with the status
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 }
 
 func (x *DataMovementDeleteResponse) Reset() {
@@ -924,14 +940,13 @@ func (x *DataMovementDeleteResponse) GetMessage() string {
 	return ""
 }
 
-// The data movement list request allows a user to get a list of the current
-// data movement requests. The user must supply the workflow and namespace
-// which will be used to filter the data movement requests for retrieval.
+// The Data Movement List Request allows a user to get a list of the current data movement requests for a given DWS Workflow.
 type DataMovementListRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The name and namespace of the initiating workflow
 	Workflow *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
 }
 
@@ -974,13 +989,13 @@ func (x *DataMovementListRequest) GetWorkflow() *DataMovementWorkflow {
 	return nil
 }
 
-// The data movement list response returns a list of the matching data movement
-// requests' uids
+// The Data Movement List Response returns a list of the matching data movement requests' UIDs
 type DataMovementListResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// List of data movement requests associated with the given workflow and namespace
 	Uids []string `protobuf:"bytes,1,rep,name=uids,proto3" json:"uids,omitempty"`
 }
 
@@ -1023,15 +1038,16 @@ func (x *DataMovementListResponse) GetUids() []string {
 	return nil
 }
 
-// The data movement cancel request permits users to iniatiate a cancellation of
-// a data movement request that is in progress.
+// The Data Movement Cancel Request permits users to initiate a cancellation of a data movement request that is in progress.
 type DataMovementCancelRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The name and namespace of the initiating workflow
 	Workflow *DataMovementWorkflow `protobuf:"bytes,1,opt,name=workflow,proto3" json:"workflow,omitempty"`
-	Uid      string                `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	// The unique identifier for the data movement resource
+	Uid string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
 }
 
 func (x *DataMovementCancelRequest) Reset() {
@@ -1080,17 +1096,16 @@ func (x *DataMovementCancelRequest) GetUid() string {
 	return ""
 }
 
-// The data movement cancel response returns the status of the cancel request.
-// The cancel process will begin upon success. This response does not indicate
-// that that cancel process has completed, but rather that it has been
-// initiated.
+// The Data Movement Cancel Response returns the status of the cancel request.  The cancel process will begin upon success. This response does not indicate that that cancel process has completed, but rather that it has been initiated.
 type DataMovementCancelResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Status  DataMovementCancelResponse_Status `protobuf:"varint,1,opt,name=status,proto3,enum=datamovement.DataMovementCancelResponse_Status" json:"status,omitempty"`
-	Message string                            `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Status of the Data Movement Cancellation Request
+	Status DataMovementCancelResponse_Status `protobuf:"varint,1,opt,name=status,proto3,enum=datamovement.DataMovementCancelResponse_Status" json:"status,omitempty"`
+	// Any extra information included with the status
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 }
 
 func (x *DataMovementCancelResponse) Reset() {

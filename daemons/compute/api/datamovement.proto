@@ -26,175 +26,210 @@ import "google/protobuf/empty.proto";
 
 package datamovement;
 
-// DataMover service definition describes the API for perform data movement
-// for NNF storage. 
+// DataMover service definition describes the API for perform data movement for NNF storage.
 service DataMover {
-    // Version sends a request to the data movement daemon and returns a response containing
-    // details on the current build version and supported API versions.
+    // Version sends a request to the data movement daemon and returns a response containing details on the current build version and supported API versions.
     rpc Version (google.protobuf.Empty) returns (DataMovementVersionResponse) {}
 
-    // Create sends a new data movement request identified by source and destination fields. It returns
-    // a response containing a unique identifier which can be used to query the status of the request.
+    // Create sends a new data movement request identified by source and destination fields. It returns a response containing a unique identifier which can be used to query the status of the request.
     rpc Create (DataMovementCreateRequest) returns (DataMovementCreateResponse) {}
 
-    // Status requests the status of a previously submitted data movement request. It accepts a unique
-    // identifier that identifies the request and returns a status message.
+    // Status requests the status of a previously submitted data movement request. It accepts a unique identifier that identifies the request and returns a status message.
     rpc Status (DataMovementStatusRequest) returns (DataMovementStatusResponse) {}
 
-    // Delete will attempt to delete a completed data movement request. It accepts a unique identifier
-    // that identifies the request and returns the status of the delete operation.
+    // Delete will attempt to delete a completed data movement request. It accepts a unique identifier that identifies the request and returns the status of the delete operation.
     rpc Delete (DataMovementDeleteRequest) returns (DataMovementDeleteResponse) {}
 
     // List returns all current data movement requests for a given namespace and workflow.
     rpc List (DataMovementListRequest) returns (DataMovementListResponse) {}
 
-    // Cancel will attempt to stop a data movement request. It accepts a unique identifier
-    // that identifies the request and returns the status of the cancel operation.
+    // Cancel will attempt to stop a data movement request. It accepts a unique identifier that identifies the request and returns the status of the cancel operation.
     rpc Cancel (DataMovementCancelRequest) returns (DataMovementCancelResponse) {}
 }
 
-// The data movement version response returns information on the running data movement daemon. This includes
-// the build version and a list of supported API versions.
+// The data movement version response returns information on the running data movement daemon.
 message DataMovementVersionResponse {
+    // Current version of the API.
     string version = 1;
+
+    // List of supported API versions.
     repeated string apiVersions = 2;
 }
 
-// Data Movement workflow message contains identifying information for the workflow initiating the data movement
-// operation. This message must be nested in all Request messages.
+// Data Movement workflow message contains identifying information for the workflow initiating the data movement operation. This message must be nested in all Request messages.
 message DataMovementWorkflow {
+    // Name of the DWS workflow that is associated with this data movement request
     string name = 1;
+
+    // Namespace of the DWS workflow that is associated with this data movement request
     string namespace = 2;
 }
 
-// Data Movement workflows contain a CommandStatus object in the Status object. This information
-// relays the current state of the data movement progress. It includes the command, the progress
-// percentage (e.g. 0-100%), elapsed time of the data movement (duration string, e.g. 5s), the last
-// received message from the data movment command, and the time of that last message.
+// Data movement operations contain a CommandStatus in the Status object. This information relays the current state of the data movement progress.
 message DataMovementCommandStatus {
+    // Command used to perform Data Movement
     string command = 1;
-    int32 progress = 2;
-    string elapsedTime = 3;
-    string lastMessage = 4;
-    string lastMessageTime = 5;
 
+    // Progress percentage (0-100%) of the data movement based on the output of `dcp`. `dcp` must be present in the command.
+    int32 progress = 2;
+
+    // Duration of how long the operation has been running (e.g. 1m30s)
+    string elapsedTime = 3;
+
+    // The most recent line of output from the data movement command
+    string lastMessage = 4;
+
+    // The time (local) of lastMessage
+    string lastMessageTime = 5;
 }
 
-// The data movement create request message containing the source and destination files or directories. The
-// NNF Data Mover will perform a copy from source to the destination. Specify dryrun to instantiate
-// a new data movement request where the copy is simulated and not executed. dcpOptions allows for
-// adding additional options to the dcp command that performs data movement.
+// Create a Data Movement Request to perform data movement. NNF Data Movement will copy from source to the destination path.
 message DataMovementCreateRequest {
+
+    // The name and namespace of the initiating workflow
     DataMovementWorkflow workflow = 1;
+
+    // Source file or directory
     string source = 2;
+
+    // Destination file or directory
     string destination = 3;
+
+    // If True, the data movement command runs `/bin/true` rather than perform actual data movement
     bool dryrun = 4;
+
+    // Extra options to pass to `dcp` if present in the Data Movement command.
     string dcpOptions = 5;
 }
 
-// The data movement create response message contains a unique identifier amont all data movement requests for
-// the lifetime of the active job. The UID can be used to query for status of the request using the
-// data movement status request message.
+// The Data Movement Create Response to indicate the status of of the Data Movement Request.
 message DataMovementCreateResponse {
+    // The unique identifier for the created data movement resource if `Status` is Success
     string uid = 1;
 
     enum Status {
-        SUCCESS = 0;
-        FAILED = 1;
-        INVALID = 2;
+        SUCCESS = 0; // The data movement resource created successfully
+        FAILED = 1; // The data movement resource failed to create. See `message` field for more information
+        INVALID = 2; // Invalid request
     }
+
+    // Status of the DataMovementCreateRequest
     Status status = 2;
+
+    // Any extra information supplied with the status
     string message = 3;
 }
 
-// The data movement status request message permits users to query the status of a previously issued
-// data movement request by specifying the request's unique identifier.
+// The Data Movement Status Request message permits users to query the status of a Data Movement Request.
 message DataMovementStatusRequest {
+    // The name and namespace of the initiating workflow
     DataMovementWorkflow workflow = 1;
+
+    // UID of the Data Movement Request
     string uid = 2;
+
+    // The maximum time in seconds to wait for completion of the data movement resource. Negative values imply an indefinite wait
     int64 maxWaitTime = 3;
 }
 
-// The data movement status response message defines the current status of a data movement request. The
-// state field describes the current state of the request. The message field contains ancillary information
-// describing the data movement request. 
+// The Data Movement Status Response message defines the current status of a data movement request.
 message DataMovementStatusResponse {
     enum State {
-        PENDING = 0;
-        STARTING = 1;
-        RUNNING = 2;
-        COMPLETED = 3;
-        CANCELLING = 4;
-        UNKNOWN_STATE = 5;
+        PENDING = 0; // The request is created but has a pending status
+        STARTING = 1; // The request was created and is in the act of starting
+        RUNNING = 2; // The data movement request is actively running
+        COMPLETED = 3; // The data movement request has completed
+        CANCELLING = 4; // The data movement request has started the cancellation process
+        UNKNOWN_STATE = 5; // Unknown state
     }
+
+    // Current state of the Data Movement Request
     State state = 1;
 
     enum Status {
-        INVALID = 0;
-        NOT_FOUND = 1;
-        SUCCESS = 2;
-        FAILED = 3;
-        CANCELLED = 4;
-        UNKNOWN_STATUS = 5;
+        INVALID = 0; // The request was found to be invalid. See `message` for details
+        NOT_FOUND = 1; // The request with the supplied UID was not found
+        SUCCESS = 2; // The request completed with success
+        FAILED = 3; // The request failed. See `message` for details
+        CANCELLED = 4; // The request was cancelled
+        UNKNOWN_STATUS = 5; // Unknown status
     }
+
+    // Current status of the Data Movement Request
     Status status = 2;
+
+    // Any extra information supplied with the state/status
     string message = 3;
+
+    // Current state/progress of the Data Movement command
     DataMovementCommandStatus commandStatus = 4;
+
+    // The start time (local) of the data movement operation
     string startTime = 5;
+
+    // The end time (local) of the data movement operation
     string endTime = 6;
 }
 
-// The data movement delete request permits users to delete a completed data movement request (any request with a 
-// status of COMPLETED) by specifying the request's unique identifier.
+// The Data Movement Delete Request permits users to delete a completed data movement request (any request with a status of COMPLETED).
 message DataMovementDeleteRequest {
+    // The name and namespace of the initiating workflow
     DataMovementWorkflow workflow = 1;
+
+    //  The unique identifier for the data movement resource
     string uid = 2;
 }
 
-// The data movement delete response returns the status of the delete operation.
+// The Data Movement Delete Response returns the status of the delete operation.
 message DataMovementDeleteResponse {
     enum Status {
-        INVALID = 0;
-        NOT_FOUND = 1;
-        SUCCESS = 2;
-        ACTIVE = 3;
-        UNKNOWN = 4;
+        INVALID = 0; // The delete request was found to be invalid
+        NOT_FOUND = 1; // The request with the supplied UID was not found
+        SUCCESS = 2; // The data movement request was deleted successfully
+        ACTIVE = 3; // The data movement request is currently active and cannot be deleted
+        UNKNOWN = 4; // Unknown status
     }
+
+    // Status of the Data Movement Delete Request
     Status status = 1;
+
+    // Any extra information supplied with the status
     string message = 2;
 }
 
-// The data movement list request allows a user to get a list of the current
-// data movement requests. The user must supply the workflow and namespace
-// which will be used to filter the data movement requests for retrieval.
+// The Data Movement List Request allows a user to get a list of the current data movement requests for a given DWS Workflow.
 message DataMovementListRequest {
+    // The name and namespace of the initiating workflow
     DataMovementWorkflow workflow = 1;
 }
 
-// The data movement list response returns a list of the matching data movement
-// requests' uids
+// The Data Movement List Response returns a list of the matching data movement requests' UIDs
 message DataMovementListResponse {
+    // List of data movement requests associated with the given workflow and namespace
     repeated string uids = 1;
 }
 
-// The data movement cancel request permits users to iniatiate a cancellation of
-// a data movement request that is in progress.
+// The Data Movement Cancel Request permits users to initiate a cancellation of a data movement request that is in progress.
 message DataMovementCancelRequest {
+    // The name and namespace of the initiating workflow
     DataMovementWorkflow workflow = 1;
+
+    // The unique identifier for the data movement resource
     string uid = 2;
 }
 
-// The data movement cancel response returns the status of the cancel request.
-// The cancel process will begin upon success. This response does not indicate
-// that that cancel process has completed, but rather that it has been
-// initiated.
+// The Data Movement Cancel Response returns the status of the cancel request.  The cancel process will begin upon success. This response does not indicate that that cancel process has completed, but rather that it has been initiated.
 message DataMovementCancelResponse {
     enum Status {
-        INVALID = 0;
-        NOT_FOUND = 1;
-        SUCCESS = 2;
-        FAILED = 3;
+        INVALID = 0; // The cancel request was found to be invalid
+        NOT_FOUND = 1; // The request with the supplied UID was not found
+        SUCCESS = 2; // The data movement request was cancelled successfully
+        FAILED = 3; // The data movement request cannot be canceled
       }
+
+      // Status of the Data Movement Cancellation Request
       Status status = 1;
+
+      // Any extra information included with the status
       string message = 2;
 }
