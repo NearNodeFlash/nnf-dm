@@ -342,17 +342,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	nnfv1alpha1.AddDataMovementTeardownStateLabel(dm, dwsv1alpha1.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
-	if req.Dryrun || len(req.DcpOptions) > 0 {
-		dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{}
-
-		if req.Dryrun {
-			dm.Spec.UserConfig.Dryrun = true
-		}
-
-		if len(req.DcpOptions) > 0 {
-			dm.Spec.UserConfig.DCPOptions = req.DcpOptions
-		}
-	}
+	setUserConfig(req, dm)
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
@@ -365,6 +355,15 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		Uid:    dm.GetName(),
 		Status: pb.DataMovementCreateResponse_SUCCESS,
 	}, nil
+}
+
+// Set the DM's UserConfig options based on the incoming requests's options
+func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha1.NnfDataMovement) {
+	dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{}
+	dm.Spec.UserConfig.Dryrun = req.Dryrun
+	dm.Spec.UserConfig.DCPOptions = req.DcpOptions
+	dm.Spec.UserConfig.LogStdout = req.LogStdout
+	dm.Spec.UserConfig.StoreStdout = req.StoreStdout
 }
 
 func getDirectiveIndexFromClientMount(object *dwsv1alpha1.ClientMount) (string, error) {

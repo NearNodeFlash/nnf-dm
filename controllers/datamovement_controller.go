@@ -98,9 +98,11 @@ type dmConfig struct {
 
 // Each profile can have different settings
 type dmConfigProfile struct {
-	Slots    int    `yaml:"slots,omitempty"`
-	MaxSlots int    `yaml:"maxSlots,omitempty"`
-	Command  string `yaml:"command"`
+	Slots       int    `yaml:"slots,omitempty"`
+	MaxSlots    int    `yaml:"maxSlots,omitempty"`
+	Command     string `yaml:"command"`
+	LogStdout   bool   `yaml:"logStdout"`
+	StoreStdout bool   `yaml:"storeStdout"`
 }
 
 // Invalid error is a non-recoverable error type that implies the Data Movement resource is invalid
@@ -240,14 +242,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Config map not found - requeueing", "name", configMapName, "namespace", configMapNamespace)
 		return ctrl.Result{}, handleInvalidError(err)
 	}
-	log.Info("Config map found", "data", configMap.Data)
 
 	cfg := dmConfig{}
 	if err := yaml.Unmarshal([]byte(configMap.Data[configMapKeyData]), &cfg); err != nil {
 		log.Error(err, "error reading config map data")
 		return ctrl.Result{}, handleInvalidError(err)
 	}
-	log.Info("Config map unmarshalled", "config", cfg)
+	log.Info("Using config map", "config", cfg)
 
 	// TODO: Allow use of non-default dm config profiles - for now only use the default. For copy
 	// offload API, we could create "fake" profiles and store those in the DM object based on the
@@ -392,6 +393,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
 		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
 
+		// On cancellation or failure, log the output. On failure, also store the output in the
+		// Status.Message. When successful, check the profile/UserConfig config options to log
+		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Error(err, "Data movement operation cancelled", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
@@ -399,10 +403,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
-
-			// TODO: Enhanced error capture: parse error response and provide useful message
 		} else {
-			log.Info("Completed Command", "cmdStatus", cmdStatus)
+			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
+
+			// Profile or DM request has enabled stdout logging
+			if profile.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
+				log.Info("Data movement operation output", "output", combinedOutBuf.String())
+			}
+
+			// Profile or DM request has enabled storing stdout
+			if profile.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
+				dm.Status.Message = combinedOutBuf.String()
+			}
 		}
 
 		os.RemoveAll(filepath.Dir(mpiHostfile))
