@@ -47,7 +47,7 @@ func (r *LustreFileSystem) SetupWebhookWithManager(mgr ctrl.Manager) error {
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-cray-hpe-com-v1alpha1-lustrefilesystem,mutating=false,failurePolicy=fail,sideEffects=None,groups=cray.hpe.com,resources=lustrefilesystems,verbs=create;update,versions=v1alpha1,name=vlustrefilesystem.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-lus-cray-hpe-com-v1alpha1-lustrefilesystem,mutating=false,failurePolicy=fail,sideEffects=None,groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=create;update,versions=v1alpha1,name=vlustrefilesystem.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &LustreFileSystem{}
 
@@ -120,22 +120,24 @@ func (r *LustreFileSystem) ValidateUpdate(obj runtime.Object) error {
 	old := obj.(*LustreFileSystem)
 
 	// Prevent the immutable fields from being updated
-	specPath := field.NewPath("Spec")
+	immutableError := func(child string) error {
+		return field.Forbidden(field.NewPath("Spec").Child(child), "field is immutable")
+	}
 
 	if r.Spec.Name != old.Spec.Name {
-		return field.Invalid(specPath.Child("Name"), r.Spec.Name, "field is immutable")
+		return immutableError("Name")
 	}
 
 	if r.Spec.MgsNids != old.Spec.MgsNids {
-		return field.Invalid(specPath.Child("MgsNids"), r.Spec.MgsNids, "field is immutable")
+		return immutableError("MgsNids")
 	}
 
 	if r.Spec.MountRoot != old.Spec.MountRoot {
-		return field.Invalid(specPath.Child("MountRoot"), r.Spec.MountRoot, "field is immutable")
+		return immutableError("MountRoot")
 	}
 
 	if r.Spec.StorageClassName != old.Spec.StorageClassName {
-		return field.Invalid(specPath.Child("StorageClassName"), r.Spec.StorageClassName, "field is immutable")
+		return immutableError("StorageClassName")
 	}
 
 	return nil

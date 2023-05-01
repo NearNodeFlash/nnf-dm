@@ -1,0 +1,63 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: daemon-role
+rules:
+- apiGroups:
+  - lus.cray.hpe.com
+  resources:
+  - lustrefilesystems
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dws.cray.hpe.com
+  resources:
+  - clientmounts
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dws.cray.hpe.com
+  resources:
+  - clientmounts/status
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dws.cray.hpe.com
+  resources:
+  - systemconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements/status
+  verbs:
+  - get
+  - patch
+  - update

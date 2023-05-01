@@ -36,6 +36,7 @@ import (
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
 	server "github.com/NearNodeFlash/nnf-dm/daemons/compute/server/servers"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 )
 
 const (
@@ -111,6 +112,8 @@ func (service *Service) Manage() (string, error) {
 }
 
 func (service *Service) Run(srv server.Server, listener net.Listener) error {
+
+	stdlog.Println("Version:", version.BuildVersion())
 
 	go func() {
 		if err := srv.StartManager(); err != nil {

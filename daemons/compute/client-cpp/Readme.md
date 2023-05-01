@@ -7,23 +7,16 @@ The Makefile, CMakeLists.txt, and common.cmake files are modifications to the [h
 ## Example code and setup
 
 1. Follow the Quick start instructions to [build and locally install gRPC from source](https://grpc.io/docs/languages/cpp/quickstart/#install-grpc)
-2. Run `cmake` in this directory (i.e. `client-cpp`):
-
-```shell
-mkdir -p cmake/build
-cd cmake/build
-cmake -DCMAKE_PREFIX_PATH=$MY_INSTALL_DIR ../..
-```
 
 ### Generating client code and interfaces
 
-Ensure you are in the `client-cpp/cmake/build/` directory before running the following `make`:
+Run make to generate the cmake build directory and build this application:
 
 ```shell
 make
 ```
 
-Running this command will generate the following files in the `client-cpp/cmake/build/` directory:
+Running this command will generate the following files in the `./cmake/build/` directory:
 
 - `datamovement.pb.h`, the header which declares your generated message classes
 - `datamovement.pb.cc`, which contains the implementation of your message classes

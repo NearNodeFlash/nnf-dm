@@ -3,11 +3,11 @@
 import grpc
 
 import datamovement_pb2 as datamovement__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class DataMoverStub(object):
-    """DataMover service definition describes the API for perform data movement
-    for NNF storage. 
+    """DataMover service definition describes the API for perform data movement for NNF storage.
     """
 
     def __init__(self, channel):
@@ -16,6 +16,11 @@ class DataMoverStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.Version = channel.unary_unary(
+                '/datamovement.DataMover/Version',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=datamovement__pb2.DataMovementVersionResponse.FromString,
+                )
         self.Create = channel.unary_unary(
                 '/datamovement.DataMover/Create',
                 request_serializer=datamovement__pb2.DataMovementCreateRequest.SerializeToString,
@@ -44,29 +49,32 @@ class DataMoverStub(object):
 
 
 class DataMoverServicer(object):
-    """DataMover service definition describes the API for perform data movement
-    for NNF storage. 
+    """DataMover service definition describes the API for perform data movement for NNF storage.
     """
 
+    def Version(self, request, context):
+        """Version sends a request to the data movement daemon and returns a response containing details on the current build version and supported API versions.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def Create(self, request, context):
-        """Create sends a new data movement request identified by source and destination fields. It returns
-        a response containing a unique identifier which can be used to query the status of the request.
+        """Create sends a new data movement request identified by source and destination fields. It returns a response containing a unique identifier which can be used to query the status of the request.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Status(self, request, context):
-        """Status requests the status of a previously submitted data movement request. It accepts a unique
-        identifier that identifies the request and returns a status message.
+        """Status requests the status of a previously submitted data movement request. It accepts a unique identifier that identifies the request and returns a status message.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Delete(self, request, context):
-        """Delete will attempt to delete a completed data movement request. It accepts a unique identifier
-        that identifies the request and returns the status of the delete operation.
+        """Delete will attempt to delete a completed data movement request. It accepts a unique identifier that identifies the request and returns the status of the delete operation.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -80,8 +88,7 @@ class DataMoverServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def Cancel(self, request, context):
-        """Cancel will attempt to stop a data movement request. It accepts a unique identifier
-        that identifies the request and returns the status of the cancel operation.
+        """Cancel will attempt to stop a data movement request. It accepts a unique identifier that identifies the request and returns the status of the cancel operation.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -90,6 +97,11 @@ class DataMoverServicer(object):
 
 def add_DataMoverServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'Version': grpc.unary_unary_rpc_method_handler(
+                    servicer.Version,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=datamovement__pb2.DataMovementVersionResponse.SerializeToString,
+            ),
             'Create': grpc.unary_unary_rpc_method_handler(
                     servicer.Create,
                     request_deserializer=datamovement__pb2.DataMovementCreateRequest.FromString,
@@ -123,9 +135,25 @@ def add_DataMoverServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class DataMover(object):
-    """DataMover service definition describes the API for perform data movement
-    for NNF storage. 
+    """DataMover service definition describes the API for perform data movement for NNF storage.
     """
+
+    @staticmethod
+    def Version(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/datamovement.DataMover/Version',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            datamovement__pb2.DataMovementVersionResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def Create(request,

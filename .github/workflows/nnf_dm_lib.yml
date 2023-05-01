@@ -2,7 +2,7 @@ name: NNF-DM Library Build
 on: push
 
 jobs:
-  build:
+  lib_build:
     runs-on: ubuntu-latest
     container: ghcr.io/nearnodeflash/grpc-cxx:latest
     steps:

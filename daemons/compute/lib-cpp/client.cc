@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -46,6 +46,20 @@ DataMoverClient::DataMoverClient(const std::string &target) {
 
 DataMoverClient::~DataMoverClient() {
     delete static_cast<DataMoverClientInternal *>(data_);
+}
+
+RPCStatus DataMoverClient::Version(VersionResponse *response) {
+    auto client = static_cast<DataMoverClientInternal *>(data_);
+
+    auto request_ = ::google::protobuf::Empty();
+
+    grpc::ClientContext context;
+    grpc::Status status = client->stub_->Version(&context,
+        request_,
+        static_cast<datamovement::DataMovementVersionResponse *>(response->data_)
+    );
+    
+    return RPCStatus(status.ok(), status.error_code(), status.error_message());
 }
 
 RPCStatus DataMoverClient::Create(const Workflow &workflow, const CreateRequest &request, CreateResponse *response) {
@@ -154,11 +168,47 @@ Workflow::Workflow(std::string name, std::string namespace_) :
     namespace_(namespace_)
 { }
 
-CreateRequest::CreateRequest(std::string source, std::string destination) {
+CommandStatus::CommandStatus(std::string command, int32_t progress, std::string elapsedTime, std::string lastMessage, std::string lastMessageTime) :
+    command(command),
+    progress(progress),
+    elapsedTime(elapsedTime),
+    lastMessage(lastMessage),
+    lastMessageTime(lastMessageTime)
+{ }
+
+VersionResponse::VersionResponse() {
+    auto response = new datamovement::DataMovementVersionResponse();
+    data_ = static_cast<void *>(response);
+}
+
+VersionResponse::~VersionResponse() {
+    delete static_cast<datamovement::DataMovementVersionResponse *>(data_);
+}
+
+std::string VersionResponse::version() {
+    return static_cast<datamovement::DataMovementVersionResponse *>(data_)->version();
+}
+
+std::vector<std::string> VersionResponse::apiversions() {
+    auto response = static_cast<datamovement::DataMovementVersionResponse *>(data_);
+
+    auto apiVersions = std::vector<std::string>();
+    apiVersions.reserve(response->apiversions_size());
+
+    for (auto& v : response->apiversions()) {
+        apiVersions.push_back(v);
+    }
+
+    return apiVersions;
+}
+
+CreateRequest::CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions) {
     auto request = new datamovement::DataMovementCreateRequest();
 
     request->set_source(source);
     request->set_destination(destination);
+    request->set_dryrun(dryrun);
+    request->set_dcpoptions(dcpOptions);
 
     data_ = static_cast<void *>(request);
 }
@@ -240,6 +290,25 @@ StatusResponse::Status StatusResponse::status() {
 
 std::string StatusResponse::message() {
     return static_cast<datamovement::DataMovementStatusResponse *>(data_)->message();
+}
+
+CommandStatus StatusResponse::commandStatus() {
+    auto dmCmdStatus = static_cast<datamovement::DataMovementStatusResponse *>(data_)->commandstatus();
+    auto cmdStatus = new CommandStatus(dmCmdStatus.command(),
+                                 dmCmdStatus.progress(),
+                                 dmCmdStatus.elapsedtime(),
+                                 dmCmdStatus.lastmessage(),
+                                 dmCmdStatus.lastmessagetime());
+
+    return *cmdStatus;
+}
+
+std::string StatusResponse::startTime() {
+    return static_cast<datamovement::DataMovementStatusResponse *>(data_)->starttime();
+}
+
+std::string StatusResponse::endTime() {
+    return static_cast<datamovement::DataMovementStatusResponse *>(data_)->endtime();
 }
 
 CancelRequest::CancelRequest(std::string uid) {
