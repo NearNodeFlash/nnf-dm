@@ -22,10 +22,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -40,13 +43,30 @@ const (
 type simulatedServer struct {
 	pb.UnimplementedDataMoverServer
 
-	requests map[uuid.UUID]requestData
+	requests      map[uuid.UUID]requestData
+	requestsMutex sync.Mutex
 }
 
 type requestData struct {
 	// Keep track of how many status responses we've sent to facilitate sending RUNNING before COMPLETE
 	statusResponseCount int
 	cancelResponseCount int
+	request             *pb.DataMovementCreateRequest
+}
+
+func (s *simulatedServer) addRequest(uid uuid.UUID, r requestData) {
+	s.requestsMutex.Lock()
+	defer s.requestsMutex.Unlock()
+
+	s.requests[uid] = r
+}
+
+func (s *simulatedServer) getRequest(uid uuid.UUID) (requestData, bool) {
+	s.requestsMutex.Lock()
+	defer s.requestsMutex.Unlock()
+
+	r, ok := s.requests[uid]
+	return r, ok
 }
 
 func CreateSimulatedServer(opts *ServerOptions) (*simulatedServer, error) {
@@ -57,10 +77,17 @@ func (s *simulatedServer) StartManager() error {
 	return nil
 }
 
+func (*simulatedServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
+	return &pb.DataMovementVersionResponse{
+		Version:     version.BuildVersion(),
+		ApiVersions: version.ApiVersions(),
+	}, nil
+}
+
 func (s *simulatedServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 	uid := uuid.New()
 
-	s.requests[uid] = requestData{statusResponseCount: 0, cancelResponseCount: 0}
+	s.addRequest(uid, requestData{statusResponseCount: 0, cancelResponseCount: 0, request: req})
 
 	return &pb.DataMovementCreateResponse{Uid: uid.String()}, nil
 }
@@ -76,7 +103,7 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		}, nil
 	}
 
-	reqData, ok := s.requests[uid]
+	reqData, ok := s.getRequest(uid)
 	if !ok {
 		return &pb.DataMovementStatusResponse{
 			State:         pb.DataMovementStatusResponse_UNKNOWN_STATE,
@@ -88,7 +115,10 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 
 	resp := pb.DataMovementStatusResponse{}
 	resp.CommandStatus = &pb.DataMovementCommandStatus{}
+
 	cmd := "mpirun -np 1 dcp --progress 1 src dest"
+
+	now := time.Now().Local()
 
 	// If a request was cancelled, send a CANCELLING response first, then COMPLETE
 	if reqData.cancelResponseCount > 0 && reqData.cancelResponseCount <= statusResponseCancellingCount {
@@ -100,24 +130,39 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		// Otherwise, send RUNNING status first, then COMPLETED
 	} else if reqData.statusResponseCount < statusResponseRunningCount {
 		resp.State = pb.DataMovementStatusResponse_RUNNING
-		resp.CommandStatus.Command = cmd
-		resp.CommandStatus.Progress = 50
-		resp.CommandStatus.ElapsedTime = (3*time.Second + 139*time.Millisecond).String()
-		resp.CommandStatus.LastMessage = "Copied 5.000 GiB (50%) in 3.139 secs (1.480 GiB/s) 1 secs left ..."
-		resp.CommandStatus.LastMessageTime = time.Now().Local().String()
+
+		if reqData.request.Dryrun {
+			resp.CommandStatus.Command = "true"
+		} else {
+			resp.CommandStatus.Command = cmd
+			resp.CommandStatus.Progress = 50
+			resp.CommandStatus.LastMessage = "Copied 5.000 GiB (50%) in 3.139 secs (1.480 GiB/s) 1 secs left ..."
+			resp.CommandStatus.LastMessageTime = time.Now().Local().String()
+			resp.CommandStatus.ElapsedTime = (3*time.Second + 139*time.Millisecond).String()
+		}
+		resp.StartTime = now.String()
+		resp.EndTime = now.Add(30 * time.Second).String()
+
 		reqData.statusResponseCount += 1
 	} else {
 		resp.State = pb.DataMovementStatusResponse_COMPLETED
 		resp.Status = pb.DataMovementStatusResponse_SUCCESS
 		resp.Message = fmt.Sprintf("Request %s completed successfully", req.Uid)
-		resp.CommandStatus.Command = cmd
-		resp.CommandStatus.Progress = 100
-		resp.CommandStatus.ElapsedTime = (6*time.Second + 755*time.Millisecond).String()
-		resp.CommandStatus.LastMessage = "Copied 10.000 GiB (100%) in 6.755 secs (1.480 GiB/s) done"
-		resp.CommandStatus.LastMessageTime = time.Now().String()
+
+		if reqData.request.Dryrun {
+			resp.CommandStatus.Command = "true"
+		} else {
+			resp.CommandStatus.Command = cmd
+			resp.CommandStatus.Progress = 100
+			resp.CommandStatus.LastMessage = "Copied 10.000 GiB (100%) in 6.755 secs (1.480 GiB/s) done"
+			resp.CommandStatus.LastMessageTime = time.Now().String()
+			resp.CommandStatus.ElapsedTime = (6*time.Second + 755*time.Millisecond).String()
+		}
+		resp.StartTime = now.String()
+		resp.EndTime = now.Add(30 * time.Second).String()
 	}
 
-	s.requests[uid] = reqData
+	s.addRequest(uid, reqData)
 
 	return &resp, nil
 }
@@ -179,7 +224,7 @@ func (s *simulatedServer) Cancel(ctx context.Context, req *pb.DataMovementCancel
 
 	// Set the count so we can use Status to get cancel statuses
 	reqData.cancelResponseCount = 1
-	s.requests[uid] = reqData
+	s.addRequest(uid, reqData)
 
 	return &pb.DataMovementCancelResponse{
 		Status:  pb.DataMovementCancelResponse_SUCCESS,

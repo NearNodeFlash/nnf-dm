@@ -20,6 +20,7 @@
 package controllers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -27,6 +28,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -46,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
@@ -59,19 +62,11 @@ const (
 
 	// DM ConfigMap Info
 	configMapName      = "nnf-dm-config"
-	configMapNamespace = corev1.NamespaceDefault
+	configMapNamespace = nnfv1alpha1.DataMovementNamespace
 
 	// DM ConfigMap Data Keys
-	configMapKeyCmd             = "dmCommand"
-	configMapKeyProgInterval    = "dmProgressInterval"
-	configMapKeyDcpProgInterval = "dcpProgressInterval"
-	configMapKeyNumProcesses    = "dmNumProcesses"
-
-	// DM ConfigMap Default Values
-	configMapDefaultCmd             = ""
-	configMapDefaultProgInterval    = 5 * time.Second
-	configMapDefaultDcpProgInterval = 1 * time.Second
-	configMapDefaultNumProcess      = 1
+	configMapKeyData           = "nnf-dm-config.yaml"
+	configMapKeyProfileDefault = "default"
 )
 
 // Regex to scrape the progress output of the `dcp` command. Example output:
@@ -95,6 +90,19 @@ type dataMovementCancelContext struct {
 	cancel context.CancelFunc
 }
 
+// Configuration that matches the nnf-dm-config ConfigMap
+type dmConfig struct {
+	Profiles                map[string]dmConfigProfile `yaml:"profiles"`
+	ProgressIntervalSeconds int                        `yaml:"progressIntervalSeconds,omitempty"`
+}
+
+// Each profile can have different settings
+type dmConfigProfile struct {
+	Slots    int    `yaml:"slots,omitempty"`
+	MaxSlots int    `yaml:"maxSlots,omitempty"`
+	Command  string `yaml:"command"`
+}
+
 // Invalid error is a non-recoverable error type that implies the Data Movement resource is invalid
 type invalidError struct {
 	err error
@@ -115,7 +123,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts,verbs=get;list
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts/status,verbs=get;list
-//+kubebuilder:rbac:groups=cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
+//+kubebuilder:rbac:groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
@@ -226,22 +234,42 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		cancel: cancel,
 	})
 
-	// Pull configurable values from the ConfigMap
+	// Get DM Config map
 	configMap := &corev1.ConfigMap{}
 	if err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
-		log.Info("Config map not found - requeueing")
-		return ctrl.Result{}, err
+		log.Info("Config map not found - requeueing", "name", configMapName, "namespace", configMapNamespace)
+		return ctrl.Result{}, handleInvalidError(err)
 	}
 	log.Info("Config map found", "data", configMap.Data)
 
-	dmCmd := getCommand(configMap)
-	progressCollectInterval := getCollectionInterval(configMap)
-	dcpProgressInterval := getDcpProgressInterval(configMap)
-	numProcesses := getNumProcesses(configMap)
+	cfg := dmConfig{}
+	if err := yaml.Unmarshal([]byte(configMap.Data[configMapKeyData]), &cfg); err != nil {
+		log.Error(err, "error reading config map data")
+		return ctrl.Result{}, handleInvalidError(err)
+	}
+	log.Info("Config map unmarshalled", "config", cfg)
 
-	// Set the command and arguments according to the values specified by the config map
-	cmdStr, cmdArgs := getCmdAndArgs(dmCmd, numProcesses, dcpProgressInterval, hosts, dm)
-	cmd := exec.CommandContext(ctxCancel, cmdStr, cmdArgs...)
+	// TODO: Allow use of non-default dm config profiles - for now only use the default. For copy
+	// offload API, we could create "fake" profiles and store those in the DM object based on the
+	// parameters supplied to the CreateRequest().
+	// Ensure profile exists
+	profile, found := cfg.Profiles[configMapKeyProfileDefault]
+	if !found {
+		return ctrl.Result{}, handleInvalidError(fmt.Errorf(
+			"'%s' profile not found in config map", configMapKeyProfileDefault))
+	}
+	log.Info("Using profile", "name", configMapKeyProfileDefault, "profile", profile)
+
+	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
+	if err != nil {
+		log.Error(err, "error building DM command")
+		return ctrl.Result{}, handleInvalidError(err)
+	}
+	if len(mpiHostfile) > 0 {
+		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
+	}
+
+	cmd := exec.CommandContext(ctxCancel, cmdArgs[0], cmdArgs[1:]...)
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
@@ -260,7 +288,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	go func() {
 		// Use a MultiWriter so that we can parse the output and save the full output at the end
 		var combinedOutBuf, parseBuf bytes.Buffer
-		cmd.Stdout = io.MultiWriter(os.Stdout, &parseBuf, &combinedOutBuf)
+		cmd.Stdout = io.MultiWriter(&parseBuf, &combinedOutBuf)
 		cmd.Stderr = cmd.Stdout // Combine stderr/stdout
 
 		// Use channels to sync progress collection and cmd.Wait().
@@ -273,6 +301,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// While the command is running, capture and process the output. Read lines until EOF to
 		// ensure we have the latest output. Then use the last regex match to obtain the most recent
 		// progress.
+		progressCollectInterval := time.Duration(cfg.ProgressIntervalSeconds) * time.Second
 		if progressCollectionEnabled(progressCollectInterval) {
 			go func() {
 				var elapsed metav1.Duration
@@ -323,7 +352,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
-						log.Info("Updating Progress", "CommandStatus", dm.Status.CommandStatus)
 						return r.Status().Update(ctx, dm)
 					})
 
@@ -377,6 +405,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Info("Completed Command", "cmdStatus", cmdStatus)
 		}
 
+		os.RemoveAll(filepath.Dir(mpiHostfile))
+
 		status := dm.Status.DeepCopy()
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -403,87 +433,127 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// Build the command and arguments based on the values we get from the config map
-func getCmdAndArgs(cmCommand string, cmNumProcesses int, progressInterval int, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, []string) {
-	var cmd string
-	var args []string
+func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) ([]string, string, error) {
+	log := log.FromContext(ctx)
+	var hostfile string
+	var err error
+	userConfig := dm.Spec.UserConfig != nil
 
-	// Allow the data movement command to be overridden via the config map for testing purposes
-	if len(cmCommand) > 0 {
-		cmdList := strings.Split(cmCommand, " ")
-		cmd = cmdList[0]
-		args = cmdList[1:]
-	} else {
-		numProcesses := len(hosts)
+	// If Dryrun is enabled, just use the "true" command with no hostfile
+	if userConfig && dm.Spec.UserConfig.Dryrun {
+		log.Info("Dry run detected")
+		return []string{"true"}, "", nil
+	}
 
-		// If data movement is on the rabbit namespace, use the config map value
-		if dm.Namespace == os.Getenv("NNF_NODE_NAME") {
-			numProcesses = cmNumProcesses
-		}
+	// Command provided via the configmap
+	providedCmd := profile.Command
 
-		cmd = "mpirun"
-		args = []string{
-			"--allow-run-as-root", // required to be able to set dcp uid/gid
-			"-np", fmt.Sprintf("%d", numProcesses),
-			"--host", strings.Join(hosts, ","),
-			"dcp",
-			"--progress", fmt.Sprintf("%d", progressInterval),
-			"--uid", fmt.Sprintf("%d", dm.Spec.UserId),
-			"--gid", fmt.Sprintf("%d", dm.Spec.GroupId),
-			dm.Spec.Source.Path, dm.Spec.Destination.Path,
+	// Create MPI hostfile only if included in the provided command
+	if strings.Contains(providedCmd, "$HOSTFILE") {
+		slots := profile.Slots
+		maxSlots := profile.MaxSlots
+
+		hostfile, err = createMpiHostfile(dm.Name, hosts, slots, maxSlots)
+		if err != nil {
+			return nil, "", fmt.Errorf("error creating MPI hostfile: %v", err)
 		}
 	}
 
-	return cmd, args
+	cmd := profile.Command
+	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
+	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", dm.Spec.UserId))
+	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", dm.Spec.GroupId))
+	cmd = strings.ReplaceAll(cmd, "$SRC", dm.Spec.Source.Path)
+	cmd = strings.ReplaceAll(cmd, "$DEST", dm.Spec.Destination.Path)
+
+	// Allow the user to override settings
+	if userConfig {
+
+		// Add extra DCP options from the user
+		if len(dm.Spec.UserConfig.DCPOptions) > 0 {
+			opts := dm.Spec.UserConfig.DCPOptions
+
+			// Insert the extra dcp options before the src argument
+			if strings.Contains(cmd, "dcp") {
+				idx := strings.Index(cmd, dm.Spec.Source.Path)
+				if idx != -1 {
+					cmd = cmd[:idx] + opts + " " + cmd[idx:]
+				} else {
+					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
+						"command", profile.Command, "DCPOptions", opts)
+				}
+			} else {
+				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
+					"command", profile.Command, "DCPOptions", opts)
+			}
+		}
+	}
+
+	return strings.Split(cmd, " "), hostfile, nil
 }
 
-func getCommand(config *corev1.ConfigMap) string {
-	cmd := configMapDefaultCmd
+// Create an MPI Hostfile given a list of hosts, slots, and maxSlots. A temporary directory is
+// created based on the DM Name. The hostfile is created inside of this directory.
+func createMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
 
-	if len(config.Data[configMapKeyCmd]) > 0 {
-		cmd = config.Data[configMapKeyCmd]
+	tmpdir := filepath.Join("/tmp", dmName)
+	if err := os.MkdirAll(tmpdir, 0755); err != nil {
+		return "", err
 	}
+	hostfilePath := filepath.Join(tmpdir, "hostfile")
 
-	return cmd
-}
+	f, err := os.Create(hostfilePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
 
-func getCollectionInterval(config *corev1.ConfigMap) time.Duration {
-	collectionInterval := configMapDefaultProgInterval
+	// $ cat my-hosts
+	// node0 slots=2 max_slots=20
+	// node1 slots=2 max_slots=20
+	// https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+	for _, host := range hosts {
+		if _, err := f.WriteString(host); err != nil {
+			return "", err
+		}
 
-	if len(config.Data[configMapKeyProgInterval]) > 0 {
-		if parsedInterval, err := time.ParseDuration(config.Data[configMapKeyProgInterval]); err == nil {
-			collectionInterval = parsedInterval
+		if slots > 0 {
+			_, err := f.WriteString(fmt.Sprintf(" slots=%d", slots))
+			if err != nil {
+				return "", err
+			}
+		}
+
+		if maxSlots > 0 {
+			_, err := f.WriteString(fmt.Sprintf(" max_slots=%d", maxSlots))
+			if err != nil {
+				return "", err
+			}
+		}
+
+		_, err = f.WriteString("\n")
+		if err != nil {
+			return "", err
 		}
 	}
 
-	return collectionInterval
+	return hostfilePath, nil
 }
 
-func getDcpProgressInterval(config *corev1.ConfigMap) int {
-	progressInterval := configMapDefaultDcpProgInterval
+// Get the first line of the hostfile for verification
+func peekMpiHostfile(hostfile string) string {
+	file, err := os.Open(hostfile)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
 
-	// DCP Progress Output Interval (int, in seconds)
-	if len(config.Data[configMapKeyDcpProgInterval]) > 0 {
-		if parsedInterval, err := time.ParseDuration(config.Data[configMapKeyDcpProgInterval]); err == nil {
-			progressInterval = parsedInterval
-		}
+	str, err := bufio.NewReader(file).ReadString('\n')
+	if err != nil {
+		return ""
 	}
 
-	// dcp progress needs to be in seconds - round and cast to int
-	progressInterval = progressInterval.Round(1 * time.Second)
-	return int(progressInterval / time.Second)
-}
-
-func getNumProcesses(config *corev1.ConfigMap) int {
-	numProcesses := configMapDefaultNumProcess
-
-	if len(config.Data[configMapKeyNumProcesses]) > 0 {
-		if parsedNum, err := strconv.Atoi(config.Data[configMapKeyNumProcesses]); err == nil {
-			numProcesses = parsedNum
-		}
-	}
-
-	return numProcesses
+	return str
 }
 
 func progressCollectionEnabled(collectInterval time.Duration) bool {

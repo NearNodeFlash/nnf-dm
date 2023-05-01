@@ -58,7 +58,7 @@ IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+ENVTEST_K8S_VERSION = 1.26.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -111,7 +111,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 		failfast="-ginkgo.fail-fast"; \
 	fi; \
 	set -o errexit; \
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v -ginkgo.progress $$failfast
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v $$failfast
 
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
@@ -119,8 +119,11 @@ container-unit-test: .version ## Run tests inside a container image
 	$(DOCKER) run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 ##@ Build
+
+build-daemon: COMMIT_HASH?=$(shell git rev-parse --short HEAD)
+build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
 build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
-	GOOS=linux GOARCH=amd64 go build -o bin/nnf-dm daemons/compute/server/main.go
+	GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).commitHash=$(COMMIT_HASH)'" -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
@@ -182,7 +185,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.2
+CONTROLLER_TOOLS_VERSION ?= v0.11.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize

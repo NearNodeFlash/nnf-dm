@@ -5,7 +5,6 @@ generatorOptions:
   disableNameSuffixHash: true
 
 configMapGenerator:
-  - name: nnf-dm-config
-    namespace: default
-    envs:
-      - nnf-dm-config.env
+- files:
+  - nnf-dm-config.yaml
+  name: config

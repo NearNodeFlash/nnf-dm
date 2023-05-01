@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/types/known/emptypb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +59,7 @@ import (
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
+	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version"
 )
 
 var (
@@ -145,6 +147,8 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			TLSClientConfig: tlsClientConfig,
 			BearerToken:     string(token),
 			BearerTokenFile: opts.tokenFile,
+			QPS:             float32(opts.k8sQPS),
+			Burst:           opts.k8sBurst,
 		}
 	}
 
@@ -270,22 +274,32 @@ func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
+func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovementVersionResponse, error) {
+	return &pb.DataMovementVersionResponse{
+		Version:     version.BuildVersion(),
+		ApiVersions: version.ApiVersions(),
+	}, nil
+}
+
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 
 	computeClientMount, computeMountInfo, err := s.findComputeMountInfo(ctx, req)
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: "Error finding compute mount info: " + err.Error(),
 		}, nil
 	}
 
 	var dm *nnfv1alpha1.NnfDataMovement
+	dmFunc := ""
 	switch computeMountInfo.Type {
 	case "lustre":
 		dm, err = s.createNnfDataMovement(ctx, req, computeMountInfo, computeClientMount)
+		dmFunc = "createNnfDataMovement()"
 	case "gfs2":
 		dm, err = s.createNnfNodeDataMovement(ctx, req, computeMountInfo)
+		dmFunc = "createNnfNodeDataMovement()"
 	default:
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_INVALID,
@@ -296,14 +310,17 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: fmt.Sprintf("Error during %s: %s", dmFunc, err),
 		}, nil
 	}
 
 	// Authentication
 	userId, groupId, err := auth.GetAuthInfo(ctx)
 	if err != nil {
-		return nil, err
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: "Error authenticating: " + err.Error(),
+		}, nil
 	}
 
 	dm.Spec.UserId = userId
@@ -322,12 +339,25 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha1.AddDataMovementTeardownStateLabel(dm, dwsv1alpha1.StatePostRun.String())
+	nnfv1alpha1.AddDataMovementTeardownStateLabel(dm, dwsv1alpha1.StatePostRun)
+
+	// Allow the user to override/supplement certain settings
+	if req.Dryrun || len(req.DcpOptions) > 0 {
+		dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{}
+
+		if req.Dryrun {
+			dm.Spec.UserConfig.Dryrun = true
+		}
+
+		if len(req.DcpOptions) > 0 {
+			dm.Spec.UserConfig.DCPOptions = req.DcpOptions
+		}
+	}
 
 	if err := s.client.Create(ctx, dm, &client.CreateOptions{}); err != nil {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: err.Error(),
+			Message: "Error creating DataMovement: " + err.Error(),
 		}, nil
 	}
 
@@ -426,7 +456,6 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
-			//Dryrun:      req.Dryrun, TODO
 		},
 	}
 
@@ -544,11 +573,20 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 			cmdStatus.ElapsedTime = d.String()
 		}
 		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
-			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.UTC().String()
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.Local().String()
 		}
 		if dm.Status.CommandStatus.ProgressPercentage != nil {
 			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
 		}
+	}
+
+	startTimeStr := ""
+	if !dm.Status.StartTime.IsZero() {
+		startTimeStr = dm.Status.StartTime.Local().String()
+	}
+	endTimeStr := ""
+	if !dm.Status.EndTime.IsZero() {
+		endTimeStr = dm.Status.EndTime.Local().String()
 	}
 
 	return &pb.DataMovementStatusResponse{
@@ -556,6 +594,8 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		Status:        status,
 		Message:       dm.Status.Message,
 		CommandStatus: &cmdStatus,
+		StartTime:     startTimeStr,
+		EndTime:       endTimeStr,
 	}, nil
 }
 

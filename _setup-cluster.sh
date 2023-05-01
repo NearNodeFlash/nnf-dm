@@ -32,14 +32,14 @@ CMD=$1
 echo "$(tput bold)Installing prerequisite CRDs $(tput sgr 0)"
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfdatamovements.yaml
 kubectl apply -f vendor/github.com/NearNodeFlash/nnf-sos/config/crd/bases/nnf.cray.hpe.com_nnfstorages.yaml
-kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/cray.hpe.com_lustrefilesystems.yaml
+kubectl apply -f vendor/github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases/lus.cray.hpe.com_lustrefilesystems.yaml
 
 # Install the sample resources
 
 # Source is always a global lustre file system
 echo "$(tput bold)Installing sample LustreFileSystem $(tput sgr 0)"
 cat <<-EOF | kubectl apply -f -
-apiVersion: cray.hpe.com/v1alpha1
+apiVersion: lus.cray.hpe.com/v1alpha1
 kind: LustreFileSystem
 metadata:
   name: lustrefilesystem-sample-maui
@@ -48,6 +48,10 @@ spec:
   name: maui
   mgsNids: 172.0.0.1@tcp
   mountRoot: /lus/maui
+  namespaces:
+    default:
+      modes:
+        - ReadWriteMany
 EOF
 
 
