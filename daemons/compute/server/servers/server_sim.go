@@ -130,6 +130,12 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 		// Otherwise, send RUNNING status first, then COMPLETED
 	} else if reqData.statusResponseCount < statusResponseRunningCount {
 		resp.State = pb.DataMovementStatusResponse_RUNNING
+		if reqData.request.StoreStdout {
+			resp.Message = fmt.Sprintf("Request %s in progress", req.Uid)
+		}
+		if reqData.request.LogStdout {
+			resp.Message += " (with logging)"
+		}
 
 		if reqData.request.Dryrun {
 			resp.CommandStatus.Command = "true"
@@ -147,7 +153,12 @@ func (s *simulatedServer) Status(ctx context.Context, req *pb.DataMovementStatus
 	} else {
 		resp.State = pb.DataMovementStatusResponse_COMPLETED
 		resp.Status = pb.DataMovementStatusResponse_SUCCESS
-		resp.Message = fmt.Sprintf("Request %s completed successfully", req.Uid)
+		if reqData.request.StoreStdout {
+			resp.Message = fmt.Sprintf("Request %s completed", req.Uid)
+		}
+		if reqData.request.LogStdout {
+			resp.Message += " (with logging)"
+		}
 
 		if reqData.request.Dryrun {
 			resp.CommandStatus.Command = "true"

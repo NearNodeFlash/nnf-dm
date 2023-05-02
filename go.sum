@@ -5,10 +5,10 @@ github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8 h1:xfn+nvgB6eNL
 github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8/go.mod h1:LBdoJFhiqcjzqpnxLqCVzDyUrw1ncoEEhho7ni7nuxI=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230426150127-b7cba32758e5 h1:Uo9kgHrI/ZfWfSlULuAl46FEMTDXXJeAsSqMS0d+oJI=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230426150127-b7cba32758e5/go.mod h1:jLFbZp8S+ByWknnZzpkGQUTp+RQNYi7RSwTD0xDhz84=
-github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d h1:Fq4ev963g4VkQy5S2QTq4R1ZBw/e5Qpv1uMCg3QcWRE=
-github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d/go.mod h1:11Ol46sAWdqlj3WmIFTzKO+UxQX3lvWBqpe6yaiMEIg=
-github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e h1:4x2/+8Z1M4prEIUdbwmn3zAiyxqozWTp7FrF4R+i43I=
-github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e/go.mod h1:BXjxZJOGOsZ1E0tMdSpM06v7OeBONlMKtj50HxDr1os=
+github.com/NearNodeFlash/nnf-ec v0.0.0-20230427164720-dc73727a986f h1:kJetY6ACr44dAKEbJkXCwDdbnqqx4KKx63cjXPCHktQ=
+github.com/NearNodeFlash/nnf-ec v0.0.0-20230427164720-dc73727a986f/go.mod h1:11Ol46sAWdqlj3WmIFTzKO+UxQX3lvWBqpe6yaiMEIg=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20230428210046-53297ed0c2ce h1:8LsXszJjcTaBYP6sszFn82VdL6bViO4jTvkVb3XGbro=
+github.com/NearNodeFlash/nnf-sos v0.0.0-20230428210046-53297ed0c2ce/go.mod h1:c4nB9rwTqYMYKs9xeAIxs4maZ8xbkDLRJ5lPMkDaEqM=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=

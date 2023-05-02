@@ -7,10 +7,10 @@ github.com/HewlettPackard/dws/utils/updater
 ## explicit; go 1.19
 github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
-# github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d
+# github.com/NearNodeFlash/nnf-ec v0.0.0-20230427164720-dc73727a986f
 ## explicit; go 1.18
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e
+# github.com/NearNodeFlash/nnf-sos v0.0.0-20230428210046-53297ed0c2ce
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases

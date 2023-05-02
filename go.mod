@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/HewlettPackard/dws v0.0.0-20230410193930-8fd6fbeff7f8
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230426150127-b7cba32758e5
-	github.com/NearNodeFlash/nnf-sos v0.0.0-20230419183905-1ec49974666e
+	github.com/NearNodeFlash/nnf-sos v0.0.0-20230428210046-53297ed0c2ce
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3
 	github.com/prometheus/client_golang v1.14.0
@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.0-20230322150739-a8190e4ef79d // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.0-20230427164720-dc73727a986f // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

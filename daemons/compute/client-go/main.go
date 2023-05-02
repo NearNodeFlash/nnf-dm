@@ -47,6 +47,8 @@ func main() {
 	count := flag.Int("count", 1, "number of requests to create")
 	cancelExpiryTime := flag.Duration("cancel", -time.Second, "duration after create to cancel request")
 	dcpOptions := flag.String("dcp-options", "", "extra options to provide to dcp")
+	logStdout := flag.Bool("log-stdout", false, "enable server-side logging of stdout on successful dm")
+	storeStdout := flag.Bool("store-stdout", false, "store stdout in status message on successful dm")
 
 	flag.Parse()
 
@@ -95,7 +97,7 @@ func main() {
 			defer wg.Done()
 
 			log.Printf("Creating request %d of %d...", i+1, *count)
-			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions)
+			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions, *logStdout, *storeStdout)
 			if err != nil {
 				log.Fatalf("could not create data movement request: %v", err)
 			}
@@ -206,7 +208,7 @@ func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMov
 	return rsp, nil
 }
 
-func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool, dcpOptions string) (*pb.DataMovementCreateResponse, error) {
+func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool, dcpOptions string, logStdout, storeStdout bool) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow: &pb.DataMovementWorkflow{
@@ -217,6 +219,8 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 		Destination: destination,
 		Dryrun:      dryrun,
 		DcpOptions:  dcpOptions,
+		LogStdout:   logStdout,
+		StoreStdout: storeStdout,
 	})
 
 	if err != nil {
