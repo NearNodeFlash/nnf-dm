@@ -146,7 +146,7 @@ kind-push: .version ## Push docker image to kind
 	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
 	${DOCKER} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
-	kind load docker-image --nodes `kubectl get node -l cray.nnf.manager=true --no-headers -o custom-columns=":metadata.name" | paste -d, -s -` gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+	kind load docker-image gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 
 minikube-push: VERSION ?= $(shell cat .version)
 minikube-push: .version
