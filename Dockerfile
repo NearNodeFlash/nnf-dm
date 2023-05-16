@@ -1,4 +1,4 @@
-# Copyright 2020, 2021, 2022 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -14,6 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# These ARGs must be before the first FROM. This allows them to be valid for
+# use in FROM instructions.
+ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
+ARG NNFMFU_VERSION=master
 
 # Build the manager binary
 FROM golang:1.19-alpine as builder
@@ -51,7 +56,7 @@ ENV CGO_ENABLED=0
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM ghcr.io/nearnodeflash/nnf-mfu:latest
+FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION
 
 RUN apt update
 
@@ -70,3 +75,10 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 
 ENTRYPOINT ["/manager"]
+
+# Make it easy to figure out which nnf-mfu was used.
+#   docker inspect --format='{{json .Config.Labels}}' image:tag
+ARG NNFMFU_TAG_BASE
+ARG NNFMFU_VERSION
+LABEL nnf-mfu="$NNFMFU_TAG_BASE:$NNFMFU_VERSION"
+

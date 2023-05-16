@@ -1,4 +1,4 @@
-# Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -52,6 +52,12 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
+
+# The NNF-MFU container image to use in NNFContainerProfile resources.
+NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
+NNFMFU_VERSION ?= master
+
+DOCKER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -115,7 +121,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
-	$(DOCKER) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
+	$(DOCKER) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(DOCKER_BUILDARGS) .
 	$(DOCKER) run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 ##@ Build
@@ -133,7 +139,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 docker-build: VERSION ?= $(shell cat .version)
 docker-build: .version ## Build docker image with the manager.
-	$(DOCKER) build -t $(IMAGE_TAG_BASE):$(VERSION) .
+	$(DOCKER) build -t $(IMAGE_TAG_BASE):$(VERSION) $(DOCKER_BUILDARGS) .
 
 docker-push: VERSION ?= $(shell cat .version)
 docker-push: .version ## Push docker image with the manager.
@@ -162,7 +168,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: VERSION ?= $(shell cat .version)
 deploy: .version kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	./deploy.sh deploy $(KUSTOMIZE) $(IMAGE_TAG_BASE):$(VERSION)
+	./deploy.sh deploy $(KUSTOMIZE) $(IMAGE_TAG_BASE):$(VERSION) $(NNFMFU_TAG_BASE):$(NNFMFU_VERSION)
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	./deploy.sh undeploy $(KUSTOMIZE)
@@ -214,7 +220,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 bundle-build: VERSION ?= $(shell cat .version)
 bundle-build: BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 bundle-build: .version ## Build the bundle image.
-	$(DOCKER) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(DOCKER) build -f bundle.Dockerfile -t $(BUNDLE_IMG) $(DOCKER_BUILDARGS) .
 
 .PHONY: bundle-push
 bundle-push: VERSION ?= $(shell cat .version)
