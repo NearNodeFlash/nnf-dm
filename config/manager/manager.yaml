@@ -76,7 +76,7 @@ spec:
       shareProcessNamespace: true
       containers:
         - name: worker
-          image: ghcr.io/nearnodeflash/nnf-mfu:latest
+          image: nnf-mfu:latest
           command: 
             - /usr/sbin/sshd
           args:
