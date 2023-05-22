@@ -46,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 )
@@ -322,7 +322,7 @@ func (r *DataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx con
 func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
 	log := log.FromContext(ctx)
 
-	filesystems := &lusv1alpha1.LustreFileSystemList{}
+	filesystems := &lusv1beta1.LustreFileSystemList{}
 	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
 		return fmt.Errorf("list lustre file systems failed: %w", err)
 	}
@@ -332,10 +332,10 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 		if !found {
 
 			if lustre.Spec.Namespaces == nil {
-				lustre.Spec.Namespaces = make(map[string]lusv1alpha1.LustreFileSystemNamespaceSpec)
+				lustre.Spec.Namespaces = make(map[string]lusv1beta1.LustreFileSystemNamespaceSpec)
 			}
 
-			lustre.Spec.Namespaces[manager.Namespace] = lusv1alpha1.LustreFileSystemNamespaceSpec{
+			lustre.Spec.Namespaces[manager.Namespace] = lusv1beta1.LustreFileSystemNamespaceSpec{
 				Modes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			}
 
@@ -353,7 +353,7 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
 	log := log.FromContext(ctx)
 
-	filesystems := &lusv1alpha1.LustreFileSystemList{}
+	filesystems := &lusv1beta1.LustreFileSystemList{}
 	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
 		return fmt.Errorf("list lustre file systems failed: %w", err)
 	}
@@ -433,7 +433,7 @@ func setupSSHAuthVolumes(manager *dmv1alpha1.DataMovementManager, podSpec *corev
 	}
 }
 
-func setupLustreVolumes(ctx context.Context, manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1alpha1.LustreFileSystem) {
+func setupLustreVolumes(ctx context.Context, manager *dmv1alpha1.DataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1beta1.LustreFileSystem) {
 	log := log.FromContext(ctx)
 
 	// Setup Volumes / Volume Mounts for accessing global Lustre file systems
@@ -506,7 +506,7 @@ func (r *DataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.DaemonSet{}).
 		Watches(
-			&source.Kind{Type: &lusv1alpha1.LustreFileSystem{}},
+			&source.Kind{Type: &lusv1beta1.LustreFileSystem{}},
 			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
 				return []reconcile.Request{
 					{

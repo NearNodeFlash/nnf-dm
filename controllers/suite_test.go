@@ -38,7 +38,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	_ "github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases"
 
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = lusv1alpha1.AddToScheme(scheme.Scheme)
+	err = lusv1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = nnfv1alpha1.AddToScheme(scheme.Scheme)

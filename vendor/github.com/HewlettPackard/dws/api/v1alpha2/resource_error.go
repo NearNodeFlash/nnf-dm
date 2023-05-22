@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 type ResourceErrorInfo struct {
 	// Optional user facing message if the error is relevant to an end user

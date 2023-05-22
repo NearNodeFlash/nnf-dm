@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"github.com/HewlettPackard/dws/utils/updater"
@@ -202,6 +202,7 @@ type WorkflowStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".status.state",description="Current state"
 //+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if current state is achieved"
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.status",description="Indicates achievement of current state"

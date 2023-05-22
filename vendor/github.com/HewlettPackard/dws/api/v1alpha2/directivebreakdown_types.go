@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"github.com/HewlettPackard/dws/utils/updater"
@@ -187,6 +187,7 @@ type DirectiveBreakdownStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if allocation sets have been generated"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
