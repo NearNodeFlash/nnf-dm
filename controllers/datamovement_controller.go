@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/yaml"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -81,6 +82,8 @@ type DataMovementReconciler struct {
 	// We maintain a map of active operations which allows us to process cancel requests
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	contexts sync.Map
+
+	WatchNamespace string
 }
 
 // Keep track of the context and its cancel function so that we can track
@@ -716,10 +719,17 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 	return hostnames, nil
 }
 
+func filterByNamespace(namespace string) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return object.GetNamespace() == namespace
+	})
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nnfv1alpha1.NnfDataMovement{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 128}).
+		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)
 }

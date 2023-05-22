@@ -182,8 +182,9 @@ func (*defaultController) SetOptions(opts *ctrl.Options) {
 
 func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		WatchNamespace: dmv1alpha1.DataMovementNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", c.GetType())
 		os.Exit(1)
@@ -199,6 +200,19 @@ type nodeController struct {
 
 func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
+	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
 	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+}
+
+func (c *nodeController) SetupReconcilers(mgr manager.Manager) (err error) {
+	if err = (&controllers.DataMovementReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		WatchNamespace: os.Getenv("NNF_NODE_NAME"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", c.GetType())
+		os.Exit(1)
+	}
+
+	return
 }
