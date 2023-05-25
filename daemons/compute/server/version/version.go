@@ -23,11 +23,9 @@ package version
 // information about the installed data-mover daemon.
 var (
 	// Version contains the current version of the data mover daemon.
-	version = "v0.0.1"
-
-	// Commit Hash is the shortened git commit of the data mover daemon. This value is patched
-	// if using the "build-daemon" make target, and "unknown" otherwise.
-	commitHash = "unknown"
+	// This is a version tag.  If there are commits past that tag, then
+	// a count is appended with a short git hash of the latest commit.
+	version = "v0.0.0"
 
 	// API Versions defines the list of API endpinds supported by the data-mover daemon.
 	// If the protobuf API changes that is not backwards compatible, a new version should be introduced.
@@ -41,6 +39,6 @@ var (
 	apiVersions = []string{"1"}
 )
 
-func BuildVersion() string { return version + "-" + commitHash }
+func BuildVersion() string { return version }
 
 func ApiVersions() []string { return apiVersions }
