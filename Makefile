@@ -126,7 +126,7 @@ container-unit-test: .version ## Run tests inside a container image
 
 ##@ Build
 
-build-daemon: RPM_VERSION ?= "UNKNOWN"
+build-daemon: RPM_VERSION ?= $(shell ./git-version-gen)
 build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
 build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
