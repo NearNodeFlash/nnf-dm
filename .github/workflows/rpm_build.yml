@@ -1,5 +1,10 @@
 name: RPM Build
 on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - 'master'
