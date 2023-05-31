@@ -273,7 +273,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 	}
 
-	cmd := exec.CommandContext(ctxCancel, cmdArgs[0], cmdArgs[1:]...)
+	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()

@@ -64,6 +64,8 @@ var _ = Describe("Data Movement Test", func() {
 		const testLabelKey = "dm-test"
 		var testLabel string
 
+		cmdBashPrefix := "/bin/bash -c "
+
 		createFakeProgressScript := func() string {
 			f, err := os.CreateTemp(tmpDir, "fakeProgressOutput-*.sh")
 			Expect(err).ToNot(HaveOccurred())
@@ -228,7 +230,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when the dm configmap has specified an overrideCmd", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "/bin/ls -l"
+				dmCfgProfile.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -238,13 +240,13 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
 			})
 		})
 
 		Context("when the dm configmap does not have $HOSTFILE in the command", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "/bin/ls -l"
+				dmCfgProfile.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -254,7 +256,7 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
 			})
 		})
 
