@@ -20,8 +20,8 @@ profiles:
       #   GID: Group ID that is inherited from the Workflow
       #   SRC: source for the data movement
       #   DEST destination for the data movement
-      # default: command: mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
-      command: mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
+      # default: command: ulimit -n 2048 && mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
+      command: ulimit -n 2048 && mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress 1 --uid $UID --gid $GID $SRC $DEST
 
       # If true, enable the command's stdout to be saved in the log when the command completes
       # successfully. On failure, the output is always logged.
