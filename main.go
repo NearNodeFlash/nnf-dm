@@ -39,7 +39,7 @@ import (
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	lusv1alpha1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1alpha1"
+	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -55,7 +55,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(lusv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 
@@ -182,8 +182,9 @@ func (*defaultController) SetOptions(opts *ctrl.Options) {
 
 func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		WatchNamespace: dmv1alpha1.DataMovementNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", c.GetType())
 		os.Exit(1)
@@ -199,6 +200,19 @@ type nodeController struct {
 
 func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
+	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
 	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+}
+
+func (c *nodeController) SetupReconcilers(mgr manager.Manager) (err error) {
+	if err = (&controllers.DataMovementReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		WatchNamespace: os.Getenv("NNF_NODE_NAME"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", c.GetType())
+		os.Exit(1)
+	}
+
+	return
 }

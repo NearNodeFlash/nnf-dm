@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 
     {
         // Create an offload request
-        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION", false, "");
+        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION", false, "", false, false);
         CreateResponse createResponse;
 
         RPCStatus status = client.Create(workflow, createRequest, &createResponse);
@@ -125,6 +125,7 @@ RequestStatus:
         std::cout << "  LastMessageTime: " << cmd.lastMessageTime <<  std::endl;
         std::cout << "Offload StartTime: " << statusResponse.startTime() << std::endl;
         std::cout << "Offload EndTime: " << statusResponse.endTime() << std::endl;
+        std::cout << "Offload Message: " << statusResponse.message() << std::endl;
 
         switch (statusResponse.status()) {
             case StatusResponse::STATUS_SUCCESS:

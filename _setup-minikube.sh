@@ -31,8 +31,6 @@ minikube start --nodes 3
 
 
 kubectl taint node minikube node-role.kubernetes.io/master:NoSchedule-
-kubectl label node minikube cray.nnf.manager=true
-kubectl label node minikube cray.wlm.manager=true
 
 NODES=$(kubectl get nodes --no-headers | grep --invert-match "control-plane" | awk '{print $1}')
 for NODE in $NODES; do

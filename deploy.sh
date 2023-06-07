@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -22,7 +22,7 @@
 usage() {
     cat <<EOF
 Deploy or Undeploy Data Movement
-Usage $0 COMMAND KUSTOMIZE [IMG]
+Usage $0 COMMAND KUSTOMIZE [IMG] [NNFMFU_IMG]
 
 Commands:
     deploy              Deploy data movement
@@ -33,14 +33,17 @@ EOF
 CMD=$1
 KUSTOMIZE=$2
 IMG=$3
+NNFMFU_IMG=$4
 
 case $CMD in
 deploy)
-    $(cd config/manager && $KUSTOMIZE edit set image controller="$IMG")
+    (cd config/manager &&
+       $KUSTOMIZE edit set image controller="$IMG" &&
+       $KUSTOMIZE edit set image nnf-mfu="$NNFMFU_IMG")
 
     $KUSTOMIZE build config/default | kubectl apply -f - || true
 
-    # Sometimes the deployment of the DataMovementManager occurs to quickly for k8s to digest the CRD
+    # Sometimes the deployment of the DataMovementManager occurs too quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
     # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
     echo "Waiting for DataMovementManager resource to become ready"

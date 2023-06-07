@@ -64,6 +64,8 @@ var _ = Describe("Data Movement Test", func() {
 		const testLabelKey = "dm-test"
 		var testLabel string
 
+		cmdBashPrefix := "/bin/bash -c "
+
 		createFakeProgressScript := func() string {
 			f, err := os.CreateTemp(tmpDir, "fakeProgressOutput-*.sh")
 			Expect(err).ToNot(HaveOccurred())
@@ -228,7 +230,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when the dm configmap has specified an overrideCmd", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "/bin/ls -l"
+				dmCfgProfile.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -238,13 +240,13 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
 			})
 		})
 
 		Context("when the dm configmap does not have $HOSTFILE in the command", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "/bin/ls -l"
+				dmCfgProfile.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -254,7 +256,7 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
 			})
 		})
 
@@ -278,6 +280,102 @@ var _ = Describe("Data Movement Test", func() {
 				By("verify that CommandStatus is empty")
 				Expect(dm.Status.CommandStatus.ProgressPercentage).To(BeNil())
 				Expect(dm.Status.CommandStatus.LastMessage).To(BeEmpty())
+			})
+		})
+
+		Context("when the dm config map has specified to store Stdout", func() {
+			output := "this is not a test"
+			BeforeEach(func() {
+				dmCfgProfile.Command = "echo " + output
+				dmCfgProfile.StoreStdout = true
+			})
+
+			It("should store the output in Status.Message", func() {
+
+				By("completing the data movement successfully")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				By("verify that Message is equal to the output")
+				Expect(dm.Status.Message).To(Equal(output + "\n"))
+			})
+		})
+
+		Context("when the dm config map has specified to not store Stdout", func() {
+			output := "this is not a test"
+			BeforeEach(func() {
+				dmCfgProfile.Command = "echo " + output
+				dmCfgProfile.StoreStdout = false
+			})
+
+			It("should not store anything in Status.Message", func() {
+
+				By("completing the data movement successfully")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				By("verify that Message is equal to the output")
+				Expect(dm.Status.Message).To(BeEmpty())
+			})
+		})
+
+		Context("when the UserConfig has specified to store Stdout", func() {
+			output := "this is not a test"
+			BeforeEach(func() {
+				dmCfgProfile.Command = "echo " + output
+				dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
+					StoreStdout: true,
+				}
+			})
+
+			It("should store the output in Status.Message", func() {
+
+				By("completing the data movement successfully")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				By("verify that Message is equal to the output")
+				Expect(dm.Status.Message).To(Equal(output + "\n"))
+			})
+		})
+
+		Context("when the UserConfig has specified not to store Stdout", func() {
+			output := "this is not a test"
+			BeforeEach(func() {
+				dmCfgProfile.Command = "echo " + output
+				dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
+					StoreStdout: false,
+				}
+			})
+
+			It("should not store anything in Status.Message", func() {
+
+				By("completing the data movement successfully")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				By("verify that Message is equal to the output")
+				Expect(dm.Status.Message).To(BeEmpty())
 			})
 		})
 
@@ -652,5 +750,4 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 	})
-
 })

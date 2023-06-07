@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"github.com/HewlettPackard/dws/utils/updater"
@@ -89,6 +89,7 @@ type PersistentStorageInstanceStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 
 // PersistentStorageInstance is the Schema for the Persistentstorageinstances API

@@ -10,7 +10,7 @@ The nnf-dm service is a compute resident daemon that provides an interface for s
 
 ### Build
 
-The nnf-dm service resides in [./server](./server) directory and can be built using `go build -o nnf-dm`
+The nnf-dm service resides in [./server](./server) directory and can be built using `make build-daemon`.
 
 ### Installation
 

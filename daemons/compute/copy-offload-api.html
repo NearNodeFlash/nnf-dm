@@ -431,6 +431,20 @@
                   <td><p>Extra options to pass to `dcp` if present in the Data Movement command. </p></td>
                 </tr>
               
+                <tr>
+                  <td>logStdout</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>If true, enable server-side logging of stdout when the command is successful. Failures output is always logged. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>storeStdout</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>If true, store stdout in DataMovementStatusResponse.Message when the command is successful. Failure output is always contained in the message. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

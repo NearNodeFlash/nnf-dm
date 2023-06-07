@@ -22,8 +22,6 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
-      nodeSelector:
-        cray.nnf.manager: "true"
       containers:
       - command:
         - /manager
@@ -46,13 +44,6 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources:
-          limits:
-            cpu: 200m
-            memory: 100Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
 ---
@@ -78,7 +69,7 @@ spec:
       shareProcessNamespace: true
       containers:
         - name: worker
-          image: ghcr.io/nearnodeflash/nnf-mfu:latest
+          image: nnf-mfu:latest
           command: 
             - /usr/sbin/sshd
           args:
