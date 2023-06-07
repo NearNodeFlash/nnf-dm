@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"context"
@@ -141,6 +141,7 @@ func InheritParentLabels(child metav1.Object, owner metav1.Object) {
 
 // DeleteStatus provides information about the status of DeleteChildren* operation
 // +kubebuilder:object:generate=false
+// +k8s:conversion-gen=false
 type DeleteStatus struct {
 	complete bool
 	objects  []client.Object

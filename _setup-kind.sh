@@ -30,8 +30,6 @@ echo "$(tput bold)Creating kind cluster with two worker nodes and /nnf mount $(t
 kind create cluster --wait 60s --image=kindest/node:v1.22.5 --config kind-config.yaml
 
 kubectl taint node kind-control-plane node-role.kubernetes.io/master:NoSchedule-
-kubectl label node kind-control-plane cray.nnf.manager=true
-kubectl label node kind-control-plane cray.wlm.manager=true
 
 # Label the kind-workers as rabbit nodes for the NLCMs.
 NODES=$(kubectl get nodes --no-headers | grep --invert-match "control-plane" | awk '{print $1}')

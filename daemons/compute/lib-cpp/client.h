@@ -113,7 +113,7 @@ class CommandStatus {
 
 class CreateRequest {
     public:
-        CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions);
+        CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions, bool logStdout, bool storeStdout);
         ~CreateRequest();
 
     private:
