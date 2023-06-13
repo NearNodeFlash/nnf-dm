@@ -2,8 +2,14 @@ module github.com/NearNodeFlash/nnf-dm
 
 go 1.19
 
+replace github.com/HewlettPackard/dws => ../dws
+
+replace github.com/NearNodeFlash/lustre-fs-operator => ../lustre-fs-operator
+
+replace github.com/NearNodeFlash/nnf-sos => ../nnf-sos
+
 require (
-	github.com/HewlettPackard/dws v0.0.1-0.20230522154633-c78e44b892ca
+	github.com/HewlettPackard/dws v0.0.1-0.20230602182741-44a9b200eedd
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.0-20230509135923-1259bed0fb14
 	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230517131334-4653f6d4ec06
 	github.com/onsi/ginkgo/v2 v2.9.1
@@ -23,7 +29,7 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.0-20230512221456-5fa47fb42560 // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.0-20230526161255-cfb2d89b35d7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
