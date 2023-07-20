@@ -3,9 +3,9 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.1-0.20230613201835-73abc41bd83c
+	github.com/HewlettPackard/dws v0.0.1-0.20230710202816-80d29afc6398
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20230613180840-6178f2b04900
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230613203338-ea5b2f78692b
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230719184207-bc070d98d779
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3
 	github.com/prometheus/client_golang v1.14.0
@@ -77,13 +77,33 @@ require (
 )
 
 require (
+	github.com/HewlettPackard/structex v1.0.4 // indirect
+	github.com/cespare/xxhash v1.1.0 // indirect
+	github.com/dgraph-io/badger/v3 v3.2103.5 // indirect
+	github.com/dgraph-io/ristretto v0.1.1 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
+	github.com/golang/glog v1.1.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/flatbuffers v23.1.21+incompatible // indirect
 	github.com/google/pprof v0.0.0-20221103000818-d260c55eee4c // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/klauspost/compress v1.16.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kubeflow/common v0.4.6 // indirect
 	github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/moby/sys/mountinfo v0.6.2 // indirect
+	github.com/pkg/term v1.1.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
+	github.com/rs/cors v1.8.3 // indirect
+	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46 // indirect
+	github.com/sigurn/crc8 v0.0.0-20220107193325-2243fe600f9f // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
+	go.chromium.org/luci v0.0.0-20230227223707-c4460eb434d8 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
+	k8s.io/mount-utils v0.27.1 // indirect
 )

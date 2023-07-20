@@ -153,6 +153,8 @@ type NnfDataMovementStatus struct {
 	// as it executes. The command status is polled at a certain frequency to avoid excessive
 	// updates to the Data Movement resource.
 	CommandStatus *NnfDataMovementCommandStatus `json:"commandStatus,omitempty"`
+
+	dwsv1alpha2.ResourceError `json:",inline"`
 }
 
 // Types describing the various data movement status conditions.

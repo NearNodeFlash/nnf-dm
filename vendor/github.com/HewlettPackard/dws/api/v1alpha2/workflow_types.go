@@ -96,6 +96,7 @@ const (
 	StatusQueued     = "Queued"
 	StatusRunning    = "Running"
 	StatusCompleted  = "Completed"
+	StatusStalled    = "Stalled"
 	StatusError      = "Error"
 	StatusDriverWait = "DriverWait"
 )
@@ -148,7 +149,7 @@ type WorkflowDriverStatus struct {
 	// User readable reason.
 	// For the CDS driver, this could be the state of the underlying
 	// data movement request:  Pending, Queued, Running, Completed or Error
-	// +kubebuilder:validation:Enum=Pending;Queued;Running;Completed;Error;DriverWait
+	// +kubebuilder:validation:Enum=Pending;Queued;Running;Completed;Stalled;Error;DriverWait
 	Status string `json:"status,omitempty"`
 
 	// Message provides additional details on the current status of the resource
@@ -173,7 +174,7 @@ type WorkflowStatus struct {
 	Ready bool `json:"ready"`
 
 	// User readable reason and status message
-	// +kubebuilder:validation:Enum=Completed;DriverWait;Error
+	// +kubebuilder:validation:Enum=Completed;DriverWait;Stalled;Error
 	Status string `json:"status,omitempty"`
 
 	// Message provides additional details on the current status of the resource
