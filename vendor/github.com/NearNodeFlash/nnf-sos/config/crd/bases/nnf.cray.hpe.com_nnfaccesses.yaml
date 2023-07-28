@@ -189,17 +189,28 @@ spec:
                   debugMessage:
                     description: Internal debug message for the error
                     type: string
-                  recoverable:
+                  severity:
                     description: Indication if the error is likely recoverable or
                       not
-                    type: boolean
+                    enum:
+                    - Minor
+                    - Major
+                    - Fatal
+                    type: string
+                  type:
+                    description: Internal or user error
+                    enum:
+                    - Internal
+                    - User
+                    type: string
                   userMessage:
                     description: Optional user facing message if the error is relevant
                       to an end user
                     type: string
                 required:
                 - debugMessage
-                - recoverable
+                - severity
+                - type
                 type: object
               ready:
                 description: Ready signifies whether status.state has been achieved
