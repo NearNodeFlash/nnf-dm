@@ -406,7 +406,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
-			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("movement operation failed: %s", combinedOutBuf.String()).WithFatal()
+			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
