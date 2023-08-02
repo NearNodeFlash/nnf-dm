@@ -292,8 +292,8 @@ spec:
                     description: Internal debug message for the error
                     type: string
                   severity:
-                    description: Indication if the error is likely recoverable or
-                      not
+                    description: Indication of how severe the error is. Minor will
+                      likely succeed, Major may succeed, and Fatal will never succeed.
                     enum:
                     - Minor
                     - Major

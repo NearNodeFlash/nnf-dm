@@ -1,4 +1,4 @@
-# github.com/HewlettPackard/dws v0.0.1-0.20230727212425-4595519b10a0
+# github.com/HewlettPackard/dws v0.0.1-0.20230802152955-11a333f31153
 ## explicit; go 1.19
 github.com/HewlettPackard/dws/api/v1alpha2
 github.com/HewlettPackard/dws/utils/dwdparse
@@ -12,7 +12,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20230526161255-cfb2d89b35d7
 ## explicit; go 1.18
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230719184207-bc070d98d779
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230802153426-7b17a96bf2de
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases

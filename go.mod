@@ -3,9 +3,9 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.19
 
 require (
-	github.com/HewlettPackard/dws v0.0.1-0.20230727212425-4595519b10a0
+	github.com/HewlettPackard/dws v0.0.1-0.20230802152955-11a333f31153
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20230613180840-6178f2b04900
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230719184207-bc070d98d779
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20230802153426-7b17a96bf2de
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3
 	github.com/prometheus/client_golang v1.14.0
