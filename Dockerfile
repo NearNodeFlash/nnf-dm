@@ -58,13 +58,6 @@ ENTRYPOINT [ "make", "test" ]
 ###############################################################################
 FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION
 
-RUN apt update
-
-RUN apt install -y openmpi-bin
-
-# TODO Remove this
-RUN apt install -y bash
-
 # The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
 # do not change them unless you know what it is you are doing
 RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
