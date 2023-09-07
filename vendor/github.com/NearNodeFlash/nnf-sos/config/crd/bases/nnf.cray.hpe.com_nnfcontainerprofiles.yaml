@@ -28,6 +28,12 @@ spec:
           data:
             description: NnfContainerProfileSpec defines the desired state of NnfContainerProfile
             properties:
+              groupID:
+                description: GroupID specifies the group ID that is allowed to use
+                  this profile. If this is specified, only Workflows that have a matching
+                  group ID can select this profile.
+                format: int32
+                type: integer
               mpiSpec:
                 description: MPIJobSpec to define the containers created from container
                   profile. This is used for MPI containers via MPIJobs. See mpi-operator
@@ -15730,11 +15736,23 @@ spec:
                         to be mounted, but can be ignored by the user not supplying
                         this filesystem in the #DW directives'
                       type: boolean
+                    pvcMode:
+                      description: For DW_GLOBAL_ (global lustre) storages, the access
+                        mode must match what is configured in the LustreFilesystem
+                        resource for the namespace. Defaults to `ReadWriteMany` for
+                        global lustre, otherwise empty.
+                      type: string
                   required:
                   - name
                   - optional
                   type: object
                 type: array
+              userID:
+                description: UserID specifies the user ID that is allowed to use this
+                  profile. If this is specified, only Workflows that have a matching
+                  user ID can select this profile.
+                format: int32
+                type: integer
             required:
             - retryLimit
             type: object
@@ -15745,6 +15763,8 @@ spec:
             type: string
           metadata:
             type: object
+        required:
+        - data
         type: object
     served: true
     storage: true

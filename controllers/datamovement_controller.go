@@ -51,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/yaml"
 
+	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -135,7 +136,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := log.FromContext(ctx)
 
 	metrics.NnfDmDataMovementReconcilesTotal.Inc()
@@ -144,6 +145,24 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	defer func() {
+		if err != nil {
+			resourceError, ok := err.(*dwsv1alpha2.ResourceErrorInfo)
+			if ok {
+				if resourceError.Severity != dwsv1alpha2.SeverityMinor {
+					dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
+					dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
+				}
+			}
+			dm.Status.SetResourceErrorAndLog(err, log)
+			dm.Status.Message = err.Error()
+
+			if updateErr := r.Status().Update(ctx, dm); updateErr != nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	if !dm.GetDeletionTimestamp().IsZero() {
 
@@ -181,7 +200,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Handle cancellation
 	if dm.Spec.Cancel {
 		if err := r.cancel(ctx, dm); err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("Unable to cancel data movement")
 		}
 
 		return ctrl.Result{}, nil
@@ -203,32 +222,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Info("Restarting", "restarts", dm.Status.Restarts)
 	}
 
-	// Handle invalid errors that can occur when setting up the data movement
-	// resource. An invalid error is unrecoverable.
-	handleInvalidError := func(err error) error {
-		if errors.Is(err, &invalidError{}) {
-			dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
-			dm.Status.Message = err.Error()
-
-			if err := r.Status().Update(ctx, dm); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		return err
-	}
-
 	nodes, err := r.getStorageNodeNames(ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, handleInvalidError(err)
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get storage nodes for data movement").WithError(err).WithMajor()
 	}
 
 	hosts, err := r.getWorkerHostnames(ctx, nodes)
 	if err != nil {
-		return ctrl.Result{}, handleInvalidError(err)
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
 	}
 
 	// Expand the context with cancel and store it in the map so the cancel function can be used in
@@ -240,16 +241,19 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	})
 
 	// Get DM Config map
-	configMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
-		log.Info("Config map not found - requeueing", "name", configMapName, "namespace", configMapNamespace)
-		return ctrl.Result{}, handleInvalidError(err)
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: configMapNamespace,
+		},
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get data movement config map: %v", client.ObjectKeyFromObject(configMap)).WithError(err).WithMajor()
 	}
 
 	cfg := dmConfig{}
 	if err := yaml.Unmarshal([]byte(configMap.Data[configMapKeyData]), &cfg); err != nil {
-		log.Error(err, "error reading config map data")
-		return ctrl.Result{}, handleInvalidError(err)
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("invalid data for config map: %v", client.ObjectKeyFromObject(configMap)).WithError(err).WithFatal()
 	}
 	log.Info("Using config map", "config", cfg)
 
@@ -259,15 +263,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Ensure profile exists
 	profile, found := cfg.Profiles[configMapKeyProfileDefault]
 	if !found {
-		return ctrl.Result{}, handleInvalidError(fmt.Errorf(
-			"'%s' profile not found in config map", configMapKeyProfileDefault))
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithUserMessage("'%s' profile not found in config map: %v", configMapKeyProfileDefault, client.ObjectKeyFromObject(configMap)).WithUser().WithFatal()
 	}
 	log.Info("Using profile", "name", configMapKeyProfileDefault, "profile", profile)
 
 	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
 	if err != nil {
-		log.Error(err, "error building DM command")
-		return ctrl.Result{}, handleInvalidError(err)
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
 	if len(mpiHostfile) > 0 {
 		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
@@ -403,9 +405,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Data movement operation cancelled", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
 		} else if err != nil {
-			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
+			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
+			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
