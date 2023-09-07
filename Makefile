@@ -55,7 +55,7 @@ IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
-NNFMFU_VERSION ?= master
+NNFMFU_VERSION ?= v0.0.2
 
 DOCKER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
