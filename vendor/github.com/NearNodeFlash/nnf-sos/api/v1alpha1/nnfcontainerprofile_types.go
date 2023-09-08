@@ -52,6 +52,16 @@ type NnfContainerProfileData struct {
 	// +kubebuilder:default:=6
 	RetryLimit int32 `json:"retryLimit"`
 
+	// UserID specifies the user ID that is allowed to use this profile. If this
+	// is specified, only Workflows that have a matching user ID can select
+	// this profile.
+	UserID *uint32 `json:"userID,omitempty"`
+
+	// GroupID specifies the group ID that is allowed to use this profile. If this
+	// is specified, only Workflows that have a matching group ID can select
+	// this profile.
+	GroupID *uint32 `json:"groupID,omitempty"`
+
 	// Spec to define the containers created from container profile. This is used for non-MPI
 	// containers.
 	// Either this or MPISpec must be provided, but not both.
@@ -73,6 +83,11 @@ type NnfContainerProfileStorage struct {
 	// the user not supplying this filesystem in the #DW directives
 	//+kubebuilder:default:=false
 	Optional bool `json:"optional"`
+
+	// For DW_GLOBAL_ (global lustre) storages, the access mode must match what is configured in
+	// the LustreFilesystem resource for the namespace. Defaults to `ReadWriteMany` for global
+	// lustre, otherwise empty.
+	PVCMode corev1.PersistentVolumeAccessMode `json:"pvcMode,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -82,7 +97,7 @@ type NnfContainerProfile struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Data NnfContainerProfileData `json:"data,omitempty"`
+	Data NnfContainerProfileData `json:"data"`
 }
 
 // +kubebuilder:object:root=true
