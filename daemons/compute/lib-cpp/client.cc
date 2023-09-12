@@ -202,7 +202,7 @@ std::vector<std::string> VersionResponse::apiversions() {
     return apiVersions;
 }
 
-CreateRequest::CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions, bool logStdout, bool storeStdout) {
+CreateRequest::CreateRequest(std::string source, std::string destination, bool dryrun, std::string dcpOptions, bool logStdout, bool storeStdout, int slots, int maxSlots) {
     auto request = new datamovement::DataMovementCreateRequest();
 
     request->set_source(source);
@@ -211,6 +211,8 @@ CreateRequest::CreateRequest(std::string source, std::string destination, bool d
     request->set_dcpoptions(dcpOptions);
     request->set_logstdout(logStdout);
     request->set_storestdout(storeStdout);
+    request->set_slots(slots);
+    request->set_maxslots(maxSlots);
 
     data_ = static_cast<void *>(request);
 }

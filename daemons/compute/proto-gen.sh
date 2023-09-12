@@ -17,23 +17,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if ! command -v protoc &> /dev/null; then
+if ! command -v protoc &>/dev/null; then
     echo "protoc is not installed"
     echo "see https://grpc.io/docs/protoc-installation/"
     exit 1
 fi
 
-if ! command -v protoc-gen-doc &> /dev/null; then
+if ! command -v protoc-gen-doc &>/dev/null; then
     echo "protoc-doc-gen plugin is not installed"
-    echo "run `go install  github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@latest`"
+    echo "run $(go install github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@latest)"
     exit 1
 fi
 
 protoc --go_out=paths=source_relative:./client-go --go-grpc_out=paths=source_relative:./client-go \
     --doc_out=. --doc_opt=html,copy-offload-api.html \
-    ./api/datamovement.proto \
+    ./api/datamovement.proto
 
-if ! command -v python3 -c "import grpc_tools.protoc" &> /dev/null; then
+if ! command -v python3 -c "import grpc_tools.protoc" &>/dev/null; then
     echo "python grpc_tools.protoc module is not installed"
     exit 1
 fi
