@@ -49,6 +49,8 @@ func main() {
 	dcpOptions := flag.String("dcp-options", "", "extra options to provide to dcp")
 	logStdout := flag.Bool("log-stdout", false, "enable server-side logging of stdout on successful dm")
 	storeStdout := flag.Bool("store-stdout", false, "store stdout in status message on successful dm")
+	slots := flag.Int("slots", -1, "slots to use in mpirun hostfile. -1 defers to system config, 0 omits from hostfile")
+	maxSlots := flag.Int("max-slots", -1, "max_slots to use in mpirun hostfile. -1 defers to system config, 0 omits from hostfile")
 
 	flag.Parse()
 
@@ -97,7 +99,7 @@ func main() {
 			defer wg.Done()
 
 			log.Printf("Creating request %d of %d...", i+1, *count)
-			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions, *logStdout, *storeStdout)
+			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions, *logStdout, *storeStdout, *slots, *maxSlots)
 			if err != nil {
 				log.Fatalf("could not create data movement request: %v", err)
 			}
@@ -208,7 +210,9 @@ func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMov
 	return rsp, nil
 }
 
-func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace, source, destination string, dryrun bool, dcpOptions string, logStdout, storeStdout bool) (*pb.DataMovementCreateResponse, error) {
+func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace,
+	source, destination string, dryrun bool, dcpOptions string, logStdout, storeStdout bool,
+	slots, maxSlots int) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow: &pb.DataMovementWorkflow{
@@ -221,6 +225,8 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 		DcpOptions:  dcpOptions,
 		LogStdout:   logStdout,
 		StoreStdout: storeStdout,
+		Slots:       int32(slots),
+		MaxSlots:    int32(maxSlots),
 	})
 
 	if err != nil {

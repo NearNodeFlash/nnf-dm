@@ -34,6 +34,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
+	"go.openly.dev/pointy"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -747,6 +748,50 @@ var _ = Describe("Data Movement Test", func() {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
+			})
+
+			When("slots/maxSlots are specified in the request", func() {
+				DescribeTable("it should use the user slots vs the profile",
+					func(numSlots *int) {
+						profileSlots, profileMaxSlots := 3, 8
+
+						profile := dmConfigProfile{
+							Command:  defaultCommand,
+							Slots:    profileSlots,
+							MaxSlots: profileMaxSlots,
+						}
+						dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
+							Slots:    numSlots,
+							MaxSlots: numSlots,
+						}
+						_, hostfilePath, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(hostfilePath).ToNot(BeEmpty())
+						DeferCleanup(func() {
+							Expect(os.Remove(hostfilePath)).ToNot(HaveOccurred())
+						})
+
+						content, err := os.ReadFile(hostfilePath)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(string(content)).ToNot(BeEmpty())
+
+						if numSlots == nil {
+							// if nil, use the profile's slots
+							Expect(string(content)).Should(MatchRegexp(fmt.Sprintf(" slots=%d", profileSlots)))
+							Expect(string(content)).Should(MatchRegexp(fmt.Sprintf(" max_slots=%d", profileMaxSlots)))
+						} else if *numSlots == 0 {
+							// if 0, then don't use slots at all
+							Expect(string(content)).ShouldNot(MatchRegexp(" slots"))
+							Expect(string(content)).ShouldNot(MatchRegexp(" max_slots"))
+						} else {
+							Expect(string(content)).Should(MatchRegexp(fmt.Sprintf(" slots=%d", *numSlots)))
+							Expect(string(content)).Should(MatchRegexp(fmt.Sprintf(" max_slots=%d", *numSlots)))
+						}
+					},
+					Entry("when non-zero", pointy.Int(17)),
+					Entry("when zero it should omit", pointy.Int(0)),
+					Entry("when nil it should use the profile", nil),
+				)
 			})
 		})
 	})

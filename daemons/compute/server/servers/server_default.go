@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"go.openly.dev/pointy"
 	"google.golang.org/protobuf/types/known/emptypb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -364,6 +365,13 @@ func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha1.NnfDataMov
 	dm.Spec.UserConfig.DCPOptions = req.DcpOptions
 	dm.Spec.UserConfig.LogStdout = req.LogStdout
 	dm.Spec.UserConfig.StoreStdout = req.StoreStdout
+
+	if req.Slots >= 0 {
+		dm.Spec.UserConfig.Slots = pointy.Int(int(req.Slots))
+	}
+	if req.MaxSlots >= 0 {
+		dm.Spec.UserConfig.MaxSlots = pointy.Int(int(req.MaxSlots))
+	}
 }
 
 func getDirectiveIndexFromClientMount(object *dwsv1alpha2.ClientMount) (string, error) {
