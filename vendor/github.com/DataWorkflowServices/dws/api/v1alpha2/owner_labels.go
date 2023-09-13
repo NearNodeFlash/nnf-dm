@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -31,9 +31,9 @@ import (
 )
 
 const (
-	OwnerKindLabel      = "dws.cray.hpe.com/owner.kind"
-	OwnerNameLabel      = "dws.cray.hpe.com/owner.name"
-	OwnerNamespaceLabel = "dws.cray.hpe.com/owner.namespace"
+	OwnerKindLabel      = "dataworkflowservices.github.io/owner.kind"
+	OwnerNameLabel      = "dataworkflowservices.github.io/owner.name"
+	OwnerNamespaceLabel = "dataworkflowservices.github.io/owner.namespace"
 )
 
 // +kubebuilder:object:generate=false
