@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HewlettPackard/dws/utils/updater"
+	"github.com/DataWorkflowServices/dws/utils/updater"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -31,10 +31,10 @@ import (
 
 const (
 	// WorkflowNameLabel is defined for resources that relate to the name of a DWS Workflow
-	WorkflowNameLabel = "dws.cray.hpe.com/workflow.name"
+	WorkflowNameLabel = "dataworkflowservices.github.io/workflow.name"
 
 	// WorkflowNamespaceLabel is defined for resources that relate to the namespace of a DWS Workflow
-	WorkflowNamespaceLabel = "dws.cray.hpe.com/workflow.namespace"
+	WorkflowNamespaceLabel = "dataworkflowservices.github.io/workflow.namespace"
 )
 
 // WorkflowState is the enumeration of the state of the workflow

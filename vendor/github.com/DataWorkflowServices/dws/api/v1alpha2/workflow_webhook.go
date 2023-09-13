@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -33,10 +33,10 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/HewlettPackard/dws/utils/dwdparse"
+	"github.com/DataWorkflowServices/dws/utils/dwdparse"
 )
 
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=dwdirectiverules,verbs=get;list;watch
+//+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=dwdirectiverules,verbs=get;list;watch
 
 // log is for logging in this package.
 var workflowlog = logf.Log.WithName("workflow-resource")
@@ -51,7 +51,7 @@ func (w *Workflow) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-dws-cray-hpe-com-v1alpha2-workflow,mutating=true,failurePolicy=fail,sideEffects=None,groups=dws.cray.hpe.com,resources=workflows,verbs=create,versions=v1alpha2,name=mworkflow.kb.io,admissionReviewVersions={v1,v1beta1}
+//+kubebuilder:webhook:path=/mutate-dataworkflowservices-github-io-v1alpha2-workflow,mutating=true,failurePolicy=fail,sideEffects=None,groups=dataworkflowservices.github.io,resources=workflows,verbs=create,versions=v1alpha2,name=mworkflow.kb.io,admissionReviewVersions={v1,v1beta1}
 
 var _ webhook.Defaulter = &Workflow{}
 
@@ -70,7 +70,7 @@ func (w *Workflow) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-dws-cray-hpe-com-v1alpha2-workflow,mutating=false,failurePolicy=fail,sideEffects=None,groups=dws.cray.hpe.com,resources=workflows,verbs=create;update,versions=v1alpha2,name=vworkflow.kb.io,admissionReviewVersions={v1,v1beta1}
+//+kubebuilder:webhook:path=/validate-dataworkflowservices-github-io-v1alpha2-workflow,mutating=false,failurePolicy=fail,sideEffects=None,groups=dataworkflowservices.github.io,resources=workflows,verbs=create;update,versions=v1alpha2,name=vworkflow.kb.io,admissionReviewVersions={v1,v1beta1}
 
 var _ webhook.Validator = &Workflow{}
 
