@@ -445,6 +445,22 @@
                   <td><p>If true, store stdout in DataMovementStatusResponse.Message when the command is successful. Failure output is always contained in the message. </p></td>
                 </tr>
               
+                <tr>
+                  <td>slots</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The number of slots specified in the MPI hostfile. A value of 0 disables the use of slots in
+the hostfile. -1 will defer to the server side configuration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>maxSlots</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p>The number of max_slots specified in the MPI hostfile. A value of 0 disables the use of
+max_slots in the hostfile. -1 will defer to the server side configuration. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -20,7 +20,7 @@
 package v1alpha2
 
 import (
-	"github.com/HewlettPackard/dws/utils/updater"
+	"github.com/DataWorkflowServices/dws/utils/updater"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,10 +29,10 @@ import (
 
 const (
 	// PersistentStorageNameLabel is defined for resources that relate to the name of a DWS PersistentStorageInstance
-	PersistentStorageNameLabel = "dws.cray.hpe.com/persistentstorage.name"
+	PersistentStorageNameLabel = "dataworkflowservices.github.io/persistentstorage.name"
 
 	// PersistentStorageNamespaceLabel is defined for resources that relate to the namespace of a DWS PersistentStorageInstance
-	PersistentStorageNamespaceLabel = "dws.cray.hpe.com/persistentstorage.namespace"
+	PersistentStorageNamespaceLabel = "dataworkflowservices.github.io/persistentstorage.namespace"
 )
 
 // PersistentStorageInstanceState specifies the golang type for PSIState

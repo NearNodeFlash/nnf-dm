@@ -79,6 +79,28 @@ rules:
   - update
   - watch
 - apiGroups:
+  - dataworkflowservices.github.io
+  resources:
+  - clientmounts
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dataworkflowservices.github.io
+  resources:
+  - clientmounts/status
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dataworkflowservices.github.io
+  resources:
+  - systemconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - dm.cray.hpe.com
   resources:
   - datamovementmanagers
@@ -104,28 +126,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - dws.cray.hpe.com
-  resources:
-  - clientmounts
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - dws.cray.hpe.com
-  resources:
-  - clientmounts/status
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - dws.cray.hpe.com
-  resources:
-  - systemconfigurations
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - lus.cray.hpe.com
   resources:
