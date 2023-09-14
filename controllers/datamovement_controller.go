@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -51,7 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/yaml"
 
-	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
+	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -127,8 +127,8 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts,verbs=get;list
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=clientmounts/status,verbs=get;list
+//+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts,verbs=get;list
+//+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts/status,verbs=get;list
 //+kubebuilder:rbac:groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;update
@@ -405,6 +405,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Data movement operation cancelled", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
 		} else if err != nil {
+			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
 			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
@@ -471,6 +472,14 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 		slots := profile.Slots
 		maxSlots := profile.MaxSlots
 
+		// Allow the user to override the slots and max_slots in the hostfile.
+		if userConfig && dm.Spec.UserConfig.Slots != nil && *dm.Spec.UserConfig.Slots >= 0 {
+			slots = *dm.Spec.UserConfig.Slots
+		}
+		if userConfig && dm.Spec.UserConfig.MaxSlots != nil && *dm.Spec.UserConfig.MaxSlots >= 0 {
+			maxSlots = *dm.Spec.UserConfig.MaxSlots
+		}
+
 		hostfile, err = createMpiHostfile(dm.Name, hosts, slots, maxSlots)
 		if err != nil {
 			return nil, "", fmt.Errorf("error creating MPI hostfile: %v", err)
@@ -512,6 +521,7 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 
 // Create an MPI Hostfile given a list of hosts, slots, and maxSlots. A temporary directory is
 // created based on the DM Name. The hostfile is created inside of this directory.
+// A value of 0 for slots or maxSlots will not use it in the hostfile.
 func createMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
 
 	tmpdir := filepath.Join("/tmp", dmName)

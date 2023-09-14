@@ -13,21 +13,21 @@ rules:
   - list
   - watch
 - apiGroups:
-  - dws.cray.hpe.com
+  - dataworkflowservices.github.io
   resources:
   - clientmounts
   verbs:
   - get
   - list
 - apiGroups:
-  - dws.cray.hpe.com
+  - dataworkflowservices.github.io
   resources:
   - clientmounts/status
   verbs:
   - get
   - list
 - apiGroups:
-  - dws.cray.hpe.com
+  - dataworkflowservices.github.io
   resources:
   - systemconfigurations
   verbs:

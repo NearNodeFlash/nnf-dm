@@ -19,7 +19,7 @@
 
 // Package v1alpha2 contains API Schema definitions for the dws v1alpha2 API group
 // +kubebuilder:object:generate=true
-// +groupName=dws.cray.hpe.com
+// +groupName=dataworkflowservices.github.io
 package v1alpha2
 
 import (
@@ -29,7 +29,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "dws.cray.hpe.com", Version: "v1alpha2"}
+	GroupVersion = schema.GroupVersion{Group: "dataworkflowservices.github.io", Version: "v1alpha2"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

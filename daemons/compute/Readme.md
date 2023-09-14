@@ -111,6 +111,19 @@ To build the generated code used for the Go and Python example clients, run `./p
 
 `client-go` and `client-py` will have updates to the generated files when the API changes.
 
+To run this script, you will need the following installed on your system:
+
+- [protoc](https://grpc.io/docs/protoc-installation/)
+- [protoc-gen-doc](https://github.com/pseudomuto/protoc-gen-doc#installation)
+- [grpc and grpc tools python modules](https://grpc.io/docs/languages/python/quickstart/)
+
+On OSX, this can be done easily via:
+
+```shell
+brew install protobuf protoc-gen-go protoc-gen-go-grpc
+pip3 install grpcio grpcio_tools
+```
+
 #### C and C++
 
 For the C and C++ clients, the clients must be built to generate the source code to support the API. Run the `Makefiles` in the `_client-c`, `client-cpp`, and `lib-cpp` directories to update the generated API files.

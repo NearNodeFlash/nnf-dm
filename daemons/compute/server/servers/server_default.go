@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"go.openly.dev/pointy"
 	"google.golang.org/protobuf/types/known/emptypb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +50,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
+	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -93,7 +94,7 @@ type defaultServer struct {
 
 // Ensure permissions are granted to access the system configuration; this is done so the NNF
 // Node Name can be found given a Node Name.
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=systemconfigurations,verbs=get;list;watch
+//+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=systemconfigurations,verbs=get;list;watch
 
 func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
@@ -364,6 +365,13 @@ func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha1.NnfDataMov
 	dm.Spec.UserConfig.DCPOptions = req.DcpOptions
 	dm.Spec.UserConfig.LogStdout = req.LogStdout
 	dm.Spec.UserConfig.StoreStdout = req.StoreStdout
+
+	if req.Slots >= 0 {
+		dm.Spec.UserConfig.Slots = pointy.Int(int(req.Slots))
+	}
+	if req.MaxSlots >= 0 {
+		dm.Spec.UserConfig.MaxSlots = pointy.Int(int(req.MaxSlots))
+	}
 }
 
 func getDirectiveIndexFromClientMount(object *dwsv1alpha2.ClientMount) (string, error) {
