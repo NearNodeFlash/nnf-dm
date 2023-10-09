@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -506,8 +505,8 @@ func (r *DataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&appsv1.Deployment{}).
 		Owns(&appsv1.DaemonSet{}).
 		Watches(
-			&source.Kind{Type: &lusv1beta1.LustreFileSystem{}},
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			&lusv1beta1.LustreFileSystem{},
+			handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 				return []reconcile.Request{
 					{
 						NamespacedName: types.NamespacedName{
