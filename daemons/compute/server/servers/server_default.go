@@ -208,14 +208,13 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 }
 
 func (s *defaultServer) StartManager() error {
-	namespaceCache := make(map[string]cache.Config)
-	namespaceCache[s.namespace] = cache.Config{}
-
 	mgr, err := ctrl.NewManager(s.config, ctrl.Options{
 		Scheme:         scheme,
 		LeaderElection: false,
 		Metrics:        metricsserver.Options{BindAddress: "0"},
-		Cache:          cache.Options{DefaultNamespaces: namespaceCache},
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			s.namespace: {},
+		}},
 	})
 	if err != nil {
 		return err
