@@ -46,8 +46,10 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
@@ -207,10 +209,12 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
 func (s *defaultServer) StartManager() error {
 	mgr, err := ctrl.NewManager(s.config, ctrl.Options{
-		Scheme:             scheme,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
-		Namespace:          s.namespace,
+		Scheme:         scheme,
+		LeaderElection: false,
+		Metrics:        metricsserver.Options{BindAddress: "0"},
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			s.namespace: {},
+		}},
 	})
 	if err != nil {
 		return err

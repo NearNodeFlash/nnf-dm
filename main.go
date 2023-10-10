@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -85,8 +86,7 @@ func main() {
 
 	options := ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Metrics:                metricsserver.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "a60dd315.cray.hpe.com",
@@ -155,8 +155,10 @@ type managerController struct{}
 
 func (*managerController) GetType() string { return ManagerController }
 func (*managerController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace}
-	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+	namespaceCache := make(map[string]cache.Config)
+	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
+	namespaceCache[dmv1alpha1.DataMovementNamespace] = cache.Config{}
+	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
 func (c *managerController) SetupReconcilers(mgr manager.Manager) (err error) {
@@ -176,8 +178,10 @@ type defaultController struct{}
 
 func (*defaultController) GetType() string { return DefaultController }
 func (*defaultController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace}
-	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+	namespaceCache := make(map[string]cache.Config)
+	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
+	namespaceCache[dmv1alpha1.DataMovementNamespace] = cache.Config{}
+	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
 func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
@@ -200,8 +204,11 @@ type nodeController struct {
 
 func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
-	namespaces := []string{corev1.NamespaceDefault, dmv1alpha1.DataMovementNamespace, os.Getenv("NNF_NODE_NAME")}
-	opts.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
+	namespaceCache := make(map[string]cache.Config)
+	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
+	namespaceCache[dmv1alpha1.DataMovementNamespace] = cache.Config{}
+	namespaceCache[os.Getenv("NNF_NODE_NAME")] = cache.Config{}
+	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
 func (c *nodeController) SetupReconcilers(mgr manager.Manager) (err error) {
