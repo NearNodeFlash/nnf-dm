@@ -9,6 +9,7 @@ bin
 testbin/*
 nnf-dm
 .version
+config/begin/*
 
 # Test binary, build with `go test -c`
 *.test
