@@ -22,7 +22,7 @@
 usage() {
     cat <<EOF
 Deploy or Undeploy Data Movement
-Usage $0 COMMAND KUSTOMIZE [IMG] [NNFMFU_IMG]
+Usage $0 COMMAND KUSTOMIZE <OVERLAY_DIR>
 
 Commands:
     deploy              Deploy data movement
@@ -32,16 +32,11 @@ EOF
 
 CMD=$1
 KUSTOMIZE=$2
-IMG=$3
-NNFMFU_IMG=$4
+OVERLAY_DIR=$3
 
 case $CMD in
 deploy)
-    (cd config/manager &&
-       $KUSTOMIZE edit set image controller="$IMG" &&
-       $KUSTOMIZE edit set image nnf-mfu="$NNFMFU_IMG")
-
-    $KUSTOMIZE build config/default | kubectl apply -f - || true
+    $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f - || true
 
     # Sometimes the deployment of the DataMovementManager occurs too quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
@@ -49,7 +44,7 @@ deploy)
     echo "Waiting for DataMovementManager resource to become ready"
     while :; do
         [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
-        $KUSTOMIZE build config/default | kubectl apply -f -
+        $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f -
         break
     done
     ;;
@@ -57,7 +52,7 @@ undeploy)
     # When the DataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
-    $KUSTOMIZE build config/default | kubectl delete --ignore-not-found -f -
+    $KUSTOMIZE build $OVERLAY_DIR | kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage
