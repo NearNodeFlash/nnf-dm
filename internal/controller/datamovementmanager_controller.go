@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -47,7 +47,7 @@ import (
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
-	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
+	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 )
 
 const (

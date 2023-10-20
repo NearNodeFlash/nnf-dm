@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package controllers
+package controller
 
 import (
 	"bufio"
@@ -53,7 +53,7 @@ import (
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
-	"github.com/NearNodeFlash/nnf-dm/controllers/metrics"
+	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
 

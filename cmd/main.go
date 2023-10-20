@@ -44,7 +44,7 @@ import (
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
-	"github.com/NearNodeFlash/nnf-dm/controllers"
+	controllers "github.com/NearNodeFlash/nnf-dm/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
