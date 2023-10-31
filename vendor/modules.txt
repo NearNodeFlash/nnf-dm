@@ -1,16 +1,16 @@
-# github.com/DataWorkflowServices/dws v0.0.1-0.20231010162938-b6d65b00cad6
+# github.com/DataWorkflowServices/dws v0.0.1-0.20231031201121-13a5a69a969e
 ## explicit; go 1.19
 github.com/DataWorkflowServices/dws/api/v1alpha2
 github.com/DataWorkflowServices/dws/utils/dwdparse
 github.com/DataWorkflowServices/dws/utils/updater
-# github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231010163846-1ecbc574e6af
+# github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e
 ## explicit; go 1.19
 github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20231010162453-a8168bb6a52f
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231010164913-dbe940193534
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231031205956-621786eb596f
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases

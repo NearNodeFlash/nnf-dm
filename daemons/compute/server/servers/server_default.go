@@ -57,7 +57,7 @@ import (
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
-	dmctrl "github.com/NearNodeFlash/nnf-dm/controllers"
+	dmctrl "github.com/NearNodeFlash/nnf-dm/internal/controller"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
