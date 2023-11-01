@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -142,6 +143,13 @@ func (r *DataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	if err := r.createOrUpdateDaemonSetIfNecessary(ctx, manager); err != nil {
 		return errorHandler(err, "create or update DaemonSet")
+	}
+
+	res, err := r.removeLustreFileSystemsFinalizersIfNecessary(ctx, manager)
+	if err != nil {
+		return errorHandler(err, "remove LustreFileSystems finalizers")
+	} else if res != nil {
+		return *res, nil
 	}
 
 	manager.Status.Ready = true
@@ -329,7 +337,6 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 	for _, lustre := range filesystems.Items {
 		_, found := lustre.Spec.Namespaces[manager.Namespace]
 		if !found {
-
 			if lustre.Spec.Namespaces == nil {
 				lustre.Spec.Namespaces = make(map[string]lusv1beta1.LustreFileSystemNamespaceSpec)
 			}
@@ -337,16 +344,83 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 			lustre.Spec.Namespaces[manager.Namespace] = lusv1beta1.LustreFileSystemNamespaceSpec{
 				Modes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
 			}
-
-			if err := r.Update(ctx, &lustre); err != nil {
-				return err
-			}
-
-			log.Info("Updated LustreFileSystem", "object", client.ObjectKeyFromObject(&lustre).String(), "namespace", manager.Namespace)
 		}
+
+		// Add the dm finalizer to keep this resource from being deleted until dm is no longer using it
+		if lustre.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(&lustre, finalizer) {
+			controllerutil.AddFinalizer(&lustre, finalizer)
+		}
+
+		if err := r.Update(ctx, &lustre); err != nil {
+			return err
+		}
+		log.Info("Updated LustreFileSystem", "object", client.ObjectKeyFromObject(&lustre).String(), "namespace", manager.Namespace)
 	}
 
 	return nil
+}
+
+func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) (*ctrl.Result, error) {
+	log := log.FromContext(ctx)
+
+	filesystems := &lusv1beta1.LustreFileSystemList{}
+	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
+		return nil, fmt.Errorf("list lustre file systems failed: %w", err)
+	}
+
+	// Get the DS to compare the list of volumes
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      daemonsetName,
+			Namespace: manager.Namespace,
+		},
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+		return nil, err
+	}
+
+	finalizersToRemove := []lusv1beta1.LustreFileSystem{}
+	for _, lustre := range filesystems.Items {
+		// This lustre is in the process of deleting, verify it is not in the list of DS volumes
+		if !lustre.DeletionTimestamp.IsZero() {
+			finalizersToRemove = append(finalizersToRemove, lustre)
+			for _, vol := range ds.Spec.Template.Spec.Volumes {
+				if lustre.Name == vol.Name {
+					log.Info("Requeue: wait for daemonset to drop lustrefilesystem volume", "lustrefilesystem", lustre)
+					return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+				}
+			}
+		}
+	}
+
+	if len(finalizersToRemove) == 0 {
+		return nil, nil
+	}
+
+	// Now the DS does not have any lustre filesystems that are being deleted, verify that the
+	// daemonset's pods (i.e. dm worker pods) have restarted
+	d := ds.Status.DesiredNumberScheduled
+	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
+		// wait for pods to restart
+		log.Info("Requeue: wait for daemonset to restart pods after dropping lustrefilesystem volume",
+			"desired", d, "updated", ds.Status.UpdatedNumberScheduled, "ready", ds.Status.NumberReady)
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	// Now the finalizers can be removed
+	for _, lustre := range finalizersToRemove {
+		if controllerutil.ContainsFinalizer(&lustre, finalizer) {
+			controllerutil.RemoveFinalizer(&lustre, finalizer)
+			if err := r.Update(ctx, &lustre); err != nil {
+				return nil, err
+			}
+			log.Info("Removed LustreFileSystem finalizer", "object", client.ObjectKeyFromObject(&lustre).String(),
+				"namespace", manager.Namespace,
+				"daemonset", ds)
+		}
+	}
+
+	return nil, nil
 }
 
 func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
@@ -437,24 +511,30 @@ func setupLustreVolumes(ctx context.Context, manager *dmv1alpha1.DataMovementMan
 
 	// Setup Volumes / Volume Mounts for accessing global Lustre file systems
 
-	volumes := make([]corev1.Volume, len(fileSystems))
-	volumeMounts := make([]corev1.VolumeMount, len(fileSystems))
-	for idx, fs := range fileSystems {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+	for _, fs := range fileSystems {
+
+		if !fs.DeletionTimestamp.IsZero() {
+			log.Info("Global lustre volume is in the process of being deleted", "name", client.ObjectKeyFromObject(&fs).String())
+			continue
+		}
+
 		log.Info("Adding global lustre volume", "name", client.ObjectKeyFromObject(&fs).String())
 
-		volumes[idx] = corev1.Volume{
+		volumes = append(volumes, corev1.Volume{
 			Name: fs.Name,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: fs.PersistentVolumeClaimName(manager.Namespace, corev1.ReadWriteMany),
 				},
 			},
-		}
+		})
 
-		volumeMounts[idx] = corev1.VolumeMount{
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      fs.Name,
 			MountPath: fs.Spec.MountRoot,
-		}
+		})
 	}
 
 	// Add the NNF Mounts
