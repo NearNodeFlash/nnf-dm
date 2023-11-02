@@ -27,7 +27,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -145,11 +144,8 @@ func (r *DataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.
 		return errorHandler(err, "create or update DaemonSet")
 	}
 
-	res, err := r.removeLustreFileSystemsFinalizersIfNecessary(ctx, manager)
-	if err != nil {
+	if err := r.removeLustreFileSystemsFinalizersIfNecessary(ctx, manager); err != nil {
 		return errorHandler(err, "remove LustreFileSystems finalizers")
-	} else if res != nil {
-		return *res, nil
 	}
 
 	manager.Status.Ready = true
@@ -360,12 +356,12 @@ func (r *DataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx c
 	return nil
 }
 
-func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) (*ctrl.Result, error) {
+func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	filesystems := &lusv1beta1.LustreFileSystemList{}
 	if err := r.List(ctx, filesystems); err != nil && !meta.IsNoMatchError(err) {
-		return nil, fmt.Errorf("list lustre file systems failed: %w", err)
+		return fmt.Errorf("list lustre file systems failed: %w", err)
 	}
 
 	// Get the DS to compare the list of volumes
@@ -376,7 +372,7 @@ func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNeces
 		},
 	}
 	if err := r.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
-		return nil, err
+		return err
 	}
 
 	finalizersToRemove := []lusv1beta1.LustreFileSystem{}
@@ -386,15 +382,15 @@ func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNeces
 			finalizersToRemove = append(finalizersToRemove, lustre)
 			for _, vol := range ds.Spec.Template.Spec.Volumes {
 				if lustre.Name == vol.Name {
-					log.Info("Requeue: wait for daemonset to drop lustrefilesystem volume", "lustrefilesystem", lustre)
-					return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+					log.Info("Daemonset still has lustrefilesystem volume", "lustrefilesystem", lustre)
+					return nil
 				}
 			}
 		}
 	}
 
 	if len(finalizersToRemove) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	// Now the DS does not have any lustre filesystems that are being deleted, verify that the
@@ -402,9 +398,9 @@ func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNeces
 	d := ds.Status.DesiredNumberScheduled
 	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
 		// wait for pods to restart
-		log.Info("Requeue: wait for daemonset to restart pods after dropping lustrefilesystem volume",
+		log.Info("Daemonset still has pods to restart after dropping lustrefilesystem volume",
 			"desired", d, "updated", ds.Status.UpdatedNumberScheduled, "ready", ds.Status.NumberReady)
-		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return nil
 	}
 
 	// Now the finalizers can be removed
@@ -412,7 +408,7 @@ func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNeces
 		if controllerutil.ContainsFinalizer(&lustre, finalizer) {
 			controllerutil.RemoveFinalizer(&lustre, finalizer)
 			if err := r.Update(ctx, &lustre); err != nil {
-				return nil, err
+				return err
 			}
 			log.Info("Removed LustreFileSystem finalizer", "object", client.ObjectKeyFromObject(&lustre).String(),
 				"namespace", manager.Namespace,
@@ -420,7 +416,7 @@ func (r *DataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNeces
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func (r *DataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *dmv1alpha1.DataMovementManager) error {
