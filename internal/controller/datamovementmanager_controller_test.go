@@ -20,8 +20,6 @@
 package controller
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
@@ -38,6 +37,7 @@ import (
 
 var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
+	var lustre *lusv1beta1.LustreFileSystem
 	ns := &corev1.Namespace{}
 	deployment := &appsv1.Deployment{}
 	mgr := &dmv1alpha1.DataMovementManager{}
@@ -51,7 +51,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			},
 		}
 
-		err := k8sClient.Create(context.TODO(), ns)
+		err := k8sClient.Create(ctx, ns)
 		Expect(err == nil || errors.IsAlreadyExists(err)).Should(BeTrue())
 
 		// Create a dummy deployment of the data movement manager
@@ -81,7 +81,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			},
 		}
 
-		err = k8sClient.Create(context.TODO(), deployment)
+		err = k8sClient.Create(ctx, deployment)
 		Expect(err == nil || errors.IsAlreadyExists(err)).Should(BeTrue())
 	})
 
@@ -112,33 +112,40 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	})
 
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), mgr)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, mgr)).Should(Succeed())
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), mgr)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, mgr)).Should(Succeed())
 		Eventually(func() error {
-			return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mgr), mgr)
+			return k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)
 		}).ShouldNot(Succeed())
+
+		if lustre != nil {
+			k8sClient.Delete(ctx, lustre) // may or may not be already deleted
+			Eventually(func() error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)
+			}).ShouldNot(Succeed())
+		}
 	})
 
 	It("Bootstraps all managed components", func() {
 		Eventually(func(g Gomega) bool {
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}).Should(BeTrue())
 	})
 
-	It("Adds global lustre volumes", func() {
+	It("Adds and removes global lustre volumes", func() {
 
 		By("Wait for the manager to go ready")
 		Eventually(func(g Gomega) bool {
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}).Should(BeTrue())
 
 		By("Creating a Global Lustre File System")
-		lustre := &lusv1beta1.LustreFileSystem{
+		lustre = &lusv1beta1.LustreFileSystem{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "global",
 				Namespace: corev1.NamespaceDefault,
@@ -150,17 +157,21 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			},
 		}
 
-		Expect(k8sClient.Create(context.TODO(), lustre)).Should(Succeed())
+		Expect(k8sClient.Create(ctx, lustre)).Should(Succeed())
 
 		By("Expect namespace is added to lustre volume")
-
 		Eventually(func(g Gomega) lusv1beta1.LustreFileSystemNamespaceSpec {
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
 			return lustre.Spec.Namespaces[mgr.Namespace]
 		}).ShouldNot(BeNil())
 
-		By("The Volume appears in the daemon set")
+		By("Expect finalizer is added to lustre volume")
+		Eventually(func(g Gomega) []string {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
+			return lustre.Finalizers
+		}).Should(ContainElement(finalizer))
 
+		By("The Volume appears in the daemon set")
 		daemonset := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      daemonsetName,
@@ -169,8 +180,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		}
 
 		Eventually(func(g Gomega) error {
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(daemonset), daemonset)).Should(Succeed())
-
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(daemonset), daemonset)).Should(Succeed())
 			g.Expect(daemonset.Spec.Template.Spec.Volumes).Should(
 				ContainElement(
 					MatchFields(IgnoreExtras, Fields{
@@ -178,7 +188,6 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 					}),
 				),
 			)
-
 			g.Expect(daemonset.Spec.Template.Spec.Containers[0].VolumeMounts).Should(
 				ContainElement(
 					MatchFields(IgnoreExtras, Fields{
@@ -187,9 +196,68 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 					}),
 				),
 			)
-
 			return nil
 		}).Should(Succeed())
 
+		By("Deleting Global Lustre File System")
+		Expect(k8sClient.Delete(ctx, lustre)).To(Succeed())
+
+		By("Expect Global Lustre File system/finalizer to stay around until daemonset restarts pods without the volume")
+		Eventually(func(g Gomega) error {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(daemonset), daemonset)).Should(Succeed())
+
+			for _, v := range daemonset.Spec.Template.Spec.Volumes {
+				desired := daemonset.Status.DesiredNumberScheduled
+				updated := daemonset.Status.UpdatedNumberScheduled
+				ready := daemonset.Status.NumberReady
+				expectedGen := daemonset.ObjectMeta.Generation
+				gen := daemonset.Status.ObservedGeneration
+
+				// Fake the updates to the daemonset since the daemonset controller doesn't run
+				fakeDSUpdates(daemonset, g)
+
+				if v.Name == lustre.Name {
+					// If the volume still exists, then so should lustre + finalizer
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
+					g.Expect(controllerutil.ContainsFinalizer(lustre, finalizer)).To(BeTrue())
+
+				} else if gen != expectedGen && updated != desired && ready != desired {
+					// If pods have not restarted, lustre + finalizer should still be there
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
+					g.Expect(controllerutil.ContainsFinalizer(lustre, finalizer)).To(BeTrue())
+				} else {
+					// Once volume is gone and pods have restarted, lustre should be gone (and return error)
+					return k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)
+				}
+			}
+
+			return nil
+		}, "15s").ShouldNot(Succeed())
 	})
 })
+
+// Envtest does not run the built-in controllers (e.g. daemonset controller).  This function fakes
+// that out. Walk the counters up by one each time so we can exercise the controller watching these
+// through a few iterations.
+func fakeDSUpdates(ds *appsv1.DaemonSet, g Gomega) {
+	const desired = 5 // number of nnf nodes
+
+	ds.Status.DesiredNumberScheduled = desired
+
+	ds.Status.ObservedGeneration++
+	if ds.Status.ObservedGeneration > ds.ObjectMeta.Generation {
+		ds.Status.ObservedGeneration = ds.ObjectMeta.Generation
+	}
+
+	ds.Status.UpdatedNumberScheduled++
+	if ds.Status.UpdatedNumberScheduled > desired {
+		ds.Status.UpdatedNumberScheduled = desired
+	}
+
+	ds.Status.NumberReady++
+	if ds.Status.NumberReady > desired {
+		ds.Status.NumberReady = desired
+	}
+
+	g.Expect(k8sClient.Status().Update(ctx, ds)).Should(Succeed())
+}
