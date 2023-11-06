@@ -47,8 +47,15 @@ deploy)
         $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f -
         break
     done
+
+    # Deploy the ServiceMonitor resource if its CRD is found. The CRD would
+    # have been installed by a metrics service such as Prometheus.
+    if kubectl get crd servicemonitors.monitoring.coreos.com > /dev/null 2>&1; then
+        $KUSTOMIZE build config/prometheus | kubectl apply -f-
+    fi
     ;;
 undeploy)
+    $KUSTOMIZE build config/prometheus | kubectl delete --ignore-not-found -f-
     # When the DataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
