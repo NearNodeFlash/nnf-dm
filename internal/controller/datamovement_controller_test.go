@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"

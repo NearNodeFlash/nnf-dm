@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: datamovementmanagers.dm.cray.hpe.com
+  name: nnfdatamovementmanagers.nnf.cray.hpe.com
 spec:
-  group: dm.cray.hpe.com
+  group: nnf.cray.hpe.com
   names:
-    kind: DataMovementManager
-    listKind: DataMovementManagerList
-    plural: datamovementmanagers
-    singular: datamovementmanager
+    kind: NnfDataMovementManager
+    listKind: NnfDataMovementManagerList
+    plural: nnfdatamovementmanagers
+    singular: nnfdatamovementmanager
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: DataMovementManager is the Schema for the datamovementmanagers
+        description: NnfDataMovementManager is the Schema for the nnfdatamovementmanagers
           API
         properties:
           apiVersion:
@@ -41,7 +41,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: DataMovementManagerSpec defines the desired state of DataMovementManager
+            description: NnfDataMovementManagerSpec defines the desired state of NnfDataMovementManager
             properties:
               hostPath:
                 description: Host Path defines the directory location of shared mounts
@@ -7633,7 +7633,8 @@ spec:
             - template
             type: object
           status:
-            description: DataMovementManagerStatus defines the observed state of DataMovementManager
+            description: NnfDataMovementManagerStatus defines the observed state of
+              NnfDataMovementManager
             properties:
               ready:
                 description: Ready indicates that the Data Movement Manager has achieved

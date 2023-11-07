@@ -25,16 +25,14 @@ import (
 )
 
 const (
-	DataMovementNamespace = "nnf-dm-system"
-
 	DataMovementWorkerLabel = "dm.cray.hpe.com/worker"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// DataMovementManagerSpec defines the desired state of DataMovementManager
-type DataMovementManagerSpec struct {
+// NnfDataMovementManagerSpec defines the desired state of NnfDataMovementManager
+type NnfDataMovementManagerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -53,8 +51,8 @@ type DataMovementManagerSpec struct {
 	MountPath string `json:"mountPath"`
 }
 
-// DataMovementManagerStatus defines the observed state of DataMovementManager
-type DataMovementManagerStatus struct {
+// NnfDataMovementManagerStatus defines the observed state of NnfDataMovementManager
+type NnfDataMovementManagerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -68,24 +66,24 @@ type DataMovementManagerStatus struct {
 //+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if manager readied all resoures"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// DataMovementManager is the Schema for the datamovementmanagers API
-type DataMovementManager struct {
+// NnfDataMovementManager is the Schema for the nnfdatamovementmanagers API
+type NnfDataMovementManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DataMovementManagerSpec   `json:"spec,omitempty"`
-	Status DataMovementManagerStatus `json:"status,omitempty"`
+	Spec   NnfDataMovementManagerSpec   `json:"spec,omitempty"`
+	Status NnfDataMovementManagerStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// DataMovementManagerList contains a list of DataMovementManager
-type DataMovementManagerList struct {
+// NnfDataMovementManagerList contains a list of NnfDataMovementManager
+type NnfDataMovementManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DataMovementManager `json:"items"`
+	Items           []NnfDataMovementManager `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&DataMovementManager{}, &DataMovementManagerList{})
+	SchemeBuilder.Register(&NnfDataMovementManager{}, &NnfDataMovementManagerList{})
 }
