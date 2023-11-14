@@ -33,6 +33,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/DataWorkflowServices/dws/utils/updater"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
@@ -106,7 +108,7 @@ type NnfDataMovementManagerReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := log.FromContext(ctx)
 
 	metrics.NnfDmDataMovementManagerReconcilesTotal.Inc()
@@ -116,10 +118,14 @@ func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	statusUpdater := updater.NewStatusUpdater[*nnfv1alpha1.NnfDataMovementManagerStatus](manager)
+	defer func() { err = statusUpdater.CloseWithStatusUpdate(ctx, r.Client.Status(), err) }()
+
 	errorHandler := func(err error, msg string) (ctrl.Result, error) {
 		if errors.IsConflict(err) {
 			return ctrl.Result{Requeue: true}, nil
 		}
+		manager.Status.Ready = false
 		log.Error(err, msg+" failed")
 		return ctrl.Result{}, err
 	}
@@ -148,11 +154,15 @@ func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ct
 		return errorHandler(err, "remove LustreFileSystems finalizers")
 	}
 
-	manager.Status.Ready = true
-	if err := r.Status().Update(ctx, manager); err != nil {
-		return ctrl.Result{}, err
+	if ready, err := r.isDaemonSetReady(ctx, manager); err != nil {
+		return errorHandler(err, "check if daemonset is ready")
+	} else if !ready {
+		manager.Status.Ready = false
+		log.Info("Daemonset not ready")
+		return ctrl.Result{}, nil
 	}
 
+	manager.Status.Ready = true
 	return ctrl.Result{}, nil
 }
 
@@ -372,6 +382,9 @@ func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNe
 		},
 	}
 	if err := r.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -395,12 +408,11 @@ func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNe
 
 	// Now the DS does not have any lustre filesystems that are being deleted, verify that the
 	// daemonset's pods (i.e. dm worker pods) have restarted
-	d := ds.Status.DesiredNumberScheduled
-	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
-		// wait for pods to restart
-		log.Info("Daemonset still has pods to restart after dropping lustrefilesystem volume",
-			"desired", d, "updated", ds.Status.UpdatedNumberScheduled, "ready", ds.Status.NumberReady)
+	if ready, err := r.isDaemonSetReady(ctx, manager); !ready {
+		log.Info("Daemonset still has pods to restart after dropping lustrefilesystem volume")
 		return nil
+	} else if err != nil {
+		return err
 	}
 
 	// Now the finalizers can be removed
@@ -410,9 +422,7 @@ func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNe
 			if err := r.Update(ctx, &lustre); err != nil {
 				return err
 			}
-			log.Info("Removed LustreFileSystem finalizer", "object", client.ObjectKeyFromObject(&lustre).String(),
-				"namespace", manager.Namespace,
-				"daemonset", ds)
+			log.Info("Removed LustreFileSystem finalizer", "object", client.ObjectKeyFromObject(&lustre).String(), "namespace", manager.Namespace)
 		}
 	}
 
@@ -473,10 +483,33 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 	if result == controllerutil.OperationResultCreated {
 		log.Info("Created DaemonSet", "object", client.ObjectKeyFromObject(ds).String())
 	} else if result == controllerutil.OperationResultUpdated {
-		log.Info("Updated DaemonSet", "object", client.ObjectKeyFromObject(ds).String())
+		log.Info("Updated DaemonSet", "object", client.ObjectKeyFromObject(ds).String(), "generation", ds.ObjectMeta.Generation, "status", ds.Status)
 	}
 
 	return nil
+}
+
+func (r *NnfDataMovementManagerReconciler) isDaemonSetReady(ctx context.Context, manager *nnfv1alpha1.NnfDataMovementManager) (bool, error) {
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      daemonsetName,
+			Namespace: manager.Namespace,
+		},
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+
+		}
+		return false, err
+	}
+
+	d := ds.Status.DesiredNumberScheduled
+	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func setupSSHAuthVolumes(manager *nnfv1alpha1.NnfDataMovementManager, podSpec *corev1.PodSpec) {
