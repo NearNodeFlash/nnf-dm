@@ -38,12 +38,12 @@ case $CMD in
 deploy)
     $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f - || true
 
-    # Sometimes the deployment of the DataMovementManager occurs too quickly for k8s to digest the CRD
+    # Sometimes the deployment of the NnfDataMovementManager occurs too quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
     # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
-    echo "Waiting for DataMovementManager resource to become ready"
+    echo "Waiting for NnfDataMovementManager resource to become ready"
     while :; do
-        [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
+        [[ $(kubectl get nnfdatamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
         $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f -
         break
     done
@@ -56,7 +56,7 @@ deploy)
     ;;
 undeploy)
     $KUSTOMIZE build config/prometheus | kubectl delete --ignore-not-found -f-
-    # When the DataMovementManager CRD gets deleted all related resource are also
+    # When the NnfDataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
     $KUSTOMIZE build $OVERLAY_DIR | kubectl delete --ignore-not-found -f -

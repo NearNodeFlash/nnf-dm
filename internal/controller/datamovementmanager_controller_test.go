@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
+	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
 
 var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
@@ -40,14 +40,14 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	var lustre *lusv1beta1.LustreFileSystem
 	ns := &corev1.Namespace{}
 	deployment := &appsv1.Deployment{}
-	mgr := &dmv1alpha1.DataMovementManager{}
+	mgr := &nnfv1alpha1.NnfDataMovementManager{}
 	labels := map[string]string{"control-plane": "controller-manager"}
 
 	/* BeforeAll (Ginkgo v2)*/
 	BeforeEach(func() {
 		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: dmv1alpha1.DataMovementNamespace,
+				Name: nnfv1alpha1.DataMovementNamespace,
 			},
 		}
 
@@ -58,7 +58,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		deployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: dmv1alpha1.DataMovementNamespace,
+				Namespace: nnfv1alpha1.DataMovementNamespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -86,12 +86,12 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	})
 
 	BeforeEach(func() {
-		mgr = &dmv1alpha1.DataMovementManager{
+		mgr = &nnfv1alpha1.NnfDataMovementManager{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: dmv1alpha1.DataMovementNamespace,
+				Namespace: nnfv1alpha1.DataMovementNamespace,
 			},
-			Spec: dmv1alpha1.DataMovementManagerSpec{
+			Spec: nnfv1alpha1.NnfDataMovementManagerSpec{
 				Selector: metav1.LabelSelector{
 					MatchLabels: labels,
 				},

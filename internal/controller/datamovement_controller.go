@@ -52,7 +52,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
-	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 )
@@ -702,9 +701,9 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 
 	// Get the Rabbit DM Worker Pods
 	listOptions := []client.ListOption{
-		client.InNamespace(dmv1alpha1.DataMovementNamespace),
+		client.InNamespace(nnfv1alpha1.DataMovementNamespace),
 		client.MatchingLabels(map[string]string{
-			dmv1alpha1.DataMovementWorkerLabel: "true",
+			nnfv1alpha1.DataMovementWorkerLabel: "true",
 		}),
 	}
 
@@ -715,7 +714,7 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 
 	nodeNameToHostnameMap := map[string]string{}
 	for _, pod := range pods.Items {
-		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + dmv1alpha1.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
+		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + nnfv1alpha1.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
 	}
 
 	hostnames := make([]string, len(nodes))
