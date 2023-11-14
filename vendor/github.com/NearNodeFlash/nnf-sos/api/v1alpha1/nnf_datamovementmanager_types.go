@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -64,7 +64,8 @@ type NnfDataMovementManagerStatus struct {
 
 	// Ready indicates that the Data Movement Manager has achieved the desired readiness state
 	// and all managed resources are initialized.
-	Ready bool `json:"ready,omitempty"`
+	// +kubebuilder:default:=false
+	Ready bool `json:"ready"`
 }
 
 //+kubebuilder:object:root=true
@@ -81,6 +82,10 @@ type NnfDataMovementManager struct {
 	Status NnfDataMovementManagerStatus `json:"status,omitempty"`
 }
 
+func (m *NnfDataMovementManager) GetStatus() updater.Status[*NnfDataMovementManagerStatus] {
+	return &m.Status
+}
+
 //+kubebuilder:object:root=true
 
 // NnfDataMovementManagerList contains a list of NnfDataMovementManager
@@ -92,8 +97,4 @@ type NnfDataMovementManagerList struct {
 
 func init() {
 	SchemeBuilder.Register(&NnfDataMovementManager{}, &NnfDataMovementManagerList{})
-}
-
-func (m *NnfDataMovementManager) GetStatus() updater.Status[*NnfDataMovementManagerStatus] {
-	return &m.Status
 }
