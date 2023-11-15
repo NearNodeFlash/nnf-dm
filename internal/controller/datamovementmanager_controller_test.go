@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -38,6 +39,8 @@ import (
 var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	var lustre *lusv1beta1.LustreFileSystem
+	var daemonset *appsv1.DaemonSet
+
 	ns := &corev1.Namespace{}
 	deployment := &appsv1.Deployment{}
 	mgr := &nnfv1alpha1.NnfDataMovementManager{}
@@ -109,6 +112,13 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 				},
 			},
 		}
+
+		daemonset = &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      daemonsetName,
+				Namespace: mgr.Namespace,
+			},
+		}
 	})
 
 	JustBeforeEach(func() {
@@ -131,15 +141,17 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	It("Bootstraps all managed components", func() {
 		Eventually(func(g Gomega) bool {
+			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
-		}).Should(BeTrue())
+		}, "5s").Should(BeTrue())
 	})
 
 	It("Adds and removes global lustre volumes", func() {
 
 		By("Wait for the manager to go ready")
 		Eventually(func(g Gomega) bool {
+			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}).Should(BeTrue())
@@ -159,6 +171,12 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 		Expect(k8sClient.Create(ctx, lustre)).Should(Succeed())
 
+		By("Status should not be ready")
+		Eventually(func(g Gomega) bool {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}).Should(BeFalse())
+
 		By("Expect namespace is added to lustre volume")
 		Eventually(func(g Gomega) lusv1beta1.LustreFileSystemNamespaceSpec {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lustre), lustre)).Should(Succeed())
@@ -172,13 +190,6 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		}).Should(ContainElement(finalizer))
 
 		By("The Volume appears in the daemon set")
-		daemonset := &appsv1.DaemonSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      daemonsetName,
-				Namespace: mgr.Namespace,
-			},
-		}
-
 		Eventually(func(g Gomega) error {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(daemonset), daemonset)).Should(Succeed())
 			g.Expect(daemonset.Spec.Template.Spec.Volumes).Should(
@@ -199,8 +210,21 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			return nil
 		}).Should(Succeed())
 
+		By("Status should be ready after daemonset is up to date")
+		Eventually(func(g Gomega) bool {
+			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}).Should(BeTrue())
+
 		By("Deleting Global Lustre File System")
 		Expect(k8sClient.Delete(ctx, lustre)).To(Succeed())
+
+		By("Status should be ready since daemonset was updated")
+		Eventually(func(g Gomega) bool {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}).Should(BeFalse())
 
 		By("Expect Global Lustre File system/finalizer to stay around until daemonset restarts pods without the volume")
 		Eventually(func(g Gomega) error {
@@ -214,7 +238,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 				gen := daemonset.Status.ObservedGeneration
 
 				// Fake the updates to the daemonset since the daemonset controller doesn't run
-				fakeDSUpdates(daemonset, g)
+				g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
 
 				if v.Name == lustre.Name {
 					// If the volume still exists, then so should lustre + finalizer
@@ -233,31 +257,45 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 			return nil
 		}, "15s").ShouldNot(Succeed())
+
+		By("Status should be ready since daemonset is up to date from previous step")
+		Eventually(func(g Gomega) bool {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}).Should(BeTrue())
 	})
 })
 
 // Envtest does not run the built-in controllers (e.g. daemonset controller).  This function fakes
 // that out. Walk the counters up by one each time so we can exercise the controller watching these
 // through a few iterations.
-func fakeDSUpdates(ds *appsv1.DaemonSet, g Gomega) {
-	const desired = 5 // number of nnf nodes
+func fakeDSUpdates(ds *appsv1.DaemonSet) error {
+	const desired = 2 // number of nnf nodes
 
-	ds.Status.DesiredNumberScheduled = desired
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
+			return err
+		}
+		ds.Status.DesiredNumberScheduled = desired
 
-	ds.Status.ObservedGeneration++
-	if ds.Status.ObservedGeneration > ds.ObjectMeta.Generation {
-		ds.Status.ObservedGeneration = ds.ObjectMeta.Generation
-	}
+		ds.Status.ObservedGeneration++
+		if ds.Status.ObservedGeneration > ds.ObjectMeta.Generation {
+			ds.Status.ObservedGeneration = ds.ObjectMeta.Generation
+		}
 
-	ds.Status.UpdatedNumberScheduled++
-	if ds.Status.UpdatedNumberScheduled > desired {
-		ds.Status.UpdatedNumberScheduled = desired
-	}
+		ds.Status.UpdatedNumberScheduled++
+		if ds.Status.UpdatedNumberScheduled > desired {
+			ds.Status.UpdatedNumberScheduled = desired
+		}
 
-	ds.Status.NumberReady++
-	if ds.Status.NumberReady > desired {
-		ds.Status.NumberReady = desired
-	}
+		ds.Status.NumberReady++
+		if ds.Status.NumberReady > desired {
+			ds.Status.NumberReady = desired
+		}
+		return k8sClient.Status().Update(ctx, ds)
+	})
 
-	g.Expect(k8sClient.Status().Update(ctx, ds)).Should(Succeed())
+	return err
+
+	// g.Expect(k8sClient.Status().Update(ctx, ds)).Should(Succeed())
 }
