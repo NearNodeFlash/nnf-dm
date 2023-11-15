@@ -55,7 +55,9 @@ deploy)
     fi
     ;;
 undeploy)
-    $KUSTOMIZE build config/prometheus | kubectl delete --ignore-not-found -f-
+    if kubectl get crd servicemonitors.monitoring.coreos.com > /dev/null 2>&1; then
+        $KUSTOMIZE build config/prometheus | kubectl delete --ignore-not-found -f-
+    fi
     # When the NnfDataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
