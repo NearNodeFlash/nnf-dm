@@ -106,13 +106,13 @@ var _ = Describe("Data Movement Test", func() {
 			// Default config map data
 			dmCfg = &dmConfig{
 				Profiles: map[string]dmConfigProfile{
-					"default": {
+					nnfv1alpha1.DataMovementProfileDefault: {
 						Command: defaultCommand,
 					},
 				},
 				ProgressIntervalSeconds: 1,
 			}
-			dmCfgProfile = dmCfg.Profiles[configMapKeyProfileDefault]
+			dmCfgProfile = dmCfg.Profiles[nnfv1alpha1.DataMovementProfileDefault]
 
 			dm = &nnfv1alpha1.NnfDataMovement{
 				ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +140,7 @@ var _ = Describe("Data Movement Test", func() {
 			// Create CM and verify label
 			if createCm {
 				// allow test to override the values in the default cfg profile
-				dmCfg.Profiles[configMapKeyProfileDefault] = dmCfgProfile
+				dmCfg.Profiles[nnfv1alpha1.DataMovementProfileDefault] = dmCfgProfile
 
 				// Convert the config to raw
 				b, err := yaml.Marshal(dmCfg)
@@ -390,6 +390,61 @@ var _ = Describe("Data Movement Test", func() {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status.State
 				}).ShouldNot(Equal(nnfv1alpha1.DataMovementConditionTypeRunning))
+			})
+		})
+
+		Context("when a non-default profile is supplied (and present)", func() {
+			p := "test-profile"
+			cmd := "sleep .1"
+
+			BeforeEach(func() {
+				dmCfgProfile = dmConfigProfile{
+					Command: cmd,
+				}
+				dmCfg.Profiles[p] = dmCfgProfile
+				dm.Spec.Profile = p
+			})
+			It("should use that profile to perform data movement", func() {
+
+				By("completing the data movement successfully")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonSuccess),
+				}))
+
+				By("verify that profile is used")
+				Expect(dm.Spec.Profile).To(Equal(p))
+				Expect(dm.Status.CommandStatus.Command).To(Equal(cmdBashPrefix + cmd))
+			})
+		})
+
+		Context("when a non-default profile is supplied (and NOT present)", func() {
+			m := "missing-test-profile"
+			cmd := "sleep .1"
+
+			BeforeEach(func() {
+				dmCfgProfile = dmConfigProfile{
+					Command: cmd,
+				}
+				dmCfg.Profiles["test-profile"] = dmCfgProfile
+				dm.Spec.Profile = m
+			})
+			It("should use that profile to perform data movement and fail", func() {
+
+				By("having a State/Status of 'Finished'/'Invalid'")
+				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
+					return dm.Status
+				}).Should(MatchFields(IgnoreExtras, Fields{
+					"State":  Equal(nnfv1alpha1.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha1.DataMovementConditionReasonInvalid),
+				}))
+
+				By("verify that profile is used")
+				Expect(dm.Spec.Profile).To(Equal(m))
 			})
 		})
 

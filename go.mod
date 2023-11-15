@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231114204216-1a62f95d74d5
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231115183043-7345e20cf440
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/prometheus/client_golang v1.16.0
