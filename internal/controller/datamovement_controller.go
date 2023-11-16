@@ -66,8 +66,7 @@ const (
 	configMapNamespace = nnfv1alpha1.DataMovementNamespace
 
 	// DM ConfigMap Data Keys
-	configMapKeyData           = "nnf-dm-config.yaml"
-	configMapKeyProfileDefault = "default"
+	configMapKeyData = "nnf-dm-config.yaml"
 )
 
 // Regex to scrape the progress output of the `dcp` command. Example output:
@@ -256,16 +255,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log.Info("Using config map", "config", cfg)
 
-	// TODO: Allow use of non-default dm config profiles - for now only use the default. For copy
-	// offload API, we could create "fake" profiles and store those in the DM object based on the
-	// parameters supplied to the CreateRequest().
-	// Ensure profile exists
-	profile, found := cfg.Profiles[configMapKeyProfileDefault]
+	// Ensure requested DM profile exists
+	profile, found := cfg.Profiles[dm.Spec.Profile]
 	if !found {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithUserMessage("'%s' profile not found in config map: %v", configMapKeyProfileDefault, client.ObjectKeyFromObject(configMap)).WithUser().WithFatal()
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithUserMessage("'%s' profile not found in config map: %v", dm.Spec.Profile, client.ObjectKeyFromObject(configMap)).WithUser().WithFatal()
 	}
-	log.Info("Using profile", "name", configMapKeyProfileDefault, "profile", profile)
+	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
 
+	// Built command + hostfile
 	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
