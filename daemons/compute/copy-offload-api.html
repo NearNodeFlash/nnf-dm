@@ -461,6 +461,16 @@ the hostfile. -1 will defer to the server side configuration. </p></td>
 max_slots in the hostfile. -1 will defer to the server side configuration. </p></td>
                 </tr>
               
+                <tr>
+                  <td>profile</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The name of the data movement configuration profile to use. The above parameters (e.g. slots,
+logStdout) will override the settings defined by the profile. This profile must exist on the
+server otherwise the data movement operation will be invalid. Empty will default to the
+default profile. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
