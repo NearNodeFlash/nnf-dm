@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,7 +40,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
@@ -76,7 +77,7 @@ var progressRe = regexp.MustCompile(`Copied.+\(([[:digit:]]{1,3})%\)`)
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme *kruntime.Scheme
 
 	// We maintain a map of active operations which allows us to process cancel requests
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
@@ -736,9 +737,10 @@ func filterByNamespace(namespace string) predicate.Predicate {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	maxReconciles := runtime.GOMAXPROCS(0)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nnfv1alpha1.NnfDataMovement{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 128}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxReconciles}).
 		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)
 }
