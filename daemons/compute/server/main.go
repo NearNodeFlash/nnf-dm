@@ -27,7 +27,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/pprof"
 	"syscall"
+	"time"
 
 	"github.com/takama/daemon"
 	"google.golang.org/grpc"
@@ -49,7 +51,7 @@ type Service struct {
 	daemon.Daemon
 }
 
-func (service *Service) Manage() (string, error) {
+func (service *Service) Manage() (msg string, err error) {
 
 	if len(os.Args) > 1 {
 		command := os.Args[1]
@@ -97,6 +99,27 @@ func (service *Service) Manage() (string, error) {
 	// Set socket permissions so non-root users can communicate
 	if err = os.Chmod(*socketAddr, 0766); err != nil {
 		return fmt.Sprintf("Failed to set permissions on socket %s", *socketAddr), err
+	}
+
+	// Enable CPU profiling with pprof
+	if len(options.CpuProfile) > 0 {
+		filename := options.CpuProfile + "-" + time.Now().UTC().Format(time.RFC3339)
+		f, err := os.Create(filename)
+		if err != nil {
+			return fmt.Sprintf("could not create CPU profile"), err
+		}
+		defer func() {
+			if cerr := f.Close(); cerr != nil {
+				err = cerr
+				msg = "could not close CPU profile"
+			}
+		}()
+
+		if err := pprof.StartCPUProfile(f); err != nil {
+			return fmt.Sprintf("could not start CPU profile"), err
+		}
+		stdlog.Printf("CPU profiling enabled: %s. Stop daemon to dump contents to file.\n", filename)
+		defer pprof.StopCPUProfile()
 	}
 
 	go service.Run(server, listener)

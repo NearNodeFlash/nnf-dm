@@ -32,10 +32,11 @@ type ServerOptions struct {
 	tokenFile string
 	certFile  string
 
-	name      string
-	nodeName  string
-	sysConfig string
-	simulated bool
+	name       string
+	nodeName   string
+	sysConfig  string
+	CpuProfile string
+	simulated  bool
 
 	k8sQPS   int
 	k8sBurst int
@@ -43,13 +44,14 @@ type ServerOptions struct {
 
 func GetOptions() (*ServerOptions, error) {
 	opts := ServerOptions{
-		host:      os.Getenv("KUBERNETES_SERVICE_HOST"),
-		port:      os.Getenv("KUBERNETES_SERVICE_PORT"),
-		name:      os.Getenv("NODE_NAME"),
-		nodeName:  os.Getenv("NNF_NODE_NAME"),
-		tokenFile: os.Getenv("NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE"),
-		certFile:  os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CERT_FILE"),
-		simulated: false,
+		host:       os.Getenv("KUBERNETES_SERVICE_HOST"),
+		port:       os.Getenv("KUBERNETES_SERVICE_PORT"),
+		name:       os.Getenv("NODE_NAME"),
+		nodeName:   os.Getenv("NNF_NODE_NAME"),
+		tokenFile:  os.Getenv("NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE"),
+		certFile:   os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CERT_FILE"),
+		CpuProfile: os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CPU_PROFILE"),
+		simulated:  false,
 
 		// These options adjust the client-side rate-limiting for k8s. The new defaults are 50 and
 		// 100 (rather than 5, 10). See more info https://github.com/kubernetes/kubernetes/pull/116121
@@ -68,6 +70,8 @@ func GetOptions() (*ServerOptions, error) {
 	flag.BoolVar(&opts.simulated, "simulated", opts.simulated, "Run in simulation mode where no requests are sent to the server")
 	flag.IntVar(&opts.k8sQPS, "kubernetes-qps", opts.k8sQPS, "Kubernetes client queries per second (QPS)")
 	flag.IntVar(&opts.k8sBurst, "kubernetes-burst", opts.k8sBurst, "Kubernetes client additional concurrent calls above QPS")
+	flag.StringVar(&opts.CpuProfile, "cpu-profile", opts.CpuProfile,
+		"Enable and dump CPU profiling data to this file after daemon is stopped. Timestamp is added to end of filename.")
 	flag.Parse()
 	return &opts, nil
 }
