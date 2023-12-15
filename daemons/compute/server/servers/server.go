@@ -35,7 +35,8 @@ type ServerOptions struct {
 	name       string
 	nodeName   string
 	sysConfig  string
-	CpuProfile string
+	CpuProfile bool
+	Tracing    bool
 	simulated  bool
 
 	k8sQPS   int
@@ -50,7 +51,8 @@ func GetOptions() (*ServerOptions, error) {
 		nodeName:   os.Getenv("NNF_NODE_NAME"),
 		tokenFile:  os.Getenv("NNF_DATA_MOVEMENT_SERVICE_TOKEN_FILE"),
 		certFile:   os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CERT_FILE"),
-		CpuProfile: os.Getenv("NNF_DATA_MOVEMENT_SERVICE_CPU_PROFILE"),
+		CpuProfile: false,
+		Tracing:    false,
 		simulated:  false,
 
 		// These options adjust the client-side rate-limiting for k8s. The new defaults are 50 and
@@ -70,8 +72,10 @@ func GetOptions() (*ServerOptions, error) {
 	flag.BoolVar(&opts.simulated, "simulated", opts.simulated, "Run in simulation mode where no requests are sent to the server")
 	flag.IntVar(&opts.k8sQPS, "kubernetes-qps", opts.k8sQPS, "Kubernetes client queries per second (QPS)")
 	flag.IntVar(&opts.k8sBurst, "kubernetes-burst", opts.k8sBurst, "Kubernetes client additional concurrent calls above QPS")
-	flag.StringVar(&opts.CpuProfile, "cpu-profile", opts.CpuProfile,
-		"Enable and dump CPU profiling data to this file after daemon is stopped. Timestamp is added to end of filename.")
+	flag.BoolVar(&opts.CpuProfile, "cpu-profile", opts.CpuProfile,
+		"Enable and dump CPU profiling data to `/tmp/nnf-dm-cpu-<timestamp>.prof`. Daemon must be stopped to dump profile.")
+	flag.BoolVar(&opts.Tracing, "tracing", opts.Tracing,
+		"Enable tracing via HTTP server")
 	flag.Parse()
 	return &opts, nil
 }

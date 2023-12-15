@@ -34,6 +34,9 @@ import (
 	"github.com/takama/daemon"
 	"google.golang.org/grpc"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
@@ -101,9 +104,24 @@ func (service *Service) Manage() (msg string, err error) {
 		return fmt.Sprintf("Failed to set permissions on socket %s", *socketAddr), err
 	}
 
-	// Enable CPU profiling with pprof
-	if len(options.CpuProfile) > 0 {
-		filename := options.CpuProfile + "-" + time.Now().UTC().Format(time.RFC3339)
+	// Print out tunable parameters
+	stdlog.Printf("GOMAXPROCS: %s\n", os.Getenv("GOMAXPROCS"))
+	stdlog.Printf("GOGC: %s\n", os.Getenv("GOGC"))
+	stdlog.Printf("GOMEMLIMIT: %s\n", os.Getenv("GOMEMLIMIT"))
+
+	// Enable HTTP tracing. See https://pkg.go.dev/net/http/pprof for more details.
+	if options.Tracing {
+		go func() {
+			url := "localhost:6061"
+			stdlog.Printf("HTTP Tracing enabled at %s\n", url)
+			stdlog.Printf("HTTP Tracing output: %s", http.ListenAndServe(url, nil))
+		}()
+	}
+
+	// Enable CPU profiling with pprof. Daemon must be stopped for contents to be written to the
+	// file.  See https://pkg.go.dev/runtime/pprof for more details.
+	if options.CpuProfile {
+		filename := fmt.Sprintf("/tmp/nnf-dm-cpu-%s.prof", time.Now().UTC().Format(time.RFC3339))
 		f, err := os.Create(filename)
 		if err != nil {
 			return fmt.Sprintf("could not create CPU profile"), err
