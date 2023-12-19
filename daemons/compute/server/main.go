@@ -108,6 +108,7 @@ func (service *Service) Manage() (msg string, err error) {
 	stdlog.Printf("GOMAXPROCS: %s\n", os.Getenv("GOMAXPROCS"))
 	stdlog.Printf("GOGC: %s\n", os.Getenv("GOGC"))
 	stdlog.Printf("GOMEMLIMIT: %s\n", os.Getenv("GOMEMLIMIT"))
+	stdlog.Printf("HTTP2_READ_IDLE_TIMEOUT_SECONDS: %s\n", os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"))
 
 	// Enable HTTP tracing. See https://pkg.go.dev/net/http/pprof for more details.
 	if options.Tracing {
