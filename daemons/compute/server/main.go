@@ -115,6 +115,11 @@ func (service *Service) Run(srv server.Server, listener net.Listener) error {
 
 	stdlog.Println("Version:", version.BuildVersion())
 
+	stdlog.Println("GOMAXPROCS:", runtime.GOMAXPROCS(0))
+	stdlog.Println("GOGC:", os.Getenv("GOGC"))
+	stdlog.Println("GOMEMLIMIT:", os.Getenv("GOMEMLIMIT"))
+	stdlog.Println("HTTP2_PING_TIMEOUT_SECONDS:", os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"))
+
 	go func() {
 		if err := srv.StartManager(); err != nil {
 			errlog.Println("Manager Error: ", err)
