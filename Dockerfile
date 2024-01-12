@@ -18,7 +18,7 @@
 # These ARGs must be before the first FROM. This allows them to be valid for
 # use in FROM instructions.
 ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
-ARG NNFMFU_VERSION=0.0.2
+ARG NNFMFU_VERSION=0.0.3
 
 # Build the manager binary
 FROM golang:1.19-alpine as builder
@@ -33,12 +33,12 @@ COPY vendor/ vendor/
 # and so that source changes don't invalidate our downloaded layer
 
 # Copy the go source
-COPY main.go main.go
+COPY cmd/ cmd/
 COPY api/ api/
-COPY controllers/ controllers/
+COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager cmd/main.go
 
 ###############################################################################
 FROM builder as testing

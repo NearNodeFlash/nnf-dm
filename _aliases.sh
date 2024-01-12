@@ -21,9 +21,9 @@
 # i.e. source ./_aliases.sh
 function dmpods   { kubectl get pods -n nnf-dm-system "${@:1}"; }
 
-function dmmget   { kubectl get  -n nnf-dm-system datamovementmanagers --no-headers  | head -n1 | awk '{print $1}'; }
-function dmmyaml  { kubectl get  -n nnf-dm-system datamovementmanagers/"$(dmmget)" -o yaml; }
-function dmmedit  { kubectl edit -n nnf-dm-system datamovementmanagers/"$(dmmget)"; }
+function dmmget   { kubectl get  -n nnf-dm-system nnfdatamovementmanagers --no-headers  | head -n1 | awk '{print $1}'; }
+function dmmyaml  { kubectl get  -n nnf-dm-system nnfdatamovementmanagers/"$(dmmget)" -o yaml; }
+function dmmedit  { kubectl edit -n nnf-dm-system nnfdatamovementmanagers/"$(dmmget)"; }
 function dmmpod   { kubectl get  -n nnf-dm-system pods --no-headers | grep nnf-dm-manager | awk '{print $1}'; }
 function dmmlog   { kubectl logs -n nnf-dm-system "$(dmmpod)" -c manager "${@:1}"; }
 

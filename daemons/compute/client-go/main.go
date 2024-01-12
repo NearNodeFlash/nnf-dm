@@ -22,6 +22,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -40,7 +41,7 @@ func main() {
 	namespace := flag.String("namespace", os.Getenv("DW_WORKFLOW_NAMESPACE"), "parent workflow namespace")
 	source := flag.String("source", "", "source file or directory")
 	destination := flag.String("destination", "", "destination file or directory")
-	dryrun := flag.Bool("dryrun", false, "perfrom dry run of operation")
+	dryrun := flag.Bool("dryrun", false, "perform dry run of operation")
 	skipDelete := flag.Bool("skip-delete", false, "skip deleting the resource after completion")
 	socket := flag.String("socket", "/var/run/nnf-dm.sock", "socket address")
 	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
@@ -51,6 +52,7 @@ func main() {
 	storeStdout := flag.Bool("store-stdout", false, "store stdout in status message on successful dm")
 	slots := flag.Int("slots", -1, "slots to use in mpirun hostfile. -1 defers to system config, 0 omits from hostfile")
 	maxSlots := flag.Int("max-slots", -1, "max_slots to use in mpirun hostfile. -1 defers to system config, 0 omits from hostfile")
+	profile := flag.String("profile", "", "which data movement profile to use on the server, empty defaults to default profile")
 
 	flag.Parse()
 
@@ -99,7 +101,10 @@ func main() {
 			defer wg.Done()
 
 			log.Printf("Creating request %d of %d...", i+1, *count)
-			createResponse, err := createRequest(ctx, c, *workflow, *namespace, *source, *destination, *dryrun, *dcpOptions, *logStdout, *storeStdout, *slots, *maxSlots)
+			createResponse, err := createRequest(ctx, c, *workflow, *namespace,
+				*source, *destination, *dryrun, *dcpOptions,
+				*logStdout, *storeStdout, *slots, *maxSlots,
+				*profile)
 			if err != nil {
 				log.Fatalf("could not create data movement request: %v", err)
 			}
@@ -145,11 +150,12 @@ func main() {
 					log.Fatalf("failed to get data movement status: %v", err)
 				}
 
-				if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED {
-					log.Fatalf("data movement status failed: %+v", statusResponse)
+				if statusResponse.GetStatus() == pb.DataMovementStatusResponse_FAILED ||
+					statusResponse.GetStatus() == pb.DataMovementStatusResponse_INVALID {
+					log.Fatalf("Data movement failed: %s", statusString(statusResponse))
 				}
 
-				log.Printf("Data movement status: %+v", statusResponse)
+				log.Printf("Data movement status: %s", statusString(statusResponse))
 				if statusResponse.GetState() == pb.DataMovementStatusResponse_COMPLETED {
 					break
 				}
@@ -212,7 +218,7 @@ func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMov
 
 func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace,
 	source, destination string, dryrun bool, dcpOptions string, logStdout, storeStdout bool,
-	slots, maxSlots int) (*pb.DataMovementCreateResponse, error) {
+	slots, maxSlots int, profile string) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
 		Workflow: &pb.DataMovementWorkflow{
@@ -227,6 +233,7 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 		StoreStdout: storeStdout,
 		Slots:       int32(slots),
 		MaxSlots:    int32(maxSlots),
+		Profile:     profile,
 	})
 
 	if err != nil {
@@ -251,6 +258,10 @@ func getStatus(ctx context.Context, client pb.DataMoverClient, workflow string, 
 	}
 
 	return rsp, nil
+}
+
+func statusString(status *pb.DataMovementStatusResponse) string {
+	return fmt.Sprintf("state: %s, status: %s, message: %s, commandStatus: %+v", status.State, status.Status, status.Message, status.CommandStatus)
 }
 
 func listRequests(ctx context.Context, client pb.DataMoverClient, workflow string, namespace string) (*pb.DataMovementListResponse, error) {

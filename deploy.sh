@@ -22,7 +22,7 @@
 usage() {
     cat <<EOF
 Deploy or Undeploy Data Movement
-Usage $0 COMMAND KUSTOMIZE [IMG] [NNFMFU_IMG]
+Usage $0 COMMAND KUSTOMIZE <OVERLAY_DIR>
 
 Commands:
     deploy              Deploy data movement
@@ -32,32 +32,36 @@ EOF
 
 CMD=$1
 KUSTOMIZE=$2
-IMG=$3
-NNFMFU_IMG=$4
+OVERLAY_DIR=$3
 
 case $CMD in
 deploy)
-    (cd config/manager &&
-       $KUSTOMIZE edit set image controller="$IMG" &&
-       $KUSTOMIZE edit set image nnf-mfu="$NNFMFU_IMG")
+    $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f - || true
 
-    $KUSTOMIZE build config/default | kubectl apply -f - || true
-
-    # Sometimes the deployment of the DataMovementManager occurs too quickly for k8s to digest the CRD
+    # Sometimes the deployment of the NnfDataMovementManager occurs too quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
     # turn around and re-deploy; but this may need to move to a polling loop if that goes away.
-    echo "Waiting for DataMovementManager resource to become ready"
+    echo "Waiting for NnfDataMovementManager resource to become ready"
     while :; do
-        [[ $(kubectl get datamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
-        $KUSTOMIZE build config/default | kubectl apply -f -
+        [[ $(kubectl get nnfdatamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
+        $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f -
         break
     done
+
+    # Deploy the ServiceMonitor resource if its CRD is found. The CRD would
+    # have been installed by a metrics service such as Prometheus.
+    if kubectl get crd servicemonitors.monitoring.coreos.com > /dev/null 2>&1; then
+        $KUSTOMIZE build config/prometheus | kubectl apply -f-
+    fi
     ;;
 undeploy)
-    # When the DataMovementManager CRD gets deleted all related resource are also
+    if kubectl get crd servicemonitors.monitoring.coreos.com > /dev/null 2>&1; then
+        $KUSTOMIZE build config/prometheus | kubectl delete --ignore-not-found -f-
+    fi
+    # When the NnfDataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
-    $KUSTOMIZE build config/default | kubectl delete --ignore-not-found -f -
+    $KUSTOMIZE build $OVERLAY_DIR | kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage
