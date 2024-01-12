@@ -101,32 +101,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - datamovementmanagers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - datamovementmanagers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dm.cray.hpe.com
-  resources:
-  - datamovementmanagers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - lus.cray.hpe.com
   resources:
   - lustrefilesystems
@@ -136,6 +110,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovementmanagers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovementmanagers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovementmanagers/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - nnf.cray.hpe.com
   resources:

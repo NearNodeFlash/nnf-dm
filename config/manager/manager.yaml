@@ -23,67 +23,67 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - command:
-        - /manager
-        args:
-        - --leader-elect
-        - --controller=manager
-        image: controller:latest
-        name: manager
-        securityContext:
-          allowPrivilegeEscalation: false
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 10
+        - command:
+            - /manager
+          args:
+            - --leader-elect
+            - --controller=manager
+          image: controller:latest
+          name: manager
+          securityContext:
+            allowPrivilegeEscalation: false
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
 ---
-apiVersion: dm.cray.hpe.com/v1alpha1
-kind: DataMovementManager
+apiVersion: nnf.cray.hpe.com/v1alpha1
+kind: NnfDataMovementManager
 metadata:
   name: manager-controller-manager
   namespace: system
 spec:
   selector:
     matchLabels:
-      cray.nnf.node: "true"
-  hostPath: "/mnt/nnf"
-  mountPath: "/mnt/nnf"
+      cray.nnf.node: 'true'
+  hostPath: '/mnt/nnf'
+  mountPath: '/mnt/nnf'
   template:
     spec:
       serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix
       tolerations:
-      - key: "cray.nnf.node"
-        operator: "Equal"
-        value: "true"
-        effect: "NoSchedule"
+        - key: 'cray.nnf.node'
+          operator: 'Equal'
+          value: 'true'
+          effect: 'NoSchedule'
       shareProcessNamespace: true
       containers:
         - name: worker
           image: nnf-mfu:latest
-          command: 
+          command:
             - /usr/sbin/sshd
           args:
             - -De
           securityContext:
             privileged: true
             capabilities:
-              add: ["SETUID", "SETGID", "MKNOD"]
+              add: ['SETUID', 'SETGID', 'MKNOD']
         - name: manager
-          command: 
-          - /manager
+          command:
+            - /manager
           args:
-          - --leader-elect=false
-          - --controller=node
+            - --leader-elect=false
+            - --controller=node
           image: controller:latest
           env:
             - name: NNF_NODE_NAME

@@ -1,4 +1,4 @@
-# Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -55,7 +55,7 @@ IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
-NNFMFU_VERSION ?= 0.0.2
+NNFMFU_VERSION ?= 0.0.3
 
 DOCKER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
@@ -64,7 +64,7 @@ DOCKER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFM
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.0
+ENVTEST_K8S_VERSION = 1.28.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -132,10 +132,10 @@ build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement da
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run cmd/main.go
 
 docker-build: VERSION ?= $(shell cat .version)
 docker-build: .version ## Build docker image with the manager.
@@ -158,20 +158,17 @@ minikube-push: VERSION ?= $(shell cat .version)
 minikube-push: .version
 	minikube image load $(IMAGE_TAG_BASE):$(VERSION)
 
-##@ Deployment
+## Deployment
 
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+edit-image: VERSION ?= $(shell cat .version)
+edit-image: .version
+	$(KUSTOMIZE_IMAGE_TAG) config/begin default $(IMAGE_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
 
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-deploy: VERSION ?= $(shell cat .version)
-deploy: .version kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	./deploy.sh deploy $(KUSTOMIZE) $(IMAGE_TAG_BASE):$(VERSION) $(NNFMFU_TAG_BASE):$(NNFMFU_VERSION)
+deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	./deploy.sh deploy $(KUSTOMIZE) config/begin
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	./deploy.sh undeploy $(KUSTOMIZE)
+	./deploy.sh undeploy $(KUSTOMIZE) config/default
 
 # Let .version be phony so that a git update to the workarea can be reflected
 # in it each time it's needed.
@@ -191,18 +188,19 @@ clean-bin:
 	fi
 
 ## Tool Binaries
+KUSTOMIZE_IMAGE_TAG ?= ./hack/make-kustomization2.sh
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.13.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
 kustomize: $(LOCALBIN) ## Download kustomize locally if necessary.
-	if [[ ! -s $(LOCALBIN)/kustomize || $$($(LOCALBIN)/kustomize version | awk '{print $$1}' | awk -F/ '{print $$2}') != $(KUSTOMIZE_VERSION) ]]; then \
+	if [[ ! -s $(LOCALBIN)/kustomize || ! $$($(LOCALBIN)/kustomize version) =~ $(KUSTOMIZE_VERSION) ]]; then \
 	  rm -f $(LOCALBIN)/kustomize && \
 	  { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }; \
 	fi

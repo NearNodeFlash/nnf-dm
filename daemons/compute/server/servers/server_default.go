@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"go.openly.dev/pointy"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/types/known/emptypb"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,16 +48,18 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	dmv1alpha1 "github.com/NearNodeFlash/nnf-dm/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
-	dmctrl "github.com/NearNodeFlash/nnf-dm/controllers"
+	dmctrl "github.com/NearNodeFlash/nnf-dm/internal/controller"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
@@ -74,7 +78,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha2.AddToScheme(scheme))
-	utilruntime.Must(dmv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(nnfv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -195,6 +198,10 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 		opts.nodeName = storageNode.Name
 	}
 
+	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+	zaplogger := zapcr.New(zapcr.Encoder(encoder), zapcr.UseDevMode(true))
+	ctrl.SetLogger(zaplogger)
+
 	return &defaultServer{
 		config:      config,
 		client:      client,
@@ -207,10 +214,12 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
 func (s *defaultServer) StartManager() error {
 	mgr, err := ctrl.NewManager(s.config, ctrl.Options{
-		Scheme:             scheme,
-		LeaderElection:     false,
-		MetricsBindAddress: "0",
-		Namespace:          s.namespace,
+		Scheme:         scheme,
+		LeaderElection: false,
+		Metrics:        metricsserver.Options{BindAddress: "0"},
+		Cache: cache.Options{DefaultNamespaces: map[string]cache.Config{
+			s.namespace: {},
+		}},
 	})
 	if err != nil {
 		return err
@@ -416,7 +425,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 			// prefix for its own names.
 			GenerateName: nameBase,
 			// Use the data movement namespace.
-			Namespace: dmv1alpha1.DataMovementNamespace,
+			Namespace: nnfv1alpha1.DataMovementNamespace,
 			Labels: map[string]string{
 				dmctrl.InitiatorLabel:           s.name,
 				nnfv1alpha1.DirectiveIndexLabel: dwIndex,
@@ -435,6 +444,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 					Name:      lustrefs.Name,
 				},
 			},
+			Profile: req.Profile,
 		},
 	}
 
@@ -463,6 +473,7 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
+			Profile: req.Profile,
 		},
 	}
 
@@ -526,7 +537,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		}
 	}
 
-	if dm.Status.StartTime.IsZero() {
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha1.DataMovementConditionReasonInvalid {
 		return &pb.DataMovementStatusResponse{
 			State:  pb.DataMovementStatusResponse_PENDING,
 			Status: pb.DataMovementStatusResponse_UNKNOWN_STATUS,
@@ -840,5 +851,5 @@ func (s *defaultServer) getNamespace(uid string) string {
 		return s.namespace
 	}
 
-	return dmv1alpha1.DataMovementNamespace
+	return nnfv1alpha1.DataMovementNamespace
 }
