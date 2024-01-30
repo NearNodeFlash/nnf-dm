@@ -504,8 +504,9 @@ func (r *NnfDataMovementManagerReconciler) isDaemonSetReady(ctx context.Context,
 		return false, err
 	}
 
+	// DS is not ready when the generations do not match, desired is 0 (e.g. no nnf nodes available), scheduled != desired, ready != desired
 	d := ds.Status.DesiredNumberScheduled
-	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
+	if ds.Status.ObservedGeneration != ds.ObjectMeta.Generation || d < 1 || ds.Status.UpdatedNumberScheduled != d || ds.Status.NumberReady != d {
 		return false, nil
 	}
 
