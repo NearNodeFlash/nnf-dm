@@ -1,4 +1,4 @@
-# github.com/DataWorkflowServices/dws v0.0.1-0.20231221163856-c438e3e7bc20
+# github.com/DataWorkflowServices/dws v0.0.1-0.20231221163856-c438e3e7bc20 => ../dws
 ## explicit; go 1.19
 github.com/DataWorkflowServices/dws/api/v1alpha2
 github.com/DataWorkflowServices/dws/utils/dwdparse
@@ -747,3 +747,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/DataWorkflowServices/dws => ../dws

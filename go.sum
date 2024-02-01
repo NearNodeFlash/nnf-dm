@@ -1,5 +1,3 @@
-github.com/DataWorkflowServices/dws v0.0.1-0.20231221163856-c438e3e7bc20 h1:zI0wmMeo7N0bqd9PqBFEJTFoLNuVVfmSlktmZY+ZOXw=
-github.com/DataWorkflowServices/dws v0.0.1-0.20231221163856-c438e3e7bc20/go.mod h1:grHFCu0CoUK8exzS57r6cdf4qHpG1Pv5nl0n7evpaUM=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e h1:j+MNZYrAcwtaUxqA2CcJFyPLWhfxpO6fsIUXhXljY2U=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e/go.mod h1:qBcz9p8sXm1qhDf8WUmhxTlD1NCMEjoAD7NoHbQvMiI=
 github.com/NearNodeFlash/nnf-ec v0.0.0-20231010162453-a8168bb6a52f h1:aWtSSQLLk9mUZj94mowirQeVw9saf80gVe10X0rZe8o=
