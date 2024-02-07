@@ -1,9 +1,13 @@
+github.com/DataWorkflowServices/dws v0.0.1-0.20240207192901-62a0958c23f7 h1:0WwSoJBPDJIZbM0rgXZk2D+/lBc4EYnM8OE1MRgskjg=
+github.com/DataWorkflowServices/dws v0.0.1-0.20240207192901-62a0958c23f7/go.mod h1:vSTBLWbsFjMYxx+sjMDyZpMXLY9m5Bp73cjnmAL30WU=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e h1:j+MNZYrAcwtaUxqA2CcJFyPLWhfxpO6fsIUXhXljY2U=
 github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e/go.mod h1:qBcz9p8sXm1qhDf8WUmhxTlD1NCMEjoAD7NoHbQvMiI=
 github.com/NearNodeFlash/nnf-ec v0.0.0-20231010162453-a8168bb6a52f h1:aWtSSQLLk9mUZj94mowirQeVw9saf80gVe10X0rZe8o=
 github.com/NearNodeFlash/nnf-ec v0.0.0-20231010162453-a8168bb6a52f/go.mod h1:oxdwMqfttOF9dabJhqrWlirCnMk8/8eyLMwl+hducjk=
 github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231221174202-f7cd3f0ac8a5 h1:px9Fk/CPoWpxxo+Ns5sRJ5q8KMmM1JnPKks9mwTkqvk=
 github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231221174202-f7cd3f0ac8a5/go.mod h1:Dz27cM45mJ+wFaF4Tv8UweiG4d8ZTN+xXltkvv95X/8=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240207194141-d4c5588829a1 h1:1FgQ8cLuy6+qpIbdHv2cFltssde2YTe823v+BAhALpo=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240207194141-d4c5588829a1/go.mod h1:YtN3gTkpS4ju1jvBMZTU/UcCbvRt4DFH8w9mFue+diQ=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -138,6 +142,7 @@ golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8U
 golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.13.0 h1:mvySKfSWJ+UKUii46M40LOvyWfN0s2U+46/jDd0e6Ck=
 golang.org/x/crypto v0.13.0/go.mod h1:y6Z2r+Rw4iayiXXAIxJIDAJ1zMW4yaTpebo8fPOliYc=
+golang.org/x/crypto v0.14.0/go.mod h1:MVFd36DqK4CsrnJYDkBA3VC4m2GkXAM0PvzMCn4JQf4=
 golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e h1:+WEEuIdZHnUeJJmEUjyYC2gfUMj69yZXw17EnHg/otA=
 golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e/go.mod h1:Kr81I6Kryrl9sr8s2FK3vxD90NdsKWRuOIl2O4CvYbA=
 golang.org/x/lint v0.0.0-20190930215403-16217165b5de/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=
@@ -154,6 +159,7 @@ golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4/go.mod h1:p54w0d4576C0XHj96b
 golang.org/x/net v0.0.0-20210525063256-abc453219eb5/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/net v0.13.0 h1:Nvo8UFsZ8X3BhAC9699Z1j7XQ3rsZnUUm7jfBEk1ueY=
 golang.org/x/net v0.13.0/go.mod h1:zEVYFnQC7m/vmpQFELhcD1EWkZlX69l4oqgmer6hfKA=
+golang.org/x/net v0.17.0/go.mod h1:NxSsAGuq816PNPmqtQdLE42eU2Fs7NoRIZrHJAlaCOE=
 golang.org/x/oauth2 v0.8.0 h1:6dkIjl3j3LtZ/O3sTgZTMsLKSftL/B8Zgq4huOIIUu8=
 golang.org/x/oauth2 v0.8.0/go.mod h1:yr7u4HXZRm1R1kBWqr/xKNqewf0plRYoB7sla+BCIXE=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
@@ -174,9 +180,11 @@ golang.org/x/sys v0.0.0-20210510120138-977fb7262007/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.12.0 h1:CM0HF96J0hcLAwsHPJZjfdNzs0gftsLfgKt57wWHJ0o=
 golang.org/x/sys v0.12.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.13.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.12.0 h1:/ZfYdc3zq+q02Rv9vGqTeSItdzZTSNDmfTi0mBAuidU=
 golang.org/x/term v0.12.0/go.mod h1:owVbMEjm3cBLCHdkQu9b1opXd4ETQWc3BhuQGKgXgvU=
+golang.org/x/term v0.13.0/go.mod h1:LTmsnFJwVN6bCy1rVCoS+qHT1HhALEFxKncY3WNNh4U=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
 golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
