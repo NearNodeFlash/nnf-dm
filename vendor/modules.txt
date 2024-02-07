@@ -1,4 +1,4 @@
-# github.com/DataWorkflowServices/dws v0.0.1-0.20231221163856-c438e3e7bc20
+# github.com/DataWorkflowServices/dws v0.0.1-0.20240207192901-62a0958c23f7
 ## explicit; go 1.19
 github.com/DataWorkflowServices/dws/api/v1alpha2
 github.com/DataWorkflowServices/dws/utils/dwdparse
@@ -10,7 +10,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.0-20231010162453-a8168bb6a52f
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20231221174202-f7cd3f0ac8a5
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240207194141-d4c5588829a1
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-sos/api/v1alpha1
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
@@ -204,13 +204,12 @@ go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.13.0
+# golang.org/x/crypto v0.14.0
 ## explicit; go 1.17
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
-golang.org/x/crypto/ed25519
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/ssh
@@ -218,7 +217,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 # golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 ## explicit; go 1.18
 golang.org/x/exp/maps
-# golang.org/x/net v0.13.0
+# golang.org/x/net v0.17.0
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/html
@@ -237,17 +236,16 @@ golang.org/x/oauth2/internal
 # golang.org/x/sync v0.3.0
 ## explicit; go 1.17
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.12.0
+# golang.org/x/sys v0.13.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
-golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.12.0
+# golang.org/x/term v0.13.0
 ## explicit; go 1.17
 golang.org/x/term
 # golang.org/x/text v0.13.0
