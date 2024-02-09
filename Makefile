@@ -129,13 +129,13 @@ container-unit-test: .version ## Run tests inside a container image
 build-daemon: RPM_VERSION ?= $(shell ./git-version-gen)
 build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
 build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
-	GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	CGO_ENABLED=0 go build -o bin/manager cmd/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run cmd/main.go
+	CGO_ENABLED=0 go run cmd/main.go
 
 docker-build: VERSION ?= $(shell cat .version)
 docker-build: .version ## Build docker image with the manager.

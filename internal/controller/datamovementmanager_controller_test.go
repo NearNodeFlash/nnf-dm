@@ -141,7 +141,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	It("Bootstraps all managed components", func() {
 		Eventually(func(g Gomega) bool {
-			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
+			g.Expect(fakeDSUpdates(daemonset, 2)).To(Succeed())
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}, "5s").Should(BeTrue())
@@ -151,7 +151,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 		By("Wait for the manager to go ready")
 		Eventually(func(g Gomega) bool {
-			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
+			g.Expect(fakeDSUpdates(daemonset, 2)).To(Succeed())
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}).Should(BeTrue())
@@ -212,7 +212,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 		By("Status should be ready after daemonset is up to date")
 		Eventually(func(g Gomega) bool {
-			g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
+			g.Expect(fakeDSUpdates(daemonset, 2)).To(Succeed())
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}).Should(BeTrue())
@@ -238,7 +238,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 				gen := daemonset.Status.ObservedGeneration
 
 				// Fake the updates to the daemonset since the daemonset controller doesn't run
-				g.Expect(fakeDSUpdates(daemonset)).To(Succeed())
+				g.Expect(fakeDSUpdates(daemonset, 2)).To(Succeed())
 
 				if v.Name == lustre.Name {
 					// If the volume still exists, then so should lustre + finalizer
@@ -264,13 +264,28 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			return mgr.Status.Ready
 		}).Should(BeTrue())
 	})
+
+	It("Does not go ready when desired pods are 0", func() {
+		By("staring ready with 4 desired pods")
+		Eventually(func(g Gomega) bool {
+			g.Expect(fakeDSUpdates(daemonset, 4)).To(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}, "5s").Should(BeTrue())
+
+		By("changing to not ready when reduced to 0 desired pods")
+		Eventually(func(g Gomega) bool {
+			g.Expect(fakeDSUpdates(daemonset, 0)).To(Succeed())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
+			return mgr.Status.Ready
+		}, "5s").Should(BeFalse())
+	})
 })
 
 // Envtest does not run the built-in controllers (e.g. daemonset controller).  This function fakes
 // that out. Walk the counters up by one each time so we can exercise the controller watching these
 // through a few iterations.
-func fakeDSUpdates(ds *appsv1.DaemonSet) error {
-	const desired = 2 // number of nnf nodes
+func fakeDSUpdates(ds *appsv1.DaemonSet, desired int32) error {
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(ds), ds); err != nil {
