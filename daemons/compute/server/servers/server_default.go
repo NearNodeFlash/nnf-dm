@@ -111,6 +111,8 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		log.Println("Hostname: " + opts.name)
 	}
 
 	if len(opts.host) == 0 && len(opts.port) == 0 {
@@ -194,7 +196,7 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			return nil, fmt.Errorf("storage node type '%s' not supported. Must be 'Rabbit'", storageNode.Type)
 		}
 
-		log.Println("Found Storage Node", storageNode.Name)
+		log.Println("Found Storage Node:", storageNode.Name)
 		opts.nodeName = storageNode.Name
 	}
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -61,7 +61,8 @@ undeploy)
     # When the NnfDataMovementManager CRD gets deleted all related resource are also
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
-    $KUSTOMIZE build $OVERLAY_DIR | kubectl delete --ignore-not-found -f -
+    # Do not touch the namespace resource when deleting this service.
+    $KUSTOMIZE build $OVERLAY_DIR | yq eval 'select(.kind != "Namespace")' |  kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage
