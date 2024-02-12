@@ -58,6 +58,10 @@ spec:
       cray.nnf.node: 'true'
   hostPath: '/mnt/nnf'
   mountPath: '/mnt/nnf'
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: '25%'
   template:
     spec:
       serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix
