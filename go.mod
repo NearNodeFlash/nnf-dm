@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20231031201943-531116c1194e
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240207194141-d4c5588829a1
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240213202206-af3a69de1bba
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/prometheus/client_golang v1.16.0
@@ -89,5 +89,3 @@ require (
 	golang.org/x/tools v0.10.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230803162519-f966b187b2e5 // indirect
 )
-
-replace github.com/NearNodeFlash/nnf-sos => ../nnf-sos
