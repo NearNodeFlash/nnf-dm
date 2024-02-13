@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -45,6 +46,9 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	deployment := &appsv1.Deployment{}
 	mgr := &nnfv1alpha1.NnfDataMovementManager{}
 	labels := map[string]string{"control-plane": "controller-manager"}
+
+	maxUnavailStr := "50%"
+	maxSurgeStr := "0%"
 
 	/* BeforeAll (Ginkgo v2)*/
 	BeforeEach(func() {
@@ -89,6 +93,8 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	})
 
 	BeforeEach(func() {
+		maxUnavailable := intstr.FromString(maxUnavailStr)
+		maxSurge := intstr.FromString(maxSurgeStr)
 		mgr = &nnfv1alpha1.NnfDataMovementManager{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
@@ -108,6 +114,13 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 								Image: "controller:latest",
 							},
 						},
+					},
+				},
+				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+					Type: appsv1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+						MaxSurge:       &maxSurge,
 					},
 				},
 			},
@@ -145,6 +158,14 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(mgr), mgr)).Should(Succeed())
 			return mgr.Status.Ready
 		}, "5s").Should(BeTrue())
+
+		By("The updateStrategy appears in the daemon set")
+		Eventually(func(g Gomega) error {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(daemonset), daemonset)).Should(Succeed())
+			g.Expect(daemonset.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.StrVal).Should(Equal(maxUnavailStr))
+			g.Expect(daemonset.Spec.UpdateStrategy.RollingUpdate.MaxSurge.StrVal).Should(Equal(maxSurgeStr))
+			return nil
+		}).Should(Succeed())
 	})
 
 	It("Adds and removes global lustre volumes", func() {

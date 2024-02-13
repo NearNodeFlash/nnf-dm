@@ -89,3 +89,5 @@ require (
 	golang.org/x/tools v0.10.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230803162519-f966b187b2e5 // indirect
 )
+
+replace github.com/NearNodeFlash/nnf-sos => ../nnf-sos
