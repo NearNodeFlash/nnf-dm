@@ -449,6 +449,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 	mutateFn := func() error {
 		podTemplateSpec := manager.Spec.Template.DeepCopy()
 		podTemplateSpec.Labels = manager.Spec.Selector.DeepCopy().MatchLabels
+		updateStrategy := manager.Spec.UpdateStrategy.DeepCopy()
 
 		if podTemplateSpec.Labels == nil {
 			podTemplateSpec.Labels = make(map[string]string)
@@ -464,8 +465,9 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		setupLustreVolumes(ctx, manager, podSpec, filesystems.Items)
 
 		ds.Spec = appsv1.DaemonSetSpec{
-			Selector: &manager.Spec.Selector,
-			Template: *podTemplateSpec,
+			Selector:       &manager.Spec.Selector,
+			Template:       *podTemplateSpec,
+			UpdateStrategy: *updateStrategy,
 		}
 
 		if err := ctrl.SetControllerReference(manager, ds, r.Scheme); err != nil {
