@@ -19,6 +19,9 @@
 
 # Deploy controller to the K8s cluster specified in ~/.kube/config.
 
+set -e
+set -o pipefail
+
 usage() {
     cat <<EOF
 Deploy or Undeploy Data Movement
@@ -36,7 +39,7 @@ OVERLAY_DIR=$3
 
 case $CMD in
 deploy)
-    $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f - || true
+    $KUSTOMIZE build "$OVERLAY_DIR" | kubectl apply -f - || true
 
     # Sometimes the deployment of the NnfDataMovementManager occurs too quickly for k8s to digest the CRD
     # Retry the deployment if this is the case. It seems to be fast enough where we can just
@@ -44,7 +47,7 @@ deploy)
     echo "Waiting for NnfDataMovementManager resource to become ready"
     while :; do
         [[ $(kubectl get nnfdatamovementmanager -n nnf-dm-system 2>&1) == "No resources found" ]] && sleep 1 && continue
-        $KUSTOMIZE build $OVERLAY_DIR | kubectl apply -f -
+        $KUSTOMIZE build "$OVERLAY_DIR" | kubectl apply -f -
         break
     done
 
@@ -62,7 +65,7 @@ undeploy)
     # removed, so the delete will always fail. We ignore all errors at our
     # own risk.
     # Do not touch the namespace resource when deleting this service.
-    $KUSTOMIZE build $OVERLAY_DIR | yq eval 'select(.kind != "Namespace")' |  kubectl delete --ignore-not-found -f -
+    $KUSTOMIZE build "$OVERLAY_DIR" | yq eval 'select(.kind != "Namespace")' |  kubectl delete --ignore-not-found -f -
     ;;
 *)
     usage
