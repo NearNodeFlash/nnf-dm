@@ -849,5 +849,74 @@ var _ = Describe("Data Movement Test", func() {
 				)
 			})
 		})
+
+		Context("Destination mkdir path", func() {
+			var tmpDir string
+
+			setup := func(fileToMake string) {
+				tmpDir = GinkgoT().TempDir()
+
+				if fileToMake != "" {
+					fileToMake = filepath.Join(tmpDir, fileToMake)
+					Expect(os.MkdirAll(filepath.Dir(fileToMake), 0755)).To(Succeed())
+					f, err := os.Create(fileToMake)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(f.Close()).To(Succeed())
+				}
+			}
+
+			// directory-directory OR directory-file
+			// $DW_JOB_MY_GFS2 -> /lus/global/user/my-job/ = /lus/global/user/my-job/
+			When("The source is a directory", func() {
+				BeforeEach(func() {
+					setup("")
+				})
+				It("should return the full destination directory", func() {
+					srcPath := tmpDir
+					destPath := "/lus/global/user/my-job"
+					mkdirPath := "/lus/global/user/my-job"
+
+					p, err := getDestinationDir(srcPath, destPath)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(p).To(Equal(mkdirPath))
+				})
+			})
+
+			// file-file
+			// $DW_JOB_MY_GFS2/file.in -> /lus/global/user/my-job/file.out = /lus/global/user/my-job/
+			When("When the source is a file and the destination suggests a file (no slash)", func() {
+				BeforeEach(func() {
+					setup("file.in")
+				})
+
+				It("should treat the destination as a file and return the directory of that file", func() {
+					srcPath := filepath.Join(tmpDir, "file.in")
+					destPath := "/lus/global/user/my-job/file.out"
+					mkdirPath := "/lus/global/user/my-job"
+
+					p, err := getDestinationDir(srcPath, destPath)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(p).To(Equal(mkdirPath))
+				})
+			})
+
+			// file-directory
+			// $DW_JOB_MY_GFS2/file.in -> /lus/global/user/my-job/file.out/ = /lus/global/user/my-job/file.out/
+			When("When the source is a file and the destination suggests a directory (slash)", func() {
+				BeforeEach(func() {
+					setup("file.in")
+				})
+
+				It("should return the full destination directory", func() {
+					srcPath := filepath.Join(tmpDir, "file.in")
+					destPath := "/lus/global/user/my-job/file.out/"
+					mkdirPath := "/lus/global/user/my-job/file.out"
+
+					p, err := getDestinationDir(srcPath, destPath)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(p).To(Equal(mkdirPath))
+				})
+			})
+		})
 	})
 })
