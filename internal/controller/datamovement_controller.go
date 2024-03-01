@@ -35,7 +35,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -54,9 +53,9 @@ import (
 	"sigs.k8s.io/yaml"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
-	"github.com/DataWorkflowServices/dws/utils/updater"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-sos/pkg/command"
 	"github.com/go-logr/logr"
 )
 
@@ -147,10 +146,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
-	statusUpdater := updater.NewStatusUpdater[*nnfv1alpha1.NnfDataMovementStatus](dm)
-	defer func() { err = statusUpdater.CloseWithStatusUpdate(ctx, r.Client.Status(), err) }()
-	// defer func() { dm.Status.SetResourceErrorAndLog(err, log) }()
 
 	defer func() {
 		if err != nil {
@@ -538,7 +533,7 @@ func prepareDestination(dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error 
 			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
 		}
 
-		if err := createDestinationDir(p, dm.Spec.UserId, dm.Spec.GroupId); err != nil {
+		if err := createDestinationDir(p, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
 			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 		}
 		log.Info("Destination path created", "path", p)
@@ -570,17 +565,11 @@ func getDestinationDir(src, dest string) (string, error) {
 	return filepath.Dir(dest), nil
 }
 
-func createDestinationDir(dest string, uid, gid uint32) error {
-	// Use exec.Command() rather than os.MkDirAll so we can set the UID/GID
-	mkdirCmd := exec.Command("mkdir", "-p", dest)
-	mkdirCmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: &syscall.Credential{
-			Uid: uid,
-			Gid: gid,
-		},
-	}
-	if err := mkdirCmd.Run(); err != nil {
-		return fmt.Errorf("data movement mkdir failed ('%s'): %w", mkdirCmd.String(), err)
+func createDestinationDir(dest string, uid, gid uint32, log logr.Logger) error {
+	cmd := "mkdir -p " + dest
+	_, err := command.RunAs(cmd, log, uid, gid)
+	if err != nil {
+		return fmt.Errorf("data movement mkdir failed ('%s'): %w", cmd, err)
 	}
 
 	return nil

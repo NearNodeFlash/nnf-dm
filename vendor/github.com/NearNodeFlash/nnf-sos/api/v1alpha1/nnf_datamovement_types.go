@@ -21,7 +21,6 @@ package v1alpha1
 
 import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
-	"github.com/DataWorkflowServices/dws/utils/updater"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -203,10 +202,6 @@ type NnfDataMovement struct {
 
 	Spec   NnfDataMovementSpec   `json:"spec,omitempty"`
 	Status NnfDataMovementStatus `json:"status,omitempty"`
-}
-
-func (n *NnfDataMovement) GetStatus() updater.Status[*NnfDataMovementStatus] {
-	return &n.Status
 }
 
 //+kubebuilder:object:root=true
