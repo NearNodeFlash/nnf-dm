@@ -55,6 +55,8 @@ import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-sos/pkg/command"
+	"github.com/go-logr/logr"
 )
 
 const (
@@ -263,7 +265,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
 
-	// Built command + hostfile
+	// Prepare Destination Directory
+	if err = prepareDestination(dm, log); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Build command + hostfile
 	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
@@ -514,6 +521,58 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 	}
 
 	return strings.Split(cmd, " "), hostfile, nil
+}
+
+func prepareDestination(dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
+	// TODO: verify destination is valid (i.e. global lustre or nnf directory).
+	// TODO: do the same with  the source. maybe these validations are done in sos/nnf-dm daemon.
+
+	if !isTestEnv() {
+		p, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+		}
+
+		if err := createDestinationDir(p, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
+			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		}
+		log.Info("Destination path created", "path", p)
+	}
+
+	return nil
+}
+
+// Determine the directory path to create based on the source and destination. There are 3 cases to
+// consider:
+// - directory
+// - file-file
+// - file-directory
+// If the source file doesn't exist, we cannot determine the appropriate behavior.
+func getDestinationDir(src, dest string) (string, error) {
+	// Get the source file
+	sf, err := os.Stat(src)
+	if err != nil {
+		return "", fmt.Errorf("source file does not exist: %w", err)
+	}
+	// If the source is a directory, then use the full destination path regardless of the
+	// destination type
+	if sf.IsDir() {
+		return dest, nil
+	}
+
+	// It's a file. Let Dir() determine if the destination appears to be a file or directory
+	// (trailing slash)
+	return filepath.Dir(dest), nil
+}
+
+func createDestinationDir(dest string, uid, gid uint32, log logr.Logger) error {
+	cmd := "mkdir -p " + dest
+	_, err := command.RunAs(cmd, log, uid, gid)
+	if err != nil {
+		return fmt.Errorf("data movement mkdir failed ('%s'): %w", cmd, err)
+	}
+
+	return nil
 }
 
 // Create an MPI Hostfile given a list of hosts, slots, and maxSlots. A temporary directory is
