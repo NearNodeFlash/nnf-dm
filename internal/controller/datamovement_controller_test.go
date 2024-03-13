@@ -918,5 +918,94 @@ var _ = Describe("Data Movement Test", func() {
 				})
 			})
 		})
+
+		Context("extractIndexMountDir", func() {
+			ns := "winchell31"
+			DescribeTable("",
+				func(fsType, path, expected string, expectError bool) {
+
+					// Create the NnfStorage the indicates the filesystem type
+					storage := &nnfv1alpha1.NnfStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "mystorage",
+							Namespace: ns,
+						},
+						Spec: nnfv1alpha1.NnfStorageSpec{FileSystemType: fsType},
+					}
+
+					idxMount, err := extractIndexMountDir(storage, path, ns)
+					Expect(idxMount).To(Equal(expected))
+					if expectError {
+						Expect(err).To(HaveOccurred())
+					} else {
+						Expect(err).To(Not(HaveOccurred()))
+					}
+				},
+				Entry("fsType - gfs2", "gfs2", "/mnt/nnf/12345-0/winchell31-0/dir1", "winchell31-0", false),
+				Entry("fsType - xfs", "xfs", "/mnt/nnf/12345-0/winchell31-7/path/to/a/file", "winchell31-7", false),
+				Entry("fsType - lustre", "lustre", "/does/not/matter", "", false),
+
+				Entry("root", "gfs2", "/mnt/nnf/12345-0/winchell31-0", "winchell31-0", false),
+				Entry("root with trailing slash", "gfs2", "/mnt/nnf/12345-0/winchell31-11/", "winchell31-11", false),
+				Entry("really big index", "gfs2", "/mnt/nnf/12345-0/winchell31-9999999999999/", "winchell31-9999999999999", false),
+				Entry("empty", "gfs2", "", "", true),
+
+				Entry("cannot extract - wrong namespace", "gfs2", "/mnt/nnf/12345-0/wrong-namespace-0/", "", true),
+				Entry("cannot extract - extra '-digit'", "gfs2", "/mnt/nnf/12345-0/winchell31-0-0/", "", true),
+			)
+		})
+
+		Context("appendIndexMountDir", func() {
+			DescribeTable("",
+				func(src, dest, idxMount, expected string, expectError bool) {
+					tmpDir := GinkgoT().TempDir()
+					fullSrc := filepath.Join(tmpDir, src)
+
+					// Create the directory structure for the source in tmpDir and determine if we
+					// need to create a file if the source path doesn't end with a trailing slash
+					dirToMake := ""
+					fileToMake := ""
+					if strings.HasSuffix(src, "/") {
+						dirToMake = filepath.Join(tmpDir, src)
+						fullSrc += "/"
+					} else {
+						dirToMake = filepath.Join(tmpDir, filepath.Dir(src))
+						fileToMake = filepath.Join(dirToMake, filepath.Base(src))
+					}
+					Expect(os.MkdirAll(dirToMake, 0755)).To(Succeed())
+
+					// And then create the file if it's not tmpdir
+					if fileToMake != "" && filepath.Clean(fileToMake) != tmpDir {
+						f, err := os.Create(fileToMake)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(f.Close()).To(Succeed())
+					}
+
+					// Now that the file exists, we can test the append
+					p, err := appendIndexMountDir(fullSrc, dest, idxMount)
+
+					if expectError {
+						Expect(err).To(HaveOccurred())
+					} else {
+						Expect(err).To(Not(HaveOccurred()))
+					}
+					Expect(p).To(Equal(expected))
+				},
+
+				// Empty would be the root dir and it should have the same results as the dir-* tests
+				Entry("root-dir", "", "/lus/global/user/", "winchell44-0", "/lus/global/user/winchell44-0/", false),
+				Entry("root-file", "", "/lus/global/user", "winchell44-0", "/lus/global/user/winchell44-0", false),
+
+				Entry("dir-dir", "/dir1/", "/lus/global/user/", "winchell44-0", "/lus/global/user/winchell44-0/", false),
+				Entry("dir-file", "/dir1/", "/lus/global/user", "winchell44-0", "/lus/global/user/winchell44-0", false),
+				Entry("dir-dir2", "/dir1/dir2/", "/lus/global/user/dir3/", "winchell44-0", "/lus/global/user/dir3/winchell44-0/", false),
+				Entry("dir-file2", "/dir1/dir2/", "/lus/global/user/dir3", "winchell44-0", "/lus/global/user/dir3/winchell44-0", false),
+
+				Entry("file-file", "/file.in", "/lus/global/user/file.out", "winchell44-0", "/lus/global/user/winchell44-0/file.out", false),
+				Entry("file-dir", "/file.in", "/lus/global/user/dir1/", "winchell44-0", "/lus/global/user/dir1/winchell44-0/", false),
+				Entry("file-file2", "/dir1/file.in", "/lus/global/user/dir2/file.out", "winchell44-0", "/lus/global/user/dir2/winchell44-0/file.out", false),
+				Entry("file-dir2", "/dir1/file.in", "/lus/global/user/dir2/dir3/", "winchell44-0", "/lus/global/user/dir2/dir3/winchell44-0/", false),
+			)
+		})
 	})
 })

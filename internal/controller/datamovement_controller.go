@@ -266,7 +266,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
 
 	// Prepare Destination Directory
-	if err = prepareDestination(dm, log); err != nil {
+	if err = r.prepareDestination(ctx, dm, log); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -523,10 +523,24 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 	return strings.Split(cmd, " "), hostfile, nil
 }
 
-func prepareDestination(dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
 	// TODO: verify destination is valid (i.e. global lustre or nnf directory).
-	// TODO: do the same with  the source. maybe these validations are done in sos/nnf-dm daemon.
+	// TODO: do the same with the source. Maybe these validations are done in sos/nnf-dm daemon.
 
+	indexMount, err := r.checkIndexMountDir(ctx, dm)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+	}
+
+	if indexMount != "" {
+		newDest, err := appendIndexMountDir(dm.Spec.Source.Path, dm.Spec.Destination.Path, indexMount)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not append index mount directory").WithError(err).WithFatal()
+		}
+		dm.Spec.Destination.Path = newDest
+	}
+
+	// These functions interact with the filesystem, so they can't run in the test env
 	if !isTestEnv() {
 		p, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
 		if err != nil {
@@ -540,6 +554,85 @@ func prepareDestination(dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error 
 	}
 
 	return nil
+}
+
+// Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
+// then we need to account for a Fan-In situation and create index mount directories on the
+// destination. Returns the index mount directory from the source path.
+func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+	var storageRef corev1.ObjectReference
+
+	// See if the source storage reference is NnfStorage
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		storageRef = dm.Spec.Destination.StorageReference
+	} else {
+		return "", nil // nothing to do here
+	}
+
+	// If it is, then go and retrieve it so we can check the filesystem type
+	storage := &nnfv1alpha1.NnfStorage{}
+	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", newInvalidError("could not retrieve NNF Storage for checking index mounts: %s", err.Error())
+		}
+		return "", err
+	}
+
+	// TODO: Do we also need to check the destination filesystem type before assuming index mount dirs?
+
+	return extractIndexMountDir(storage, dm.Spec.Source.Path, dm.Namespace)
+}
+
+// Pull out the index mount directory from the path for the correct file systems that require it
+func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace string) (string, error) {
+	// If it's not gfs2 or xfs, then there are no index mounts
+	if storage.Spec.FileSystemType != "gfs2" && storage.Spec.FileSystemType != "xfs" {
+		return "", nil // nothing to do here
+	}
+
+	// To get the index mount directory, We need to scrap the source path to find the index mount
+	// directory - we don't have access to the directive index since and only know the source/dest
+	// paths.
+	// Match namespace-digit and then the end of the string OR slash
+	pattern := regexp.MustCompile(fmt.Sprintf(`(%s-\d+)(/|$)`, namespace))
+	match := pattern.FindStringSubmatch(path)
+	if match == nil {
+		return "", fmt.Errorf("could not extract index mount directory from source path: %s", path)
+	}
+
+	return match[1], nil
+}
+
+// Add in the appropriate index mount directory given the file type of the source and weather the
+// destination appears to be a file or directory (trailing slash). Returns the destination
+// directory path including the index mount.
+func appendIndexMountDir(src, dest, indexMount string) (string, error) {
+	// Get the source file
+	sf, err := os.Stat(src)
+	if err != nil {
+		return "", fmt.Errorf("source file does not exist: %w", err)
+	}
+
+	path := ""
+	if sf.IsDir() {
+		// If the source is a directory, then use the full destination path regardless of the
+		// destination type
+		path = filepath.Join(dest, indexMount)
+	} else if strings.HasSuffix(dest, "/") {
+		// We can only guess at the destination. If it ends in a slash, then it's a dir.
+		// file-directory
+		path = filepath.Join(dest, indexMount)
+	} else {
+		// Otherwise its file-file and we need to add the index between the dir and filename
+		path = filepath.Join(filepath.Dir(dest), indexMount, filepath.Base(dest))
+	}
+
+	// Put back any trailing slashes on the original dest - Join() will remove them
+	if strings.HasSuffix(dest, "/") {
+		path += "/"
+	}
+
+	return path, nil
 }
 
 // Determine the directory path to create based on the source and destination. There are 3 cases to
