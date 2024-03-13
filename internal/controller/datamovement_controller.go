@@ -564,7 +564,7 @@ func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnf
 
 	// See if the source storage reference is NnfStorage
 	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
-		storageRef = dm.Spec.Destination.StorageReference
+		storageRef = dm.Spec.Source.StorageReference
 	} else {
 		return "", nil // nothing to do here
 	}
