@@ -945,7 +945,9 @@ var _ = Describe("Data Movement Test", func() {
 				Entry("fsType - xfs", "xfs", "/mnt/nnf/12345-0/winchell31-7/path/to/a/file", "winchell31-7", false),
 				Entry("fsType - lustre", "lustre", "/does/not/matter", "", false),
 
-				Entry("root", "gfs2", "/mnt/nnf/12345-0/winchell31-0", "winchell31-0", false),
+				// root is a special case where you would "double up", we don't want to return an
+				// index mount in this case since it's already there.
+				Entry("root", "gfs2", "/mnt/nnf/12345-0/winchell31-0", "", false),
 				Entry("root with trailing slash", "gfs2", "/mnt/nnf/12345-0/winchell31-11/", "winchell31-11", false),
 				Entry("really big index", "gfs2", "/mnt/nnf/12345-0/winchell31-9999999999999/", "winchell31-9999999999999", false),
 				Entry("empty", "gfs2", "", "", true),
@@ -995,6 +997,8 @@ var _ = Describe("Data Movement Test", func() {
 				// Empty would be the root dir and it should have the same results as the dir-* tests
 				Entry("root-dir", "", "/lus/global/user/", "winchell44-0", "/lus/global/user/winchell44-0/", false),
 				Entry("root-file", "", "/lus/global/user", "winchell44-0", "/lus/global/user/winchell44-0", false),
+
+				Entry("root-file", "/winchell-44-0/", "/lus/global/user", "winchell44-0", "/lus/global/user/winchell44-0", false),
 
 				Entry("dir-dir", "/dir1/", "/lus/global/user/", "winchell44-0", "/lus/global/user/winchell44-0/", false),
 				Entry("dir-file", "/dir1/", "/lus/global/user", "winchell44-0", "/lus/global/user/winchell44-0", false),

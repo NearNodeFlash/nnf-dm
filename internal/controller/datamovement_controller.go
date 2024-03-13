@@ -600,7 +600,16 @@ func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace strin
 		return "", fmt.Errorf("could not extract index mount directory from source path: %s", path)
 	}
 
-	return match[1], nil
+	idxMount := match[1]
+	// If the path ends with the index mount (and no trailing slash), then we need to return "" so
+	// that we don't double up. This happens when you copy out of the root without a trailing slash
+	// - dcp will copy the directory (index mount) over to the destination. So there's no need to
+	// append it.
+	if strings.HasSuffix(path, idxMount) {
+		return "", nil // nothing to do here
+	}
+
+	return idxMount, nil
 }
 
 // Add in the appropriate index mount directory given the file type of the source and weather the
