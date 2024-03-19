@@ -527,31 +527,35 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 	// TODO: verify destination is valid (i.e. global lustre or nnf directory).
 	// TODO: do the same with the source. Maybe these validations are done in sos/nnf-dm daemon.
 
-	indexMount, err := r.checkIndexMountDir(ctx, dm)
-	if err != nil {
-		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
-	}
-
-	// // These functions interact with the filesystem, so they can't run in the test env
+	// These functions interact with the filesystem, so they can't run in the test env
 	if !isTestEnv() {
-		p, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
+		// Determine the destination directory based on the source and path
+		destDir, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
 		if err != nil {
 			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
 		}
 
-		if indexMount != "" {
-			newDest := appendIndexMountDir(dm.Spec.Source.Path, p, indexMount)
-
-			if isDestFile(dm.Spec.Destination.Path) {
-				newDest = filepath.Join(newDest, filepath.Base(dm.Spec.Destination.Path))
-			}
-			dm.Spec.Destination.Path = newDest
+		// See if an index mount directory on the destination is required
+		indexMount, err := r.checkIndexMountDir(ctx, dm)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
 		}
 
-		if err := createDestinationDir(p, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
+		// Account for index mount directory on the destDir and the dm dest path
+		// This updates the destination on dm
+		if indexMount != "" {
+			d, err := handleIndexMountDir(destDir, indexMount, dm)
+			if err != nil {
+				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			}
+			destDir = d
+		}
+
+		// Create the destination directory
+		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
 			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 		}
-		log.Info("Destination path created", "path", p)
+		log.Info("Destination path created", "path", destDir)
 	}
 
 	return nil
@@ -613,48 +617,74 @@ func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace strin
 	return idxMount, nil
 }
 
-// Add in the appropriate index mount directory given the file type of the source and weather the
-// destination appears to be a file or directory (trailing slash). Returns the destination
-// directory path including the index mount.
-func appendIndexMountDir(src, dest, indexMount string) string {
+// Given a destination directory and index mount directory, apply the necessary changes to the
+// destination directory and the DM's destination path to account for index mount directories
+func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
 
-	// Just add it to the end of the destination directory
-	idxMntDir := filepath.Join(dest, indexMount)
-
-	// if the src is root without a slash, then don't do anything
-	if strings.HasSuffix(src, indexMount) {
-		idxMntDir = ""
+	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
+	// in the index mount directory without a trailing slash. If that's the case, there's nothing
+	// to handle.
+	if strings.HasSuffix(dm.Spec.Source.Path, indexMount) {
+		return destDir, nil
 	}
 
-	return idxMntDir
+	// Add index mount directory to the end of the destination directory
+	idxMntDir := filepath.Join(destDir, indexMount)
+
+	// Update dm.Spec.Destination.Path for the new path
+	dmDest := idxMntDir
+	// Get the source to see if it's a file
+	srcIsFile, err := isSourceAFile(dm.Spec.Source.Path)
+	if err != nil {
+		return "", err
+	}
+	// Account for file-file
+	if srcIsFile && isDestAFile(dm.Spec.Destination.Path) {
+		dmDest = filepath.Join(idxMntDir, filepath.Base(dm.Spec.Destination.Path))
+	}
+	// Preserve the trailing slash. This should not matter in dcp's eye, but let's preserve it for
+	// posterity.
+	if strings.HasSuffix(dm.Spec.Destination.Path, "/") {
+		dmDest += "/"
+	}
+	// Update the dm pointer with the new path
+	dm.Spec.Destination.Path = dmDest
+
+	return idxMntDir, nil
 }
 
-// Determine the directory path to create based on the source and destination. There are 3 cases to
-// consider:
-// - directory
-// - file-file
-// - file-directory
-// If the source file doesn't exist, we cannot determine the appropriate behavior.
+// Determine the directory path to create based on the source and destination.
 // Returns the mkdir directory and error.
 func getDestinationDir(src, dest string) (string, error) {
 	// Default to using the full path of dest
 	destDir := dest
 
-	// Get the source file
-	sf, err := os.Stat(src)
+	srcIsFile, err := isSourceAFile(src)
 	if err != nil {
-		return "", fmt.Errorf("source file does not exist: %w", err)
+		return "", err
 	}
 
-	// Account for file-file data movement
-	if !sf.IsDir() && isDestFile(dest) {
+	// Account for file-file data movement - we don't want the full path
+	// ex: /path/to/a/file -> /path/to/a
+	if srcIsFile && isDestAFile(dest) {
 		destDir = filepath.Dir(dest)
 	}
 
+	// We know it's a directory, so we don't care about the trailing slash
 	return filepath.Clean(destDir), nil
 }
 
-func isDestFile(dest string) bool {
+func isSourceAFile(src string) (bool, error) {
+	// Get the source file
+	sf, err := os.Stat(src)
+	if err != nil {
+		return false, fmt.Errorf("source file does not exist: %w", err)
+	}
+
+	return !sf.IsDir(), nil
+}
+
+func isDestAFile(dest string) bool {
 	isFile := false
 
 	// Attempt to the get the destination file. The error is not important since we can assume a
