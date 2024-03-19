@@ -532,19 +532,20 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
 	}
 
-	if indexMount != "" {
-		newDest, err := appendIndexMountDir(dm.Spec.Source.Path, dm.Spec.Destination.Path, indexMount)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not append index mount directory").WithError(err).WithFatal()
-		}
-		dm.Spec.Destination.Path = newDest
-	}
-
-	// These functions interact with the filesystem, so they can't run in the test env
+	// // These functions interact with the filesystem, so they can't run in the test env
 	if !isTestEnv() {
 		p, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
 		if err != nil {
 			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+		}
+
+		if indexMount != "" {
+			newDest := appendIndexMountDir(dm.Spec.Source.Path, p, indexMount)
+
+			if isDestFile(dm.Spec.Destination.Path) {
+				newDest = filepath.Join(newDest, filepath.Base(dm.Spec.Destination.Path))
+			}
+			dm.Spec.Destination.Path = newDest
 		}
 
 		if err := createDestinationDir(p, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
@@ -615,33 +616,17 @@ func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace strin
 // Add in the appropriate index mount directory given the file type of the source and weather the
 // destination appears to be a file or directory (trailing slash). Returns the destination
 // directory path including the index mount.
-func appendIndexMountDir(src, dest, indexMount string) (string, error) {
-	// Get the source file
-	sf, err := os.Stat(src)
-	if err != nil {
-		return "", fmt.Errorf("source file does not exist: %w", err)
+func appendIndexMountDir(src, dest, indexMount string) string {
+
+	// Just add it to the end of the destination directory
+	idxMntDir := filepath.Join(dest, indexMount)
+
+	// if the src is root without a slash, then don't do anything
+	if strings.HasSuffix(src, indexMount) {
+		idxMntDir = ""
 	}
 
-	path := ""
-	if sf.IsDir() {
-		// If the source is a directory, then use the full destination path regardless of the
-		// destination type
-		path = filepath.Join(dest, indexMount)
-	} else if strings.HasSuffix(dest, "/") {
-		// We can only guess at the destination. If it ends in a slash, then it's a dir.
-		// file-directory
-		path = filepath.Join(dest, indexMount)
-	} else {
-		// Otherwise its file-file and we need to add the index between the dir and filename
-		path = filepath.Join(filepath.Dir(dest), indexMount, filepath.Base(dest))
-	}
-
-	// Put back any trailing slashes on the original dest - Join() will remove them
-	if strings.HasSuffix(dest, "/") {
-		path += "/"
-	}
-
-	return path, nil
+	return idxMntDir
 }
 
 // Determine the directory path to create based on the source and destination. There are 3 cases to
@@ -650,21 +635,43 @@ func appendIndexMountDir(src, dest, indexMount string) (string, error) {
 // - file-file
 // - file-directory
 // If the source file doesn't exist, we cannot determine the appropriate behavior.
+// Returns the mkdir directory and error.
 func getDestinationDir(src, dest string) (string, error) {
+	// Default to using the full path of dest
+	destDir := dest
+
 	// Get the source file
 	sf, err := os.Stat(src)
 	if err != nil {
 		return "", fmt.Errorf("source file does not exist: %w", err)
 	}
-	// If the source is a directory, then use the full destination path regardless of the
-	// destination type
-	if sf.IsDir() {
-		return dest, nil
+
+	// Account for file-file data movement
+	if !sf.IsDir() && isDestFile(dest) {
+		destDir = filepath.Dir(dest)
 	}
 
-	// It's a file. Let Dir() determine if the destination appears to be a file or directory
-	// (trailing slash)
-	return filepath.Dir(dest), nil
+	return filepath.Clean(destDir), nil
+}
+
+func isDestFile(dest string) bool {
+	isFile := false
+
+	// Attempt to the get the destination file. The error is not important since we can assume a
+	// dest without a trailing slash is a file when it does not exist.
+	df, _ := os.Stat(dest)
+
+	// Dest exists and is a file; then use Dir() OR
+	if df != nil && !df.IsDir() {
+		isFile = true
+	}
+
+	// Dest does not exist but looks like a file (no trailing slash)
+	if df == nil && !strings.HasSuffix(dest, "/") {
+		isFile = true
+	}
+
+	return isFile
 }
 
 func createDestinationDir(dest string, uid, gid uint32, log logr.Logger) error {

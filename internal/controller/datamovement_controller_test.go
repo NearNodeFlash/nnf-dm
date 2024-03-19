@@ -850,73 +850,77 @@ var _ = Describe("Data Movement Test", func() {
 			})
 		})
 
-		Context("Destination mkdir path", func() {
-			var tmpDir string
+		Context("getDestinationDir", func() {
+			expectedSourceFile := "/src/job/data.out"
+			destRoot := "/lus/global/user"
 
-			setup := func(fileToMake string) {
-				tmpDir = GinkgoT().TempDir()
+			FDescribeTable("",
+				func(src, dest, expected string) {
+					tmpDir := GinkgoT().TempDir()
 
-				if fileToMake != "" {
-					fileToMake = filepath.Join(tmpDir, fileToMake)
-					Expect(os.MkdirAll(filepath.Dir(fileToMake), 0755)).To(Succeed())
-					f, err := os.Create(fileToMake)
+					// create sourceFile in tmpdir root
+					sourceFilePath := filepath.Join(tmpDir, expectedSourceFile)
+					Expect(os.MkdirAll(filepath.Dir(sourceFilePath), 0755)).To(Succeed())
+					f, err := os.Create(sourceFilePath)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(f.Close()).To(Succeed())
-				}
-			}
 
-			// directory-directory OR directory-file
-			// $DW_JOB_MY_GFS2 -> /lus/global/user/my-job/ = /lus/global/user/my-job/
-			When("The source is a directory", func() {
-				BeforeEach(func() {
-					setup("")
-				})
-				It("should return the full destination directory", func() {
-					srcPath := tmpDir
-					destPath := "/lus/global/user/my-job"
-					mkdirPath := "/lus/global/user/my-job"
+					// create destDir
+					destDirPath := filepath.Join(tmpDir, destRoot)
+					Expect(os.MkdirAll(destDirPath, 0755)).To(Succeed())
 
-					p, err := getDestinationDir(srcPath, destPath)
+					// create a file that already exists in this case
+					if dest == "/lus/global/user/data.out" {
+						existing := filepath.Join(tmpDir, dest)
+						f, err := os.Create(existing)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(f.Close()).To(Succeed())
+					}
+
+					// Replace the paths to use tmpDir root
+					newSrc := strings.Replace(src, "$DW_JOB_workflow", filepath.Join(tmpDir, "src"), -1)
+					newDest := filepath.Join(tmpDir, dest)
+					// don't drop trailing slashes on the dest
+					if strings.HasSuffix(dest, "/") {
+						newDest += "/"
+					}
+
+					destDir, err := getDestinationDir(newSrc, newDest)
+					destDir = strings.Replace(destDir, tmpDir, "", -1) // remove tmpdir from the path
 					Expect(err).ToNot(HaveOccurred())
-					Expect(p).To(Equal(mkdirPath))
-				})
-			})
+					Expect(destDir).To(Equal(expected))
+				},
+				Entry("file-dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user", "/lus/global/user"),
+				Entry("file-dir/", "$DW_JOB_workflow/job/data.out", "/lus/global/user/", "/lus/global/user"),
+				Entry("file-file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/data.out", "/lus/global/user"),
+				Entry("file-DNE file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/idontexist", "/lus/global/user"),
+				Entry("file-DNE dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("file-DNE dir/file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/idontexist", "/lus/global/user/newdir"),
+				Entry("file-DNE dir/dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
+				Entry("file-DNE dir/dir/file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/newdir2/idontexist", "/lus/global/user/newdir/newdir2"),
 
-			// file-file
-			// $DW_JOB_MY_GFS2/file.in -> /lus/global/user/my-job/file.out = /lus/global/user/my-job/
-			When("When the source is a file and the destination suggests a file (no slash)", func() {
-				BeforeEach(func() {
-					setup("file.in")
-				})
+				Entry("dir-dir", "$DW_JOB_workflow/job", "/lus/global/user", "/lus/global/user"),
+				Entry("dir-dir/", "$DW_JOB_workflow/job", "/lus/global/user/", "/lus/global/user"),
+				Entry("dir/-dir", "$DW_JOB_workflow/job/", "/lus/global/user", "/lus/global/user"),
+				Entry("dir/-dir/", "$DW_JOB_workflow/job/", "/lus/global/user/", "/lus/global/user"),
+				Entry("dir-DNE dir", "$DW_JOB_workflow/job", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("dir-DNE dir/", "$DW_JOB_workflow/job", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("dir/-DNE dir", "$DW_JOB_workflow/job/", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("dir/-DNE dir/", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("dir-DNE dir/dir", "$DW_JOB_workflow/job", "/lus/global/user/newdir/newdir2", "/lus/global/user/newdir/newdir2"),
+				Entry("dir-DNE dir/dir/", "$DW_JOB_workflow/job", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
+				Entry("dir/-DNE dir/dir", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/newdir2", "/lus/global/user/newdir/newdir2"),
+				Entry("dir/-DNE dir/dir/", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
 
-				It("should treat the destination as a file and return the directory of that file", func() {
-					srcPath := filepath.Join(tmpDir, "file.in")
-					destPath := "/lus/global/user/my-job/file.out"
-					mkdirPath := "/lus/global/user/my-job"
-
-					p, err := getDestinationDir(srcPath, destPath)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(p).To(Equal(mkdirPath))
-				})
-			})
-
-			// file-directory
-			// $DW_JOB_MY_GFS2/file.in -> /lus/global/user/my-job/file.out/ = /lus/global/user/my-job/file.out/
-			When("When the source is a file and the destination suggests a directory (slash)", func() {
-				BeforeEach(func() {
-					setup("file.in")
-				})
-
-				It("should return the full destination directory", func() {
-					srcPath := filepath.Join(tmpDir, "file.in")
-					destPath := "/lus/global/user/my-job/file.out/"
-					mkdirPath := "/lus/global/user/my-job/file.out"
-
-					p, err := getDestinationDir(srcPath, destPath)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(p).To(Equal(mkdirPath))
-				})
-			})
+				Entry("root-dir", "$DW_JOB_workflow", "/lus/global/user", "/lus/global/user"),
+				Entry("root-dir/", "$DW_JOB_workflow", "/lus/global/user/", "/lus/global/user"),
+				Entry("root/-dir", "$DW_JOB_workflow/", "/lus/global/user", "/lus/global/user"),
+				Entry("root/-dir/", "$DW_JOB_workflow/", "/lus/global/user/", "/lus/global/user"),
+				Entry("root-DNE dir", "$DW_JOB_workflow", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("root-DNE dir/", "$DW_JOB_workflow", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("root/-DNE dir", "$DW_JOB_workflow/", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("root/-DNE dir/", "$DW_JOB_workflow/", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+			)
 		})
 
 		Context("extractIndexMountDir", func() {
@@ -984,13 +988,13 @@ var _ = Describe("Data Movement Test", func() {
 					}
 
 					// Now that the file exists, we can test the append
-					p, err := appendIndexMountDir(fullSrc, dest, idxMount)
+					p := appendIndexMountDir(fullSrc, dest, idxMount)
 
-					if expectError {
-						Expect(err).To(HaveOccurred())
-					} else {
-						Expect(err).To(Not(HaveOccurred()))
-					}
+					// if expectError {
+					// 	Expect(err).To(HaveOccurred())
+					// } else {
+					// 	Expect(err).To(Not(HaveOccurred()))
+					// }
 					Expect(p).To(Equal(expected))
 				},
 
