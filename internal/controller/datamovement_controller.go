@@ -676,10 +676,11 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 }
 
 func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
-	cmd := "mpirun --hostfile $HOSTFILE -- stat -c '%F' " + path
+	cmd := "mpirun --allow-run-as-root --hostfile $HOSTFILE -- stat -c '%F' " + path
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
 
-	output, err := command.RunAs(cmd, log, uid, gid)
+	// output, err := command.RunAs(cmd, log, uid, gid)
+	output, err := command.Run(cmd, log)
 	if err != nil {
 		return false, fmt.Errorf("could not stat path ('%s'): %w", path, err)
 	}
