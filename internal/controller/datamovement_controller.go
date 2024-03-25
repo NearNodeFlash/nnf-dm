@@ -529,7 +529,7 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 	// These functions interact with the filesystem, so they can't run in the test env
 	if !isTestEnv() {
 		// Determine the destination directory based on the source and path
-		destDir, err := getDestinationDir(dm.Spec.Source.Path, dm.Spec.Destination.Path)
+		destDir, err := getDestinationDir(dm, mpiHostfile, log)
 		if err != nil {
 			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
 		}
@@ -543,7 +543,7 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 		// Account for index mount directory on the destDir and the dm dest path
 		// This updates the destination on dm
 		if indexMount != "" {
-			d, err := handleIndexMountDir(destDir, indexMount, dm)
+			d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
 			if err != nil {
 				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
 			}
@@ -618,7 +618,7 @@ func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace strin
 
 // Given a destination directory and index mount directory, apply the necessary changes to the
 // destination directory and the DM's destination path to account for index mount directories
-func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
 
 	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
 	// in the index mount directory without a trailing slash. If that's the case, there's nothing
@@ -633,12 +633,12 @@ func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMove
 	// Update dm.Spec.Destination.Path for the new path
 	dmDest := idxMntDir
 	// Get the source to see if it's a file
-	srcIsFile, err := isSourceAFile(dm.Spec.Source.Path)
+	srcIsFile, err := isSourceAFile(dm.Spec.Source.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
 	if err != nil {
 		return "", err
 	}
 	// Account for file-file
-	if srcIsFile && isDestAFile(dm.Spec.Destination.Path) {
+	if srcIsFile && isDestAFile(dm.Spec.Destination.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log) {
 		dmDest = filepath.Join(idxMntDir, filepath.Base(dm.Spec.Destination.Path))
 	}
 	// Preserve the trailing slash. This should not matter in dcp's eye, but let's preserve it for
@@ -654,18 +654,20 @@ func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMove
 
 // Determine the directory path to create based on the source and destination.
 // Returns the mkdir directory and error.
-func getDestinationDir(src, dest string) (string, error) {
+func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
 	// Default to using the full path of dest
+	src := dm.Spec.Source.Path
+	dest := dm.Spec.Destination.Path
 	destDir := dest
 
-	srcIsFile, err := isSourceAFile(src)
+	srcIsFile, err := isSourceAFile(src, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
 	if err != nil {
 		return "", err
 	}
 
 	// Account for file-file data movement - we don't want the full path
 	// ex: /path/to/a/file -> /path/to/a
-	if srcIsFile && isDestAFile(dest) {
+	if srcIsFile && isDestAFile(dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log) {
 		destDir = filepath.Dir(dest)
 	}
 
@@ -673,30 +675,52 @@ func getDestinationDir(src, dest string) (string, error) {
 	return filepath.Clean(destDir), nil
 }
 
-func isSourceAFile(src string) (bool, error) {
-	// Get the source file
-	sf, err := os.Stat(src)
+func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	cmd := "mpirun --hostfile $HOSTILE stat -c '%F' " + path
+	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
+
+	output, err := command.RunAs(cmd, log, uid, gid)
 	if err != nil {
-		return false, fmt.Errorf("source file does not exist: %w", err)
+		return false, fmt.Errorf("could not stat path ('%s'): %w", path, err)
 	}
 
-	return !sf.IsDir(), nil
+	if strings.ToLower(output) == "directory" {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
 
-func isDestAFile(dest string) bool {
+func isSourceAFile(src string, uid, gid uint32, mpiHostFile string, log logr.Logger) (bool, error) {
+	// Get the source file
+	// sf, err := os.Stat(src)
+	// if err != nil {
+	// 	return false, fmt.Errorf("source file does not exist: %w", err)
+	// }
+
+	isDir, err := mpiIsDir(src, uid, gid, mpiHostFile, log)
+	if err != nil {
+		return false, err
+	}
+
+	return !isDir, nil
+}
+
+func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logger) bool {
 	isFile := false
 
 	// Attempt to the get the destination file. The error is not important since we can assume a
 	// dest without a trailing slash is a file when it does not exist.
-	df, _ := os.Stat(dest)
+	// df, _ := os.Stat(dest)
+	isDir, err := mpiIsDir(dest, uid, gid, mpiHostFile, log)
 
 	// Dest exists and is a file; then use Dir() OR
-	if df != nil && !df.IsDir() {
+	if err == nil && !isDir {
 		isFile = true
 	}
 
 	// Dest does not exist but looks like a file (no trailing slash)
-	if df == nil && !strings.HasSuffix(dest, "/") {
+	if err != nil && !strings.HasSuffix(dest, "/") {
 		isFile = true
 	}
 
@@ -705,6 +729,7 @@ func isDestAFile(dest string) bool {
 
 func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
 	// TODO: make this configurable in nnf-dm config map?
+	// TODO: remove run as root?
 	cmd := "mpirun --allow-run-as-root --hostfile $HOSTFILE mkdir -p " + dest
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
 	_, err := command.RunAs(cmd, log, uid, gid)
