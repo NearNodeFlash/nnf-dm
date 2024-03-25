@@ -676,7 +676,7 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 }
 
 func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
-	cmd := "mpirun --hostfile $HOSTILE stat -c '%F' " + path
+	cmd := "mpirun --hostfile $HOSTFILE -- stat -c '%F' " + path
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
 
 	output, err := command.RunAs(cmd, log, uid, gid)
@@ -729,8 +729,7 @@ func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logg
 
 func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
 	// TODO: make this configurable in nnf-dm config map?
-	// TODO: remove run as root?
-	cmd := "mpirun --allow-run-as-root --hostfile $HOSTFILE mkdir -p " + dest
+	cmd := "mpirun --hostfile $HOSTFILE -- mkdir -p " + dest
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
 	_, err := command.RunAs(cmd, log, uid, gid)
 	if err != nil {
