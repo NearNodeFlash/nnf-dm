@@ -265,11 +265,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
 
-	// Prepare Destination Directory
-	if err = r.prepareDestination(ctx, dm, log); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Build command + hostfile
 	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
 	if err != nil {
@@ -278,8 +273,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if len(mpiHostfile) > 0 {
 		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 	}
-
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
+
+	// Prepare Destination Directory
+	if err = r.prepareDestination(ctx, dm, mpiHostfile, log); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
@@ -523,7 +522,7 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 	return strings.Split(cmd, " "), hostfile, nil
 }
 
-func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
 	// TODO: verify destination is valid (i.e. global lustre or nnf directory).
 	// TODO: do the same with the source. Maybe these validations are done in sos/nnf-dm daemon.
 
@@ -552,7 +551,7 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 		}
 
 		// Create the destination directory
-		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, log); err != nil {
+		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
 			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 		}
 		log.Info("Destination path created", "path", destDir)
@@ -704,8 +703,10 @@ func isDestAFile(dest string) bool {
 	return isFile
 }
 
-func createDestinationDir(dest string, uid, gid uint32, log logr.Logger) error {
-	cmd := "mkdir -p " + dest
+func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
+	// TODO: make this configurable in nnf-dm config map?
+	cmd := "mpirun --allow-run-as-root --hostfile $HOSTFILE mkdir -p " + dest
+	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
 	_, err := command.RunAs(cmd, log, uid, gid)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w", cmd, err)
@@ -861,7 +862,7 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	}
 
 	if targetAllocationSetIndex == -1 {
-		return nil, newInvalidError("ost allocation set not found")
+		return nil, newInvalidError("OST allocation set not found")
 	}
 
 	nodes := storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes
