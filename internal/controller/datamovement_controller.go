@@ -733,9 +733,9 @@ func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log 
 	// Use setpriv to create the directory with the specified UID/GID
 	cmd := fmt.Sprintf("mpirun --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups mkdir -p %s",
 		mpiHostfile, uid, gid, dest)
-	_, err := command.Run(cmd, log)
+	output, err := command.Run(cmd, log)
 	if err != nil {
-		return fmt.Errorf("data movement mkdir failed ('%s'): %w", cmd, err)
+		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
 	}
 
 	return nil
