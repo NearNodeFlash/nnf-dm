@@ -676,8 +676,9 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 }
 
 func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
-	cmd := "mpirun --allow-run-as-root --hostfile $HOSTFILE -- stat -c '%F' " + path
-	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
+	// Use setpriv to stat the path with the specified UID/GID
+	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups stat -c '%%F' %s",
+		mpiHostfile, uid, gid, path)
 
 	// output, err := command.RunAs(cmd, log, uid, gid)
 	output, err := command.Run(cmd, log)
@@ -729,10 +730,10 @@ func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logg
 }
 
 func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
-	// TODO: make this configurable in nnf-dm config map?
-	cmd := "mpirun --hostfile $HOSTFILE -- mkdir -p " + dest
-	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", mpiHostfile)
-	_, err := command.RunAs(cmd, log, uid, gid)
+	// Use setpriv to create the directory with the specified UID/GID
+	cmd := fmt.Sprintf("mpirun --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups mkdir -p %s",
+		mpiHostfile, uid, gid, dest)
+	_, err := command.Run(cmd, log)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w", cmd, err)
 	}
