@@ -675,7 +675,7 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 	return filepath.Clean(destDir), nil
 }
 
-func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
 	// Use setpriv to stat the path with the specified UID/GID
 	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups stat -c '%%F' %s",
 		mpiHostfile, uid, gid, path)
@@ -683,7 +683,28 @@ func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger)
 	// output, err := command.RunAs(cmd, log, uid, gid)
 	output, err := command.Run(cmd, log)
 	if err != nil {
-		return false, fmt.Errorf("could not stat path ('%s'): %w", path, err)
+		return output, fmt.Errorf("could not stat path ('%s'): %w", path, err)
+	}
+
+	return output, nil
+}
+
+func mpiExists(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	_, err := mpiStat(path, uid, gid, mpiHostfile, log)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	output, err := mpiStat(path, uid, gid, mpiHostfile, log)
+	if err != nil {
+		return false, err
 	}
 
 	if strings.ToLower(output) == "directory" {
@@ -730,6 +751,13 @@ func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logg
 }
 
 func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
+	// Don't do anything if it already exists
+	if exists, err := mpiExists(dest, uid, gid, mpiHostfile, log); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+
 	// Use setpriv to create the directory with the specified UID/GID
 	cmd := fmt.Sprintf("mpirun --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups mkdir -p %s",
 		mpiHostfile, uid, gid, dest)
