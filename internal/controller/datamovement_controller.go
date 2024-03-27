@@ -679,7 +679,7 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 
 func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
 	// Use setpriv to stat the path with the specified UID/GID
-	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups stat -c '%%F' %s",
+	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups stat -c '%%F' %s",
 		mpiHostfile, uid, gid, path)
 
 	// output, err := command.RunAs(cmd, log, uid, gid)
@@ -764,7 +764,7 @@ func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log 
 	}
 
 	// Use setpriv to create the directory with the specified UID/GID
-	cmd := fmt.Sprintf("mpirun --hostfile %s -- setpriv --reuid %d --regid %d --clear-groups mkdir -p %s",
+	cmd := fmt.Sprintf("mpirun --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
 		mpiHostfile, uid, gid, dest)
 	output, err := command.Run(cmd, log)
 	if err != nil {
