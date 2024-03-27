@@ -710,9 +710,11 @@ func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger)
 		return false, err
 	}
 
-	if strings.ToLower(output) == "directory" {
+	if strings.Contains(strings.ToLower(output), "directory") {
+		log.Info("mpiIsDir", "directory", true)
 		return true, nil
 	} else {
+		log.Info("mpiIsDir", "directory", true)
 		return false, nil
 	}
 }
