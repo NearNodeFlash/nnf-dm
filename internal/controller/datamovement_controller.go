@@ -678,8 +678,9 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 }
 
 func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
-	// Use setpriv to stat the path with the specified UID/GID
-	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups stat -c '%%F' %s",
+	// Use setpriv to stat the path with the specified UID/GID. Only run it on 1 host.
+	// FIXME: I don't think stat is designed to run in parallel
+	cmd := fmt.Sprintf("mpirun --allow-run-as-root -n 1 --hostfile %s -- setpriv --euid %d --egid %d --clear-groups stat -c '%%F' %s",
 		mpiHostfile, uid, gid, path)
 
 	// output, err := command.RunAs(cmd, log, uid, gid)
