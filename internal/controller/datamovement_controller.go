@@ -668,10 +668,12 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 	// Account for file-file data movement - we don't want the full path
 	// ex: /path/to/a/file -> /path/to/a
 	if srcIsFile && isDestAFile(dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log) {
+		log.Info("getDestinationDir", "msg", "file-file")
 		destDir = filepath.Dir(dest)
 	}
 
 	// We know it's a directory, so we don't care about the trailing slash
+	log.Info("getDestinationDir", "msg", "dest")
 	return filepath.Clean(destDir), nil
 }
 
@@ -685,6 +687,7 @@ func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) 
 	if err != nil {
 		return output, fmt.Errorf("could not stat path ('%s'): %w", path, err)
 	}
+	log.Info("mpiStat", "path", path, "output", output)
 
 	return output, nil
 }
