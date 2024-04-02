@@ -116,7 +116,6 @@ func init() {
 	SchemeBuilder.Register(&SystemConfiguration{}, &SystemConfigurationList{})
 }
 
-// Computes returns the names of the computes attached to Rabbit nodes
 func (in *SystemConfiguration) Computes() []*string {
 	// We expect that there can be a large number of compute nodes and we don't
 	// want to duplicate all of those names.
@@ -126,7 +125,8 @@ func (in *SystemConfiguration) Computes() []*string {
 	for i1 := range in.Spec.StorageNodes {
 		num += len(in.Spec.StorageNodes[i1].ComputesAccess)
 	}
-
+	// Add room for the external computes.
+	num += len(in.Spec.ExternalComputeNodes)
 	computes := make([]*string, num)
 	idx := 0
 	for i2 := range in.Spec.StorageNodes {
@@ -135,18 +135,9 @@ func (in *SystemConfiguration) Computes() []*string {
 			idx++
 		}
 	}
-	return computes
-}
-
-// ComputesExternal returns the names of the external compute nodes in the system
-func (in *SystemConfiguration) ComputesExternal() []*string {
-	num := len(in.Spec.ExternalComputeNodes)
-	computes := make([]*string, num)
-	idx := 0
-
 	// Add the external computes.
-	for i := range in.Spec.ExternalComputeNodes {
-		computes[idx] = &in.Spec.ExternalComputeNodes[i].Name
+	for i4 := range in.Spec.ExternalComputeNodes {
+		computes[idx] = &in.Spec.ExternalComputeNodes[i4].Name
 		idx++
 	}
 	return computes
