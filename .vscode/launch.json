@@ -56,7 +56,7 @@
                 "-ginkgo.failFast",
             ],
             "env": {
-                "KUBEBUILDER_ASSETS": "${workspaceRoot}/bin/k8s/1.28.0-darwin-arm64",
+                "KUBEBUILDER_ASSETS": "${workspaceRoot}/bin/k8s/1.25.0-darwin-amd64",
                 "GOMEGA_DEFAULT_EVENTUALLY_TIMEOUT": "10m",
                 "GOMEGA_DEFAULT_EVENTUALLY_POLLING_INTERVAL": "500ms",
             },
