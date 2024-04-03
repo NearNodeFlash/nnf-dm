@@ -657,13 +657,13 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	}
 	targetAllocationSetIndex := -1
 	for allocationSetIndex, allocationSet := range storage.Spec.AllocationSets {
-		if allocationSet.TargetType == "OST" {
+		if allocationSet.TargetType == "ost" {
 			targetAllocationSetIndex = allocationSetIndex
 		}
 	}
 
 	if targetAllocationSetIndex == -1 {
-		return nil, newInvalidError("OST allocation set not found")
+		return nil, newInvalidError("ost allocation set not found")
 	}
 
 	nodes := storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes
