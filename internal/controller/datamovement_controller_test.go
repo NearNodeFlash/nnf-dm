@@ -30,6 +30,7 @@ import (
 
 	"github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -692,7 +693,7 @@ var _ = Describe("Data Movement Test", func() {
 			hosts := []string{"node1", "node2"}
 			DescribeTable("setting hosts, slots, and maxSlots",
 				func(hosts []string, slots, maxSlots int, expected string) {
-					hostfilePath, err := createMpiHostfile("my-dm", hosts, slots, maxSlots)
+					hostfilePath, err := writeMpiHostfile("my-dm", hosts, slots, maxSlots)
 					defer os.RemoveAll(filepath.Dir(hostfilePath))
 					Expect(err).To(BeNil())
 					Expect(hostfilePath).ToNot(Equal(""))
@@ -712,7 +713,7 @@ var _ = Describe("Data Movement Test", func() {
 			It("should return the first line of the hostfile", func() {
 				hosts := []string{"one", "two", "three"}
 				slots, maxSlots := 16, 32
-				hostfilePath, err := createMpiHostfile("my-dm", hosts, slots, maxSlots)
+				hostfilePath, err := writeMpiHostfile("my-dm", hosts, slots, maxSlots)
 				Expect(err).ToNot(HaveOccurred())
 
 				actual := peekMpiHostfile(hostfilePath)
@@ -740,29 +741,12 @@ var _ = Describe("Data Movement Test", func() {
 						Command: "mpirun --hostfile $HOSTFILE dcp src dest",
 					}
 
-					cmd, hostfile, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
+					hostfile, err := createMpiHostfile(profile, hosts, &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(len(hostfile)).Should((BeNumerically(">", 0)))
-					Expect(cmd).ToNot(BeEmpty())
 					info, err := os.Stat(hostfile)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(info).ToNot(BeNil())
-				})
-
-			})
-			When("$HOSTFILE is not present", func() {
-				It("should not create the hostfile", func() {
-					profile := dmConfigProfile{
-						Command: "mpirun -np 1 dcp src dest",
-					}
-
-					cmd, hostfile, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(len(hostfile)).Should(Equal(0))
-					Expect(cmd).ToNot(BeEmpty())
-					info, err := os.Stat(hostfile)
-					Expect(err).To(HaveOccurred())
-					Expect(info).To(BeNil())
 				})
 
 			})
@@ -796,10 +780,10 @@ var _ = Describe("Data Movement Test", func() {
 						DCPOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
-						"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
+						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, _, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
+					cmd, err := buildDMCommand(context.TODO(), profile, "/tmp/hostfile", &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -819,7 +803,8 @@ var _ = Describe("Data Movement Test", func() {
 							Slots:    numSlots,
 							MaxSlots: numSlots,
 						}
-						_, hostfilePath, err := buildDMCommand(context.TODO(), profile, hosts, &dm)
+
+						hostfilePath, err := createMpiHostfile(profile, hosts, &dm)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(hostfilePath).ToNot(BeEmpty())
 						DeferCleanup(func() {
@@ -848,6 +833,192 @@ var _ = Describe("Data Movement Test", func() {
 					Entry("when nil it should use the profile", nil),
 				)
 			})
+		})
+
+		Context("getDestinationDir", func() {
+			expectedSourceFile := "/src/job/data.out"
+			destRoot := "/lus/global/user"
+
+			DescribeTable("",
+				func(src, dest, expected string) {
+					tmpDir := GinkgoT().TempDir()
+
+					// create sourceFile in tmpdir root
+					sourceFilePath := filepath.Join(tmpDir, expectedSourceFile)
+					Expect(os.MkdirAll(filepath.Dir(sourceFilePath), 0755)).To(Succeed())
+					f, err := os.Create(sourceFilePath)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(f.Close()).To(Succeed())
+
+					// create destDir
+					destDirPath := filepath.Join(tmpDir, destRoot)
+					Expect(os.MkdirAll(destDirPath, 0755)).To(Succeed())
+
+					// for this one case, we want the destination file to exist
+					if dest == "/lus/global/user/data.out" {
+						existing := filepath.Join(tmpDir, dest)
+						f, err := os.Create(existing)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(f.Close()).To(Succeed())
+					}
+
+					// Replace the paths to use tmpDir root
+					newSrc := strings.Replace(src, "$DW_JOB_workflow", filepath.Join(tmpDir, "src"), -1)
+					newDest := filepath.Join(tmpDir, dest)
+					// don't drop trailing slashes on the dest
+					if strings.HasSuffix(dest, "/") {
+						newDest += "/"
+					}
+
+					dm := &nnfv1alpha1.NnfDataMovement{
+						Spec: nnfv1alpha1.NnfDataMovementSpec{
+							Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+								Path: newSrc,
+							},
+							Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+								Path: newDest,
+							},
+							UserId:  1234,
+							GroupId: 2345,
+						},
+					}
+
+					destDir, err := getDestinationDir(dm, "", logr.Logger{})
+					destDir = strings.Replace(destDir, tmpDir, "", -1) // remove tmpdir from the path
+					Expect(err).ToNot(HaveOccurred())
+					Expect(destDir).To(Equal(expected))
+				},
+				Entry("file-dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user", "/lus/global/user"),
+				Entry("file-dir/", "$DW_JOB_workflow/job/data.out", "/lus/global/user/", "/lus/global/user"),
+				Entry("file-file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/data.out", "/lus/global/user"),
+				Entry("file-DNE file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/idontexist", "/lus/global/user"),
+				Entry("file-DNE dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("file-DNE dir/file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/idontexist", "/lus/global/user/newdir"),
+				Entry("file-DNE dir/dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
+				Entry("file-DNE dir/dir/file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newdir/newdir2/idontexist", "/lus/global/user/newdir/newdir2"),
+
+				Entry("dir-dir", "$DW_JOB_workflow/job", "/lus/global/user", "/lus/global/user"),
+				Entry("dir-dir/", "$DW_JOB_workflow/job", "/lus/global/user/", "/lus/global/user"),
+				Entry("dir/-dir", "$DW_JOB_workflow/job/", "/lus/global/user", "/lus/global/user"),
+				Entry("dir/-dir/", "$DW_JOB_workflow/job/", "/lus/global/user/", "/lus/global/user"),
+				Entry("dir-DNE dir", "$DW_JOB_workflow/job", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("dir-DNE dir/", "$DW_JOB_workflow/job", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("dir/-DNE dir", "$DW_JOB_workflow/job/", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("dir/-DNE dir/", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("dir-DNE dir/dir", "$DW_JOB_workflow/job", "/lus/global/user/newdir/newdir2", "/lus/global/user/newdir/newdir2"),
+				Entry("dir-DNE dir/dir/", "$DW_JOB_workflow/job", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
+				Entry("dir/-DNE dir/dir", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/newdir2", "/lus/global/user/newdir/newdir2"),
+				Entry("dir/-DNE dir/dir/", "$DW_JOB_workflow/job/", "/lus/global/user/newdir/newdir2/", "/lus/global/user/newdir/newdir2"),
+
+				Entry("root-dir", "$DW_JOB_workflow", "/lus/global/user", "/lus/global/user"),
+				Entry("root-dir/", "$DW_JOB_workflow", "/lus/global/user/", "/lus/global/user"),
+				Entry("root/-dir", "$DW_JOB_workflow/", "/lus/global/user", "/lus/global/user"),
+				Entry("root/-dir/", "$DW_JOB_workflow/", "/lus/global/user/", "/lus/global/user"),
+				Entry("root-DNE dir", "$DW_JOB_workflow", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("root-DNE dir/", "$DW_JOB_workflow", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+				Entry("root/-DNE dir", "$DW_JOB_workflow/", "/lus/global/user/newdir", "/lus/global/user/newdir"),
+				Entry("root/-DNE dir/", "$DW_JOB_workflow/", "/lus/global/user/newdir/", "/lus/global/user/newdir"),
+			)
+		})
+
+		Context("extractIndexMountDir", func() {
+			ns := "winchell31"
+			DescribeTable("",
+				func(fsType, path, expected string, expectError bool) {
+
+					// Create the NnfStorage the indicates the filesystem type
+					storage := &nnfv1alpha1.NnfStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "mystorage",
+							Namespace: ns,
+						},
+						Spec: nnfv1alpha1.NnfStorageSpec{FileSystemType: fsType},
+					}
+
+					idxMount, err := extractIndexMountDir(storage, path, ns)
+					Expect(idxMount).To(Equal(expected))
+					if expectError {
+						Expect(err).To(HaveOccurred())
+					} else {
+						Expect(err).To(Not(HaveOccurred()))
+					}
+				},
+				Entry("fsType - gfs2", "gfs2", "/mnt/nnf/12345-0/winchell31-0/dir1", "winchell31-0", false),
+				Entry("fsType - xfs", "xfs", "/mnt/nnf/12345-0/winchell31-7/path/to/a/file", "winchell31-7", false),
+				Entry("fsType - lustre", "lustre", "/does/not/matter", "", false),
+
+				// root is a special case where you would "double up", we don't want to return an
+				// index mount in this case since it's already there.
+				Entry("root", "gfs2", "/mnt/nnf/12345-0/winchell31-0", "", false),
+				Entry("root with trailing slash", "gfs2", "/mnt/nnf/12345-0/winchell31-11/", "winchell31-11", false),
+				Entry("really big index", "gfs2", "/mnt/nnf/12345-0/winchell31-9999999999999/", "winchell31-9999999999999", false),
+				Entry("empty", "gfs2", "", "", true),
+
+				Entry("cannot extract - wrong namespace", "gfs2", "/mnt/nnf/12345-0/wrong-namespace-0/", "", true),
+				Entry("cannot extract - extra '-digit'", "gfs2", "/mnt/nnf/12345-0/winchell31-0-0/", "", true),
+			)
+		})
+
+		Context("handleIndexMountDir", func() {
+			idxMount := "rabbit-node-2-10"
+			expectedSourceFile := fmt.Sprintf("/%s/job/data.out", idxMount)
+			destRoot := "/lus/global/user"
+
+			DescribeTable("",
+				func(src, dest, destDir, expectedDir, expectedPath string) {
+					tmpDir := GinkgoT().TempDir()
+
+					// create sourceFile in tmpdir root
+					sourceFilePath := filepath.Join(tmpDir, expectedSourceFile)
+					Expect(os.MkdirAll(filepath.Dir(sourceFilePath), 0755)).To(Succeed())
+					f, err := os.Create(sourceFilePath)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(f.Close()).To(Succeed())
+
+					// create destDir
+					destDirPath := filepath.Join(tmpDir, destRoot)
+					Expect(os.MkdirAll(destDirPath, 0755)).To(Succeed())
+
+					// Replace the paths to use tmpDir root
+					newSrc := strings.Replace(src, "$DW_JOB_workflow", filepath.Join(tmpDir, "rabbit-node-2-10"), -1)
+					newDest := filepath.Join(tmpDir, dest)
+					// don't drop trailing slashes on the dest
+					if strings.HasSuffix(dest, "/") {
+						newDest += "/"
+					}
+
+					// We need a DM to stuff the paths and check the updated destination after account for index mount
+					dm := &nnfv1alpha1.NnfDataMovement{
+						Spec: nnfv1alpha1.NnfDataMovementSpec{
+							Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+								Path: newSrc,
+							},
+							Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
+								Path: newDest,
+							},
+						},
+					}
+
+					newDestDir, err := handleIndexMountDir(destDir, idxMount, dm, "", logr.Logger{})
+					Expect(err).ToNot((HaveOccurred()))
+
+					// Remove any tmpDir paths before verifying
+					newDestDir = strings.Replace(newDestDir, tmpDir, "", -1)
+					dm.Spec.Destination.Path = strings.Replace(dm.Spec.Destination.Path, tmpDir, "", -1)
+					Expect(newDestDir).To(Equal(expectedDir), "updated dest directory")
+					Expect(dm.Spec.Destination.Path).To(Equal(expectedPath), "updated DM destination path")
+				},
+
+				// Entry("","src", "dest", "destDir", "idxMount", "expectedDir", "expectedPath" ),
+				Entry("file-dir", "$DW_JOB_workflow/job/data.out", "/lus/global/user/", "/lus/global/user", "/lus/global/user/rabbit-node-2-10", "/lus/global/user/rabbit-node-2-10/"),
+				Entry("file-file", "$DW_JOB_workflow/job/data.out", "/lus/global/user/newname.out", "/lus/global/user", "/lus/global/user/rabbit-node-2-10", "/lus/global/user/rabbit-node-2-10/newname.out"),
+
+				Entry("dir-dir", "$DW_JOB_workflow/job/", "/lus/global/user/", "/lus/global/user", "/lus/global/user/rabbit-node-2-10", "/lus/global/user/rabbit-node-2-10/"),
+				Entry("dir-file", "$DW_JOB_workflow/job/", "/lus/global/user/newdir", "/lus/global/user/newdir", "/lus/global/user/newdir/rabbit-node-2-10", "/lus/global/user/newdir/rabbit-node-2-10"),
+
+				Entry("root-dir", "$DW_JOB_workflow", "/lus/global/user/", "/lus/global/user", "/lus/global/user", "/lus/global/user/"),
+				Entry("root/-dir", "$DW_JOB_workflow/", "/lus/global/user/", "/lus/global/user", "/lus/global/user/rabbit-node-2-10", "/lus/global/user/rabbit-node-2-10/"),
+			)
 		})
 	})
 })
