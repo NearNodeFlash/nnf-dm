@@ -577,9 +577,8 @@ func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace strin
 		return "", nil // nothing to do here
 	}
 
-	// To get the index mount directory, We need to scrap the source path to find the index mount
-	// directory - we don't have access to the directive index since and only know the source/dest
-	// paths.
+	// To get the index mount directory, We need to scrape the source path to find the index mount
+	// directory - we don't have access to the directive index and only know the source/dest paths.
 	// Match namespace-digit and then the end of the string OR slash
 	pattern := regexp.MustCompile(fmt.Sprintf(`(%s-\d+)(/|$)`, namespace))
 	match := pattern.FindStringSubmatch(path)
@@ -955,7 +954,7 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 	}
 
 	if targetAllocationSetIndex == -1 {
-		return nil, newInvalidError("OST allocation set not found")
+		return nil, newInvalidError("ost allocation set not found")
 	}
 
 	nodes := storage.Spec.AllocationSets[targetAllocationSetIndex].Nodes
