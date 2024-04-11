@@ -128,6 +128,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfnodestorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts,verbs=get;list
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts/status,verbs=get;list
 //+kubebuilder:rbac:groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
@@ -547,35 +548,47 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnf
 // then we need to account for a Fan-In situation and create index mount directories on the
 // destination. Returns the index mount directory from the source path.
 func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
-	var storageRef corev1.ObjectReference
+	var storage *nnfv1alpha1.NnfStorage
+	var nodeStorage *nnfv1alpha1.NnfNodeStorage
 
-	// See if the source storage reference is NnfStorage
 	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
-		storageRef = dm.Spec.Source.StorageReference
+		// The source storage reference is NnfStorage - this came from copy_in/copy_out directives
+		storageRef := dm.Spec.Source.StorageReference
+
+		storage = &nnfv1alpha1.NnfStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", newInvalidError("could not retrieve NnfStorage for checking index mounts: %s", err.Error())
+			}
+			return "", err
+		}
+	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfNodeStorage{}).Name() {
+		// The source storage reference is NnfNodeStorage - this came from copy_offload
+		storageRef := dm.Spec.Source.StorageReference
+
+		nodeStorage = &nnfv1alpha1.NnfNodeStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, nodeStorage); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", newInvalidError("could not retrieve NnfNodeStorage for checking index mounts: %s", err.Error())
+			}
+			return "", err
+		}
 	} else {
 		return "", nil // nothing to do here
 	}
 
-	// If it is, then go and retrieve it so we can check the filesystem type
-	storage := &nnfv1alpha1.NnfStorage{}
-	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
-		if apierrors.IsNotFound(err) {
-			return "", newInvalidError("could not retrieve NNF Storage for checking index mounts: %s", err.Error())
-		}
-		return "", err
+	// If it is gfs2 or xfs, then there are index mounts
+	if storage != nil && (storage.Spec.FileSystemType == "gfs2" || storage.Spec.FileSystemType == "xfs") {
+		return extractIndexMountDir(dm.Spec.Source.Path, dm.Namespace)
+	} else if nodeStorage != nil && (nodeStorage.Spec.FileSystemType == "gfs2" || nodeStorage.Spec.FileSystemType == "xfs") {
+		return extractIndexMountDir(dm.Spec.Source.Path, dm.Namespace)
 	}
 
-	// TODO: Do we also need to check the destination filesystem type before assuming index mount dirs?
-
-	return extractIndexMountDir(storage, dm.Spec.Source.Path, dm.Namespace)
+	return "", nil // nothing to do here
 }
 
 // Pull out the index mount directory from the path for the correct file systems that require it
-func extractIndexMountDir(storage *nnfv1alpha1.NnfStorage, path, namespace string) (string, error) {
-	// If it's not gfs2 or xfs, then there are no index mounts
-	if storage.Spec.FileSystemType != "gfs2" && storage.Spec.FileSystemType != "xfs" {
-		return "", nil // nothing to do here
-	}
+func extractIndexMountDir(path, namespace string) (string, error) {
 
 	// To get the index mount directory, We need to scrape the source path to find the index mount
 	// directory - we don't have access to the directive index and only know the source/dest paths.

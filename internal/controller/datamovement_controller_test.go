@@ -924,18 +924,9 @@ var _ = Describe("Data Movement Test", func() {
 		Context("extractIndexMountDir", func() {
 			ns := "winchell31"
 			DescribeTable("",
-				func(fsType, path, expected string, expectError bool) {
+				func(path, expected string, expectError bool) {
 
-					// Create the NnfStorage the indicates the filesystem type
-					storage := &nnfv1alpha1.NnfStorage{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "mystorage",
-							Namespace: ns,
-						},
-						Spec: nnfv1alpha1.NnfStorageSpec{FileSystemType: fsType},
-					}
-
-					idxMount, err := extractIndexMountDir(storage, path, ns)
+					idxMount, err := extractIndexMountDir(path, ns)
 					Expect(idxMount).To(Equal(expected))
 					if expectError {
 						Expect(err).To(HaveOccurred())
@@ -943,19 +934,18 @@ var _ = Describe("Data Movement Test", func() {
 						Expect(err).To(Not(HaveOccurred()))
 					}
 				},
-				Entry("fsType - gfs2", "gfs2", "/mnt/nnf/12345-0/winchell31-0/dir1", "winchell31-0", false),
-				Entry("fsType - xfs", "xfs", "/mnt/nnf/12345-0/winchell31-7/path/to/a/file", "winchell31-7", false),
-				Entry("fsType - lustre", "lustre", "/does/not/matter", "", false),
+				Entry("standard 1", "/mnt/nnf/12345-0/winchell31-0/dir1", "winchell31-0", false),
+				Entry("standard 2", "/mnt/nnf/12345-0/winchell31-7/path/to/a/file", "winchell31-7", false),
 
 				// root is a special case where you would "double up", we don't want to return an
 				// index mount in this case since it's already there.
-				Entry("root", "gfs2", "/mnt/nnf/12345-0/winchell31-0", "", false),
-				Entry("root with trailing slash", "gfs2", "/mnt/nnf/12345-0/winchell31-11/", "winchell31-11", false),
-				Entry("really big index", "gfs2", "/mnt/nnf/12345-0/winchell31-9999999999999/", "winchell31-9999999999999", false),
-				Entry("empty", "gfs2", "", "", true),
+				Entry("root", "/mnt/nnf/12345-0/winchell31-0", "", false),
+				Entry("root with trailing slash", "/mnt/nnf/12345-0/winchell31-11/", "winchell31-11", false),
+				Entry("really big index", "/mnt/nnf/12345-0/winchell31-9999999999999/", "winchell31-9999999999999", false),
+				Entry("empty", "", "", true),
 
-				Entry("cannot extract - wrong namespace", "gfs2", "/mnt/nnf/12345-0/wrong-namespace-0/", "", true),
-				Entry("cannot extract - extra '-digit'", "gfs2", "/mnt/nnf/12345-0/winchell31-0-0/", "", true),
+				Entry("cannot extract - wrong namespace", "/mnt/nnf/12345-0/wrong-namespace-0/", "", true),
+				Entry("cannot extract - extra '-digit'", "mnt/nnf/12345-0/winchell31-0-0/", "", true),
 			)
 		})
 
