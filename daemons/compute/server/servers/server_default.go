@@ -313,6 +313,9 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		dm, err = s.createNnfNodeDataMovement(ctx, req, computeMountInfo)
 		dmFunc = "createNnfNodeDataMovement()"
 	default:
+		// xfs is not supported since it can only be mounted in one location at a time. It is
+		// already mounted on the compute node when copy offload occurs (PreRun/PostRun), therefore
+		// it cannot be mounted on the rabbit to perform data movement.
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_INVALID,
 			Message: fmt.Sprintf("filesystem not supported: '%s'", computeMountInfo.Type),
@@ -470,7 +473,8 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
 			Source: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
-				Path: source,
+				Path:             source,
+				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
