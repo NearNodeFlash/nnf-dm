@@ -181,8 +181,9 @@ func main() {
 	// and couldn't recover the data movement request). The NNF Data Movement Workflow ensures that these requests are
 	// deleted.
 	if !*skipDelete {
-		// Use List to cleanup and delete requests
-		for _, uid := range listResponse.GetUids() {
+		// Delete each DM this client created
+		for _, resp := range responses {
+			uid := resp.GetUid()
 			log.Printf("Deleting request: %v", uid)
 
 			deleteResponse, err := deleteRequest(ctx, c, *workflow, *namespace, uid)
