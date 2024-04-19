@@ -190,11 +190,13 @@ func main() {
 				log.Fatalf("could not delete data movement request: %s", err)
 			}
 
-			if deleteResponse.Status != pb.DataMovementDeleteResponse_SUCCESS {
-				log.Fatalf("data movement delete failed: %+v", deleteResponse)
+			if deleteResponse.Status == pb.DataMovementDeleteResponse_NOT_FOUND {
+				log.Printf("Data movement request deleted (not found): %v %v", uid, deleteResponse.String())
+			} else if deleteResponse.Status != pb.DataMovementDeleteResponse_SUCCESS {
+				log.Fatalf("data movement delete failed: %v %+v", uid, deleteResponse)
+			} else {
+				log.Printf("Data movement request deleted: %v %v", uid, deleteResponse.String())
 			}
-
-			log.Printf("Data movement request deleted: %v %v", uid, deleteResponse.String())
 		}
 
 		// Print out the list again to verify deletes
@@ -288,7 +290,8 @@ func deleteRequest(ctx context.Context, client pb.DataMoverClient, workflow stri
 		Uid: uid,
 	})
 
-	if err != nil {
+	// It's already been deleted if it's not found
+	if err != nil && rsp.Status != pb.DataMovementDeleteResponse_NOT_FOUND {
 		return nil, err
 	}
 
