@@ -15,6 +15,13 @@ rules:
 - apiGroups:
   - dataworkflowservices.github.io
   resources:
+  - workflows
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - dataworkflowservices.github.io
+  resources:
   - clientmounts
   verbs:
   - get

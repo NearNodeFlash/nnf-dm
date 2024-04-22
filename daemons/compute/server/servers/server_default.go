@@ -295,6 +295,25 @@ func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovement
 
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 
+	// Ensure workflow exists and is in PreRun:Ready
+	workflow := &dwsv1alpha2.Workflow{ObjectMeta: metav1.ObjectMeta{
+		Name:      req.Workflow.Name,
+		Namespace: req.Workflow.Namespace,
+	}}
+	if err := s.client.Get(ctx, client.ObjectKeyFromObject(workflow), workflow); err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: "Could find matching workflow: " + err.Error(),
+		}, nil
+	}
+
+	if workflow.Status.State != dwsv1alpha2.StatePreRun || workflow.Status.Status != "Completed" {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: fmt.Sprintf("Workflow must be in '%s' state and 'Completed' status", dwsv1alpha2.StatePreRun),
+		}, nil
+	}
+
 	computeClientMount, computeMountInfo, err := s.findComputeMountInfo(ctx, req)
 	if err != nil {
 		return &pb.DataMovementCreateResponse{
@@ -341,16 +360,9 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	dm.Spec.UserId = userId
 	dm.Spec.GroupId = groupId
 
-	// We don't have the actual NnfDataMovement parent available, but we know the name
-	// and the namespace because they will match the workflow's name and namespace.
-	parentDm := &nnfv1alpha1.NnfDataMovement{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Workflow.Name,
-			Namespace: req.Workflow.Namespace,
-		},
-	}
-
-	dwsv1alpha2.AddOwnerLabels(dm, parentDm)
+	// Add appropriate workflow labels so this is cleaned up
+	dwsv1alpha2.AddWorkflowLabels(dm, workflow)
+	dwsv1alpha2.AddOwnerLabels(dm, workflow)
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
