@@ -64,7 +64,7 @@ spec:
       maxUnavailable: '25%'
   template:
     spec:
-      serviceAccountName: nnf-dm-controller-manager # not sure why 'controller-manager' isn't patched to include the 'nnf-dm-' prefix
+      serviceAccountName: nnf-dm-node-controller
       tolerations:
         - key: 'cray.nnf.node'
           operator: 'Equal'
