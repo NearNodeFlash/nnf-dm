@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -55,6 +55,8 @@ import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	"github.com/NearNodeFlash/nnf-sos/pkg/command"
+	"github.com/go-logr/logr"
 )
 
 const (
@@ -126,6 +128,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfnodestorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts,verbs=get;list
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts/status,verbs=get;list
 //+kubebuilder:rbac:groups=lus.cray.hpe.com,resources=lustrefilesystems,verbs=get;list;watch
@@ -263,15 +266,25 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
 
-	// Built command + hostfile
-	cmdArgs, mpiHostfile, err := buildDMCommand(ctx, profile, hosts, dm)
+	// Create the hostfile. This is needed for preparing the destination and the data movement
+	// command itself.
+	mpiHostfile, err := createMpiHostfile(profile, hosts, dm)
+	if err != nil {
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create MPI hostfile").WithError(err).WithMajor()
+	}
+	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
+
+	// Prepare Destination Directory
+	if err = r.prepareDestination(ctx, dm, mpiHostfile, log); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
+
+	// Build command
+	cmdArgs, err := buildDMCommand(ctx, profile, mpiHostfile, dm)
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
-	if len(mpiHostfile) > 0 {
-		log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
-	}
-
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
 	// Record the start of the data movement operation
@@ -449,38 +462,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) ([]string, string, error) {
+func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
 	log := log.FromContext(ctx)
-	var hostfile string
-	var err error
 	userConfig := dm.Spec.UserConfig != nil
 
-	// If Dryrun is enabled, just use the "true" command with no hostfile
+	// If Dryrun is enabled, just use the "true" command
 	if userConfig && dm.Spec.UserConfig.Dryrun {
 		log.Info("Dry run detected")
-		return []string{"true"}, "", nil
-	}
-
-	// Command provided via the configmap
-	providedCmd := profile.Command
-
-	// Create MPI hostfile only if included in the provided command
-	if strings.Contains(providedCmd, "$HOSTFILE") {
-		slots := profile.Slots
-		maxSlots := profile.MaxSlots
-
-		// Allow the user to override the slots and max_slots in the hostfile.
-		if userConfig && dm.Spec.UserConfig.Slots != nil && *dm.Spec.UserConfig.Slots >= 0 {
-			slots = *dm.Spec.UserConfig.Slots
-		}
-		if userConfig && dm.Spec.UserConfig.MaxSlots != nil && *dm.Spec.UserConfig.MaxSlots >= 0 {
-			maxSlots = *dm.Spec.UserConfig.MaxSlots
-		}
-
-		hostfile, err = createMpiHostfile(dm.Name, hosts, slots, maxSlots)
-		if err != nil {
-			return nil, "", fmt.Errorf("error creating MPI hostfile: %v", err)
-		}
+		return []string{"true"}, nil
 	}
 
 	cmd := profile.Command
@@ -513,13 +502,328 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hosts []string
 		}
 	}
 
-	return strings.Split(cmd, " "), hostfile, nil
+	return strings.Split(cmd, " "), nil
 }
 
-// Create an MPI Hostfile given a list of hosts, slots, and maxSlots. A temporary directory is
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
+	// These functions interact with the filesystem, so they can't run in the test env
+	if !isTestEnv() {
+		// Determine the destination directory based on the source and path
+		log.Info("Determining destination directory based on source/dest file types")
+		destDir, err := getDestinationDir(dm, mpiHostfile, log)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+		}
+
+		// See if an index mount directory on the destination is required
+		log.Info("Determining if index mount directory is required")
+		indexMount, err := r.checkIndexMountDir(ctx, dm)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+		}
+
+		// Account for index mount directory on the destDir and the dm dest path
+		// This updates the destination on dm
+		if indexMount != "" {
+			log.Info("Index mount directory is required", "indexMountdir", indexMount)
+			d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
+			if err != nil {
+				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			}
+			destDir = d
+			log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
+		}
+
+		// Create the destination directory
+		log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
+		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
+			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		}
+	}
+
+	return nil
+}
+
+// Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
+// then we need to account for a Fan-In situation and create index mount directories on the
+// destination. Returns the index mount directory from the source path.
+func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+	var storage *nnfv1alpha1.NnfStorage
+	var nodeStorage *nnfv1alpha1.NnfNodeStorage
+
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+		// The source storage reference is NnfStorage - this came from copy_in/copy_out directives
+		storageRef := dm.Spec.Source.StorageReference
+
+		storage = &nnfv1alpha1.NnfStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", newInvalidError("could not retrieve NnfStorage for checking index mounts: %s", err.Error())
+			}
+			return "", err
+		}
+	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfNodeStorage{}).Name() {
+		// The source storage reference is NnfNodeStorage - this came from copy_offload
+		storageRef := dm.Spec.Source.StorageReference
+
+		nodeStorage = &nnfv1alpha1.NnfNodeStorage{}
+		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, nodeStorage); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", newInvalidError("could not retrieve NnfNodeStorage for checking index mounts: %s", err.Error())
+			}
+			return "", err
+		}
+	} else {
+		return "", nil // nothing to do here
+	}
+
+	// If it is gfs2 or xfs, then there are index mounts
+	if storage != nil && (storage.Spec.FileSystemType == "gfs2" || storage.Spec.FileSystemType == "xfs") {
+		return extractIndexMountDir(dm.Spec.Source.Path, dm.Namespace)
+	} else if nodeStorage != nil && (nodeStorage.Spec.FileSystemType == "gfs2" || nodeStorage.Spec.FileSystemType == "xfs") {
+		return extractIndexMountDir(dm.Spec.Source.Path, dm.Namespace)
+	}
+
+	return "", nil // nothing to do here
+}
+
+// Pull out the index mount directory from the path for the correct file systems that require it
+func extractIndexMountDir(path, namespace string) (string, error) {
+
+	// To get the index mount directory, We need to scrape the source path to find the index mount
+	// directory - we don't have access to the directive index and only know the source/dest paths.
+	// Match namespace-digit and then the end of the string OR slash
+	pattern := regexp.MustCompile(fmt.Sprintf(`(%s-\d+)(/|$)`, namespace))
+	match := pattern.FindStringSubmatch(path)
+	if match == nil {
+		return "", fmt.Errorf("could not extract index mount directory from source path: %s", path)
+	}
+
+	idxMount := match[1]
+	// If the path ends with the index mount (and no trailing slash), then we need to return "" so
+	// that we don't double up. This happens when you copy out of the root without a trailing slash
+	// - dcp will copy the directory (index mount) over to the destination. So there's no need to
+	// append it.
+	if strings.HasSuffix(path, idxMount) {
+		return "", nil // nothing to do here
+	}
+
+	return idxMount, nil
+}
+
+// Given a destination directory and index mount directory, apply the necessary changes to the
+// destination directory and the DM's destination path to account for index mount directories
+func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+
+	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
+	// in the index mount directory without a trailing slash. If that's the case, there's nothing
+	// to handle.
+	if strings.HasSuffix(dm.Spec.Source.Path, indexMount) {
+		return destDir, nil
+	}
+
+	// Add index mount directory to the end of the destination directory
+	idxMntDir := filepath.Join(destDir, indexMount)
+
+	// Update dm.Spec.Destination.Path for the new path
+	dmDest := idxMntDir
+
+	// Get the source to see if it's a file
+	srcIsFile, err := isSourceAFile(dm.Spec.Source.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	if err != nil {
+		return "", err
+	}
+	destIsFile := isDestAFile(dm.Spec.Destination.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	log.Info("Checking source and dest types", "srcIsFile", srcIsFile, "destIsFile", destIsFile)
+
+	// Account for file-file
+	if srcIsFile && destIsFile {
+		dmDest = filepath.Join(idxMntDir, filepath.Base(dm.Spec.Destination.Path))
+	}
+
+	// Preserve the trailing slash. This should not matter in dcp's eye, but let's preserve it for
+	// posterity.
+	if strings.HasSuffix(dm.Spec.Destination.Path, "/") {
+		dmDest += "/"
+	}
+
+	// Update the dm destination with the new path
+	dm.Spec.Destination.Path = dmDest
+
+	return idxMntDir, nil
+}
+
+// Determine the directory path to create based on the source and destination.
+// Returns the mkdir directory and error.
+func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+	// Default to using the full path of dest
+	src := dm.Spec.Source.Path
+	dest := dm.Spec.Destination.Path
+	destDir := dest
+
+	srcIsFile, err := isSourceAFile(src, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	if err != nil {
+		return "", err
+	}
+
+	// Account for file-file data movement - we don't want the full path
+	// ex: /path/to/a/file -> /path/to/a
+	if srcIsFile && isDestAFile(dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log) {
+		destDir = filepath.Dir(dest)
+	}
+
+	// We know it's a directory, so we don't care about the trailing slash
+	return filepath.Clean(destDir), nil
+}
+
+// Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
+func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
+	// Use setpriv to stat the path with the specified UID/GID. Only run it on 1 host (ie. -n 1)
+	cmd := fmt.Sprintf("mpirun --allow-run-as-root -n 1 --hostfile %s -- setpriv --euid %d --egid %d --clear-groups stat --cached never -c '%%F' %s",
+		mpiHostfile, uid, gid, path)
+
+	output, err := command.Run(cmd, log)
+	if err != nil {
+		return output, fmt.Errorf("could not stat path ('%s'): %w", path, err)
+	}
+	log.Info("mpiStat", "path", path, "output", output)
+
+	return output, nil
+}
+
+// Use mpirun to check if a file exists
+func mpiExists(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	_, err := mpiStat(path, uid, gid, mpiHostfile, log)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+// Use mpirun to determine if a given path is a directory
+func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	output, err := mpiStat(path, uid, gid, mpiHostfile, log)
+	if err != nil {
+		return false, err
+	}
+
+	if strings.Contains(strings.ToLower(output), "directory") {
+		log.Info("mpiIsDir", "directory", true)
+		return true, nil
+	} else {
+		log.Info("mpiIsDir", "directory", true)
+		return false, nil
+	}
+}
+
+// Check to see if the source path is a file. The source must exist and will result in error if it
+// does not. Do not use mpi in the test environment.
+func isSourceAFile(src string, uid, gid uint32, mpiHostFile string, log logr.Logger) (bool, error) {
+	var isDir bool
+	var err error
+
+	if isTestEnv() {
+		sf, err := os.Stat(src)
+		if err != nil {
+			return false, fmt.Errorf("source file does not exist: %w", err)
+		}
+		isDir = sf.IsDir()
+	} else {
+		isDir, err = mpiIsDir(src, uid, gid, mpiHostFile, log)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return !isDir, nil
+}
+
+// Check to see if the destination path is a file. If it exists, use stat to determine if it is a
+// file or a directory. If it doesn't exist, check for a trailing slash and make an assumption based
+// on that.
+func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logger) bool {
+	isFile := false
+	exists := true
+
+	// Attempt to the get the destination file. The error is not important since an assumption can
+	// be made by checking if there is a trailing slash.
+	if isTestEnv() {
+		df, _ := os.Stat(dest)
+		if df != nil { // file exists, so use IsDir()
+			isFile = !df.IsDir()
+		} else {
+			exists = false
+		}
+	} else {
+		isDir, err := mpiIsDir(dest, uid, gid, mpiHostFile, log)
+		if err == nil { // file exists, so use mpiIsDir() result
+			isFile = !isDir
+		} else {
+			exists = false
+		}
+	}
+
+	// Dest does not exist but looks like a file (no trailing slash)
+	if !exists && !strings.HasSuffix(dest, "/") {
+		log.Info("Destination does not exist and has no trailing slash - assuming file", "dest", dest)
+		isFile = true
+	}
+
+	return isFile
+}
+
+func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
+	// Don't do anything if it already exists
+	if exists, err := mpiExists(dest, uid, gid, mpiHostfile, log); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+
+	// Use setpriv to create the directory with the specified UID/GID
+	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
+		mpiHostfile, uid, gid, dest)
+	output, err := command.Run(cmd, log)
+	if err != nil {
+		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
+	}
+
+	return nil
+}
+
+// Create an MPI hostfile given settings from a profile and user config from the dm
+func createMpiHostfile(profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+	userConfig := dm.Spec.UserConfig != nil
+
+	// Create MPI hostfile only if included in the provided command
+	slots := profile.Slots
+	maxSlots := profile.MaxSlots
+
+	// Allow the user to override the slots and max_slots in the hostfile.
+	if userConfig && dm.Spec.UserConfig.Slots != nil && *dm.Spec.UserConfig.Slots >= 0 {
+		slots = *dm.Spec.UserConfig.Slots
+	}
+	if userConfig && dm.Spec.UserConfig.MaxSlots != nil && *dm.Spec.UserConfig.MaxSlots >= 0 {
+		maxSlots = *dm.Spec.UserConfig.MaxSlots
+	}
+
+	// Create it
+	hostfile, err := writeMpiHostfile(dm.Name, hosts, slots, maxSlots)
+	if err != nil {
+		return "", err
+	}
+
+	return hostfile, nil
+}
+
+// Create the MPI Hostfile given a list of hosts, slots, and maxSlots. A temporary directory is
 // created based on the DM Name. The hostfile is created inside of this directory.
 // A value of 0 for slots or maxSlots will not use it in the hostfile.
-func createMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
+func writeMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
 
 	tmpdir := filepath.Join("/tmp", dmName)
 	if err := os.MkdirAll(tmpdir, 0755); err != nil {
