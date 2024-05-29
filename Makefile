@@ -15,11 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Default container tool to use.
-#   To use podman:
-#   $ DOCKER=podman make docker-build
-DOCKER ?= docker
-
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -57,7 +52,7 @@ IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
 NNFMFU_VERSION ?= master
 
-DOCKER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
+CONTAINER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -72,6 +67,12 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+
+# CONTAINER_TOOL defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_TOOL ?= docker
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -121,8 +122,8 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
-	$(DOCKER) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(DOCKER_BUILDARGS) .
-	$(DOCKER) run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
+	${CONTAINER_TOOL} build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(CONTAINER_BUILDARGS) .
+	${CONTAINER_TOOL} run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 ##@ Build
 
@@ -137,13 +138,36 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	CGO_ENABLED=0 go run cmd/main.go
 
+# If you wish to build the manager image targeting other platforms you can use the --platform flag.
+# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
+# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+.PHONY: docker-build
 docker-build: VERSION ?= $(shell cat .version)
 docker-build: .version ## Build docker image with the manager.
-	$(DOCKER) build -t $(IMAGE_TAG_BASE):$(VERSION) $(DOCKER_BUILDARGS) .
+	${CONTAINER_TOOL} build -t $(IMAGE_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
 
+.PHONY: docker-push
 docker-push: VERSION ?= $(shell cat .version)
 docker-push: .version ## Push docker image with the manager.
-	$(DOCKER) push $(IMAGE_TAG_BASE):$(VERSION)
+	${CONTAINER_TOOL} push $(IMAGE_TAG_BASE):$(VERSION)
+
+# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
+# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
+# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
+# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
+# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
+PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+.PHONY: docker-buildx
+docker-buildx: VERSION ?= $(shell cat .version)
+docker-buildx: ## Build and push docker image for the manager for cross-platform support
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
+	$(CONTAINER_TOOL) buildx use project-v3-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(IMAGE_TAG_BASE):$(VERSION) -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx rm project-v3-builder
+	rm Dockerfile.cross
 
 kind-push: VERSION ?= $(shell cat .version)
 kind-push: .version ## Push docker image to kind
@@ -151,7 +175,7 @@ kind-push: .version ## Push docker image to kind
 	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
 	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
-	${DOCKER} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+	${CONTAINER_TOOL} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 	kind load docker-image gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 
 minikube-push: VERSION ?= $(shell cat .version)
@@ -227,7 +251,7 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 bundle-build: VERSION ?= $(shell cat .version)
 bundle-build: BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 bundle-build: .version ## Build the bundle image.
-	$(DOCKER) build -f bundle.Dockerfile -t $(BUNDLE_IMG) $(DOCKER_BUILDARGS) .
+	${CONTAINER_TOOL} build -f bundle.Dockerfile -t $(BUNDLE_IMG) $(CONTAINER_BUILDARGS) .
 
 .PHONY: bundle-push
 bundle-push: VERSION ?= $(shell cat .version)
