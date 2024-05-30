@@ -420,6 +420,24 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
 			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
+
+			// TODO: remove this
+			// Sleep for 10 minutes on a failure to investigate
+			if !isTestEnv() {
+				log.Info("Data movement failed - pausing for investigation")
+				sleepDuration := 10 * time.Minute
+				time.Sleep(sleepDuration)
+				ticker := time.NewTicker(1 * time.Minute)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						log.Info("Data movement failed - pausing for investigation")
+					}
+				}
+
+			}
+
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
@@ -433,6 +451,28 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				dm.Status.Message = combinedOutBuf.String()
 			}
 		}
+
+		// TODO: remove this
+		// Print out the contents of the destination - pass or fail
+		//
+		// index := -1
+		// for i, v := range cmd.Args {
+		// 	if v == "dcp" {
+		// 		index = i
+		// 		break
+		// 	}
+		// }
+		// if index != -1 {
+		// 	cmd.Args = cmd.Args[:index]
+		// 	newArgs := []string{"ls", "-laR", dm.Spec.Destination.Path}
+		// 	cmd.Args = append(cmd.Args, newArgs...)
+		// 	log.Info("TEST - getting dest contents", "cmd", cmdStatus.Command)
+		// 	if err = cmd.Run(); err != nil {
+		// 		log.Error(err, "TEST - failed to get dest contents", "stderr", cmd.Stderr, "stdout", cmd.Stdout)
+		// 	} else {
+		// 		log.Info("TEST - dest contents", "stdout", cmd.Stdout)
+		// 	}
+		// }
 
 		os.RemoveAll(filepath.Dir(mpiHostfile))
 
