@@ -1,7 +1,7 @@
 %undefine _missing_build_ids_terminate_build
 %global debug_package %{nil}
 
-Name: nnf-datamovement
+Name: nnf-dm
 Version: 1.0
 Release: 1%{?dist}
 Summary: Near Node Flash data movement daemon
@@ -11,8 +11,6 @@ License: Apache-2.0
 URL: https://github.com/NearNodeFlash/nnf-dm
 Source0: %{name}-%{version}.tar.gz
 
-BuildRequires:	golang
-
 %description
 This package provides the data movement server for Near Node Flash. This allows
 Near Node Flash data movement through the data movement API.
@@ -21,7 +19,8 @@ Near Node Flash data movement through the data movement API.
 %setup -q
 
 %build
-RPM_VERSION=$(cat .rpmversion) make build-daemon
+# The executable was already created by the Dockerfile.
+mkdir bin && cp /workspace/nnf-dm bin
 
 %install
 mkdir -p %{buildroot}/usr/bin/

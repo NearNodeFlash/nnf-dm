@@ -126,11 +126,20 @@ container-unit-test: .version ## Run tests inside a container image
 	${CONTAINER_TOOL} run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 ##@ Build
+RPM_PLATFORM ?= linux/amd64
+RPM_TARGET ?= x86_64
+.PHONY: build-daemon-rpm
+build-daemon-rpm: RPM_VERSION ?= $(shell ./git-version-gen | sed -e 's/\-.*//')
+build-daemon-rpm: $(RPMBIN)
+build-daemon-rpm: fmt vet ## Build standalone nnf-dm binary and its rpm
+	${CONTAINER_TOOL} build --platform=$(RPM_PLATFORM) --build-arg="RPMTARGET=$(RPM_TARGET)" --build-arg="RPMVERSION=$(RPM_VERSION)" --output=type=local,dest=$(RPMBIN) -f Dockerfile.rpmbuild .
 
+.PHONY: build-daemon
 build-daemon: RPM_VERSION ?= $(shell ./git-version-gen)
 build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
+build-daemon: $(LOCALBIN)
 build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
+	CGO_ENABLED=0 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
 	CGO_ENABLED=0 go build -o bin/manager cmd/main.go
@@ -209,6 +218,17 @@ $(LOCALBIN):
 clean-bin:
 	if [[ -d $(LOCALBIN) ]]; then \
 	  chmod -R u+w $(LOCALBIN) && rm -rf $(LOCALBIN); \
+	fi
+
+## Location to place rpms
+RPMBIN ?= $(shell pwd)/rpms
+$(RPMBIN):
+	mkdir $(RPMBIN)
+
+.PHONY: clean-rpmbin
+clean-rpmbin:
+	if [[ -d $(RPMBIN) ]]; then \
+	  rm -rf $(RPMBIN); \
 	fi
 
 ## Tool Binaries
