@@ -420,6 +420,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
 			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
+
+			// FIXME: remove this
+			log.Info("TEST: pausing for 10m after failure")
+			time.Sleep(10 * time.Minute)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
