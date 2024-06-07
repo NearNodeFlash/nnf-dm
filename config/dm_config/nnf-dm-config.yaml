@@ -33,7 +33,7 @@ profiles:
   no-xattr:
     slots: 8
     maxSlots: 0
-    command: ulimit -n 2048 && mpirun --allow-run-as-root --hostfile $HOSTFILE dcp -d dbg --progress 1 --xattrs none --uid $UID --gid $GID $SRC $DEST
+    command: ulimit -n 2048 && && lctl clear && lctl mark "RABBIT START" && mpirun --allow-run-as-root --hostfile $HOSTFILE dcp -d dbg --progress 1 --xattrs none --uid $UID --gid $GID $SRC $DEST || (lctl dk /tmp/mknod-issue.out && mv /tmp/mknod-issue.out /tmp/mknod-issue-`date +%F_%T`-`hostname`)
     logStdout: true
     storeStdout: true
 
