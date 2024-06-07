@@ -134,12 +134,22 @@ build-daemon-rpm: $(RPMBIN)
 build-daemon-rpm: fmt vet ## Build standalone nnf-dm binary and its rpm
 	${CONTAINER_TOOL} build --platform=$(RPM_PLATFORM) --build-arg="RPMTARGET=$(RPM_TARGET)" --build-arg="RPMVERSION=$(RPM_VERSION)" --output=type=local,dest=$(RPMBIN) -f daemons/compute/server/Dockerfile.rpmbuild .
 
+.PHONY: build-daemon-local
+build-daemon-local: GOOS = $(shell go env GOOS)
+build-daemon-local: GOARCH = $(shell go env GOARCH)
+build-daemon-local: build-daemon-with
+
 .PHONY: build-daemon
-build-daemon: RPM_VERSION ?= $(shell ./git-version-gen)
-build-daemon: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
-build-daemon: $(LOCALBIN)
-build-daemon: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
-	CGO_ENABLED=0 go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
+build-daemon: GOOS ?= linux
+build-daemon: GOARCH ?= amd64
+build-daemon: build-daemon-with
+
+.PHONY: build-daemon-with
+build-daemon-with: RPM_VERSION ?= $(shell ./git-version-gen)
+build-daemon-with: PACKAGE = github.com/NearNodeFlash/nnf-dm/daemons/compute/server/version
+build-daemon-with: $(LOCALBIN)
+build-daemon-with: manifests generate fmt vet ## Build standalone nnf-datamovement daemon
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X '$(PACKAGE).version=$(RPM_VERSION)'" -o bin/nnf-dm daemons/compute/server/main.go
 
 build: generate fmt vet ## Build manager binary.
 	CGO_ENABLED=0 go build -o bin/manager cmd/main.go
