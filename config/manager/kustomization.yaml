@@ -16,7 +16,7 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/nearnodeflash/nnf-dm
-  newTag: 0.1.1
+  newTag: 0.1.2
 - name: nnf-mfu
   newName: ghcr.io/nearnodeflash/nnf-mfu
   newTag: 0.1.0
