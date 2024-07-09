@@ -3,17 +3,17 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.21
 
 require (
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240628142748-51f35b24cf72
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240626175232-ad50c774ed2e
-	github.com/onsi/ginkgo/v2 v2.11.0
-	github.com/onsi/gomega v1.27.10
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240709160956-40dcbac0aadf
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240709163441-6af5511bbea9
+	github.com/onsi/ginkgo/v2 v2.17.1
+	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/takama/daemon v1.0.0
 	go.uber.org/zap v1.25.0
-	golang.org/x/crypto v0.14.0
-	golang.org/x/sys v0.13.0
+	golang.org/x/crypto v0.18.0
+	golang.org/x/sys v0.16.0
 	google.golang.org/grpc v1.57.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.33.0
 	k8s.io/api v0.28.1
 	k8s.io/apimachinery v0.28.1
 	k8s.io/client-go v0.28.1
@@ -22,12 +22,12 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20240607170045-9d0ccb5f133a // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20240708183336-34d1295977f5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -35,7 +35,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.1
 	github.com/imdario/mergo v0.3.16 // indirect
@@ -52,11 +52,11 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/term v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/term v0.16.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.8-0.20221117013220-504804fb50de // indirect
@@ -73,7 +73,7 @@ require (
 )
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20240628142816-167b50149e2d
+	github.com/DataWorkflowServices/dws v0.0.1-0.20240709160056-4a27e5a8dc76
 	go.openly.dev/pointy v1.3.0
 )
 
@@ -86,6 +86,6 @@ require (
 	github.com/kubeflow/common v0.4.6 // indirect
 	github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
-	golang.org/x/tools v0.10.0 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230803162519-f966b187b2e5 // indirect
 )
