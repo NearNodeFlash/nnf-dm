@@ -2,15 +2,9 @@ module github.com/NearNodeFlash/nnf-dm
 
 go 1.21
 
-replace github.com/DataWorkflowServices/dws => ../dws
-
-replace github.com/NearNodeFlash/lustre-fs-operator => ../lustre-fs-operator
-
-replace github.com/NearNodeFlash/nnf-sos => ../nnf-sos
-
 require (
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240628142748-51f35b24cf72
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240626175232-ad50c774ed2e
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240709160956-40dcbac0aadf
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240709163441-6af5511bbea9
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
@@ -28,7 +22,7 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20240607170045-9d0ccb5f133a // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20240708183336-34d1295977f5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -79,7 +73,7 @@ require (
 )
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20240628142816-167b50149e2d
+	github.com/DataWorkflowServices/dws v0.0.1-0.20240709160056-4a27e5a8dc76
 	go.openly.dev/pointy v1.3.0
 )
 
