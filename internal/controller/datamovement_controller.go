@@ -291,8 +291,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
 	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
-	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{}
-	cmdStatus.Command = cmd.String()
+
+	// Initialize command status
+	zero := new(int32)
+	*zero = 0
+	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{
+		ElapsedTime:        metav1.Duration{Duration: 0},
+		ProgressPercentage: zero,
+		Command:            cmd.String(),
+	}
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
 
@@ -422,6 +429,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
+
+			// Set progress to 100%
+			if *cmdStatus.ProgressPercentage != 100 {
+				hundred := new(int32)
+				*hundred = 100
+				cmdStatus.ProgressPercentage = hundred
+			}
 
 			// Profile or DM request has enabled stdout logging
 			if profile.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
