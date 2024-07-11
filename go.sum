@@ -8,6 +8,8 @@ github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240709163441-6af5511bbea9 h1:rSbs3On
 github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240709163441-6af5511bbea9/go.mod h1:p2RH66XnO+qs8L23WT1AThMGxvzMSqeBXe15FOkZIX4=
 github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240711192244-8fc032b6c19f h1:sgO4NY038975Ozpw2kXrbvD1btxzd+RZOpTPizyi/nk=
 github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240711192244-8fc032b6c19f/go.mod h1:p2RH66XnO+qs8L23WT1AThMGxvzMSqeBXe15FOkZIX4=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240711205130-5140d9e4e466 h1:xXYye2EMCvBZq1QQtMRlFVzaI+nVfXyW/3woDbRvqVA=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240711205130-5140d9e4e466/go.mod h1:p2RH66XnO+qs8L23WT1AThMGxvzMSqeBXe15FOkZIX4=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
