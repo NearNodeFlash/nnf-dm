@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2023 Hewlett Packard Enterprise Development LP
+# Copyright 2023-2024 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -21,26 +21,60 @@ set -e
 
 OVERLAY_DIR=$1
 OVERLAY=$2
-IMAGE_TAG_BASE_1=$3
-TAG_1=$4
-IMAGE_TAG_BASE_2=$5
-TAG_2=$6
+IMAGE_TAG_BASE_NNF_DM=$3
+TAG_NNF_DM=$4
+IMAGE_TAG_BASE_NNF_MFU=$5
+TAG_NNF_MFU=$6
 
 if [[ ! -d $OVERLAY_DIR ]]
 then
     mkdir "$OVERLAY_DIR"
 fi
 
+COMPONENT_LABELS="
+    - op: add
+      path: /metadata/labels/app.kubernetes.io~1version
+      value: "$TAG_NNF_DM"
+    - op: add
+      path: /metadata/labels/app.kubernetes.io~1component
+      value: nnf-dm
+"
+
+NNF_VER_LABELS=""
+if [[ -n $NNF_VERSION ]]
+then
+    NNF_VER_LABELS="
+    - op: add
+      path: /metadata/labels/app.kubernetes.io~1nnf-version
+      value: "$NNF_VERSION"
+    - op: add
+      path: /metadata/labels/app.kubernetes.io~1part-of
+      value: nnf
+"
+fi
+
 cat <<EOF > "$OVERLAY_DIR"/kustomization.yaml
 resources:
 - ../$OVERLAY
 
+patches:
+- target:
+    kind: Deployment
+  patch: |-
+$COMPONENT_LABELS
+$NNF_VER_LABELS
+- target:
+    kind: DaemonSet
+  patch: |-
+$COMPONENT_LABELS
+$NNF_VER_LABELS
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: $IMAGE_TAG_BASE_1
-  newTag: $TAG_1
-- name: $IMAGE_TAG_BASE_2
-  newTag: $TAG_2
+- name: $IMAGE_TAG_BASE_NNF_DM
+  newTag: $TAG_NNF_DM
+- name: $IMAGE_TAG_BASE_NNF_MFU
+  newTag: $TAG_NNF_MFU
 EOF
 

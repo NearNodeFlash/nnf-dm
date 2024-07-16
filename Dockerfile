@@ -21,7 +21,7 @@ ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
 ARG NNFMFU_VERSION=0.1.0
 
 # Build the manager binary
-FROM golang:1.19-alpine as builder
+FROM golang:1.21-alpine as builder
 
 ARG TARGETARCH
 ARG TARGETOS
