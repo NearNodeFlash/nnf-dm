@@ -59,8 +59,6 @@ import (
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 
-	dmctrl "github.com/NearNodeFlash/nnf-dm/internal/controller"
-
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/compute/server/auth"
@@ -245,7 +243,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(ce event.CreateEvent) bool { return false },
 		UpdateFunc: func(ue event.UpdateEvent) bool {
-			if initiator := ue.ObjectNew.GetLabels()[dmctrl.InitiatorLabel]; initiator == s.name {
+			if initiator := ue.ObjectNew.GetLabels()[nnfv1alpha1.DataMovementInitiatorLabel]; initiator == s.name {
 				return true
 			}
 			return false
@@ -444,8 +442,8 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 			// Use the data movement namespace.
 			Namespace: nnfv1alpha1.DataMovementNamespace,
 			Labels: map[string]string{
-				dmctrl.InitiatorLabel:           s.name,
-				nnfv1alpha1.DirectiveIndexLabel: dwIndex,
+				nnfv1alpha1.DataMovementInitiatorLabel: s.name,
+				nnfv1alpha1.DirectiveIndexLabel:        dwIndex,
 			},
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
@@ -480,7 +478,7 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 			GenerateName: nodeNameBase,
 			Namespace:    s.namespace, // Use the rabbit
 			Labels: map[string]string{
-				dmctrl.InitiatorLabel: s.name,
+				nnfv1alpha1.DataMovementInitiatorLabel: s.name,
 			},
 		},
 		Spec: nnfv1alpha1.NnfDataMovementSpec{
