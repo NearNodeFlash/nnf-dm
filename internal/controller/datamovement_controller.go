@@ -62,8 +62,6 @@ import (
 const (
 	finalizer = "dm.cray.hpe.com"
 
-	InitiatorLabel = "dm.cray.hpe.com/initiator"
-
 	// DM ConfigMap Info
 	configMapName      = "nnf-dm-config"
 	configMapNamespace = nnfv1alpha1.DataMovementNamespace
