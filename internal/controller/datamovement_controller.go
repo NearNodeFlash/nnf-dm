@@ -74,6 +74,42 @@ const (
 // Copied 1.000 GiB (10%) in 1.001 secs (4.174 GiB/s) 9 secs left ..."
 var progressRe = regexp.MustCompile(`Copied.+\(([[:digit:]]{1,3})%\)`)
 
+// Regexes to scrape the stats output of the `dcp` command once it's done. Example output:
+/*
+Copied 18.626 GiB (100%) in 171.434 secs (111.259 MiB/s) done
+Copy data: 18.626 GiB (20000000000 bytes)
+Copy rate: 111.258 MiB/s (20000000000 bytes in 171.434 seconds)
+Syncing data to disk.
+Sync completed in 0.017 seconds.
+Fixing permissions.
+Updated 2 items in 0.003 seconds (742.669 items/sec)
+Syncing directory updates to disk.
+Sync completed in 0.001 seconds.
+Started: Jul-25-2024,16:44:33
+Completed: Jul-25-2024,16:47:25
+Seconds: 171.458
+Items: 2
+  Directories: 1
+  Files: 1
+  Links: 0
+Data: 18.626 GiB (20000000000 bytes)
+Rate: 111.243 MiB/s (20000000000 bytes in 171.458 seconds)
+*/
+type statsRegex struct {
+	name  string
+	regex *regexp.Regexp
+}
+
+var dcpStatsRegexes = []statsRegex{
+	{"seconds", regexp.MustCompile(`Seconds: ([[:digit:].]+)`)},
+	{"items", regexp.MustCompile(`Items: ([[:digit:]]+)`)},
+	{"dirs", regexp.MustCompile(`Directories: ([[:digit:]]+)`)},
+	{"files", regexp.MustCompile(`Files: ([[:digit:]]+)`)},
+	{"links", regexp.MustCompile(`Files: ([[:digit:]]+)`)},
+	{"data", regexp.MustCompile(`Data: (.*)`)},
+	{"rate", regexp.MustCompile(`Rate: (.*)`)},
+}
+
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
 	client.Client
@@ -335,15 +371,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						}
 
 						// If it's a progress line, grab the percentage
-						match := progressRe.FindStringSubmatch(line)
-						if len(match) > 0 {
-							progress, err := strconv.Atoi(match[1])
-							if err != nil {
-								log.Error(err, "failed to parse progress output", "match", match)
+						if err := parseDcpProgress(line, &cmdStatus); err != nil {
+							log.Error(err, "failed to parse progress", "line", line)
+							return
+						}
+
+						// Collect stats only when finished
+						if cmdStatus.ProgressPercentage != nil && *cmdStatus.ProgressPercentage >= 100 {
+							if err := parseDcpStats(line, &cmdStatus); err != nil {
+								log.Error(err, "failed to parse stats", "line", line)
 								return
 							}
-							progressInt32 := int32(progress)
-							cmdStatus.ProgressPercentage = &progressInt32
 						}
 
 						// Always update LastMessage and timing
@@ -458,6 +496,78 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}()
 
 	return ctrl.Result{}, nil
+}
+
+func parseDcpProgress(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+	match := progressRe.FindStringSubmatch(line)
+	if len(match) > 0 {
+		progress, err := strconv.Atoi(match[1])
+		if err != nil {
+			return fmt.Errorf("failed to parse progress output: %w", err)
+		}
+		progressInt32 := int32(progress)
+		cmdStatus.ProgressPercentage = &progressInt32
+	}
+
+	return nil
+}
+
+// Go through the list of dcp stat regexes, parse them, and put them in their appropriate place in cmdStatus
+func parseDcpStats(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+	for _, s := range dcpStatsRegexes {
+		match := s.regex.FindStringSubmatch(line)
+		if len(match) > 0 {
+			matched := true // default case will set this to false
+
+			// Each regex is parsed depending on its type (e.g. float, int, string) and then stored
+			// in a different place in cmdStatus
+			switch s.name {
+			case "seconds":
+				cmdStatus.Seconds = match[1]
+			case "items":
+				items, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Items output: %w", err)
+				}
+				i32 := int32(items)
+				cmdStatus.Items = &i32
+			case "dirs":
+				dirs, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Directories output: %w", err)
+				}
+				i32 := int32(dirs)
+				cmdStatus.Directories = &i32
+			case "files":
+				files, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Directories output: %w", err)
+				}
+				i32 := int32(files)
+				cmdStatus.Files = &i32
+			case "links":
+				links, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Links output: %w", err)
+				}
+				i32 := int32(links)
+				cmdStatus.Links = &i32
+			case "data":
+				cmdStatus.Data = match[1]
+			case "rate":
+				cmdStatus.Rate = match[1]
+			default:
+				matched = false // if we got here then nothing happened, so try the next regex
+			}
+
+			// if one of the regexes matched, then we're done
+			if matched {
+				return nil
+			}
+		}
+	}
+
+	return nil
 }
 
 func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
