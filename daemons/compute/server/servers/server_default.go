@@ -96,6 +96,7 @@ type defaultServer struct {
 // Ensure permissions are granted to access the system configuration; this is done so the NNF
 // Node Name can be found given a Node Name.
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=systemconfigurations,verbs=get;list;watch
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovementprofiles,verbs=get;list;watch
 
 func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 
@@ -237,7 +238,7 @@ func (s *defaultServer) StartManager() error {
 }
 
 // Setup two managers for watching the individual data movement type resources. They behave
-// similarily, performing a reconcile only for updates to this node
+// similarly, performing a reconcile only for updates to this node
 func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 
 	p := predicate.Funcs{
@@ -355,6 +356,20 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
+	// Dm Profile - no pinned profiles here since copy_offload could use any profile
+	profile, err := s.getProfile(ctx, req.Profile)
+	if err != nil {
+		return &pb.DataMovementCreateResponse{
+			Status:  pb.DataMovementCreateResponse_FAILED,
+			Message: "Error finding profile: " + err.Error(),
+		}, nil
+	}
+	dm.Spec.ProfileReference = corev1.ObjectReference{
+		Kind:      reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name(),
+		Name:      profile.Name,
+		Namespace: profile.Namespace,
+	}
+
 	dm.Spec.UserId = userId
 	dm.Spec.GroupId = groupId
 
@@ -396,6 +411,47 @@ func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha1.NnfDataMov
 	if req.MaxSlots >= 0 {
 		dm.Spec.UserConfig.MaxSlots = pointy.Int(int(req.MaxSlots))
 	}
+}
+
+func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nnfv1alpha1.NnfDataMovementProfile, error) {
+	ns := "nnf-system"
+
+	// If a profile is named then verify that it exists.  Otherwise, verify that a default profile
+	// can be found.
+	if len(profileName) == 0 {
+		NnfDataMovementProfiles := &nnfv1alpha1.NnfDataMovementProfileList{}
+		if err := s.client.List(ctx, NnfDataMovementProfiles, &client.ListOptions{Namespace: ns}); err != nil {
+			return nil, err
+		}
+		profilesFound := make([]string, 0, len(NnfDataMovementProfiles.Items))
+		for _, profile := range NnfDataMovementProfiles.Items {
+			if profile.Data.Default {
+				objkey := client.ObjectKeyFromObject(&profile)
+				profilesFound = append(profilesFound, objkey.Name)
+			}
+		}
+		// Require that there be one and only one default.
+		if len(profilesFound) == 0 {
+			return nil, fmt.Errorf("unable to find a default NnfDataMovementProfile to use")
+		} else if len(profilesFound) > 1 {
+			return nil, fmt.Errorf("more than one default NnfDataMovementProfile found; unable to pick one: %v", profilesFound)
+		}
+		profileName = profilesFound[0]
+	}
+
+	profile := &nnfv1alpha1.NnfDataMovementProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      profileName,
+			Namespace: ns,
+		},
+	}
+
+	err := s.client.Get(ctx, client.ObjectKeyFromObject(profile), profile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve NnfDataMovementProfile: %s", profileName)
+	}
+
+	return profile, nil
 }
 
 func getDirectiveIndexFromClientMount(object *dwsv1alpha2.ClientMount) (string, error) {
@@ -459,7 +515,6 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 					Name:      lustrefs.Name,
 				},
 			},
-			Profile: req.Profile,
 		},
 	}
 
@@ -489,7 +544,6 @@ func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.D
 			Destination: &nnfv1alpha1.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
-			Profile: req.Profile,
 		},
 	}
 

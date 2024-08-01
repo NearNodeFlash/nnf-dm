@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240709160956-40dcbac0aadf
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240729130730-8f01fd2116ea
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240801190336-58f2d99dd6cb
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
@@ -69,11 +69,11 @@ require (
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20240726140248-bd9f85356c73
+	github.com/DataWorkflowServices/dws v0.0.1-0.20240801173757-1fb2188d84b9
 	go.openly.dev/pointy v1.3.0
 )
 

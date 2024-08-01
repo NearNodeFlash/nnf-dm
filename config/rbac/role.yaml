@@ -139,6 +139,14 @@ rules:
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
+  - nnfdatamovementprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
   - nnfdatamovements
   verbs:
   - create
