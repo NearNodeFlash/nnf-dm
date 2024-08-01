@@ -179,6 +179,7 @@ func (*defaultController) SetOptions(opts *ctrl.Options) {
 	namespaceCache := make(map[string]cache.Config)
 	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
 	namespaceCache[nnfv1alpha1.DataMovementNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha1.DataMovementProfileNamespace] = cache.Config{}
 	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
@@ -205,6 +206,7 @@ func (*nodeController) SetOptions(opts *ctrl.Options) {
 	namespaceCache := make(map[string]cache.Config)
 	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
 	namespaceCache[nnfv1alpha1.DataMovementNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha1.DataMovementProfileNamespace] = cache.Config{}
 	namespaceCache[os.Getenv("NNF_NODE_NAME")] = cache.Config{}
 	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
