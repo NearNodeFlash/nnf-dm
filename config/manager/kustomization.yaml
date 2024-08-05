@@ -4,8 +4,8 @@ resources:
 generatorOptions:
   disableNameSuffixHash: true
 
-#patchesStrategicMerge:
-#- manager_imagepullsecret_patch.yaml
+#patches:
+#- path: manager_imagepullsecret_patch.yaml
 
 configMapGenerator:
 - files:
