@@ -34,14 +34,16 @@ type NnfDataMovementProfileData struct {
 	// +kubebuilder:default:=false
 	Pinned bool `json:"pinned,omitempty"`
 
-	// Slots is the number of slots specified in the MPI hostfile. A value less than 1 disables the
-	// use of slots in the hostfile.
+	// Slots is the number of slots specified in the MPI hostfile. A value of 0 disables the use of
+	// slots in the hostfile.
 	// +kubebuilder:default:=8
+	// +kubebuilder:validation:Minimum:=0
 	Slots int `json:"slots"`
 
-	// MaxSlots is the number of max_slots specified in the MPI hostfile. A value less than 1
-	// disables the use of max_slots in the hostfile.
+	// MaxSlots is the number of max_slots specified in the MPI hostfile. A value of 0 disables the
+	// use of max_slots in the hostfile.
 	// +kubebuilder:default:=0
+	// +kubebuilder:validation:Minimum:=0
 	MaxSlots int `json:"maxSlots"`
 
 	// Command to execute to perform data movement. $VARS are replaced by the nnf software and must
@@ -69,9 +71,17 @@ type NnfDataMovementProfileData struct {
 	// NnfDataMovement resources have the ability to collect and store the progress percentage and the
 	// last few lines of output in the CommandStatus field. This number is used for the interval to collect
 	// the progress data. `dcp --progress N` must be included in the data movement command in order for
-	// progress to be collected. A value less than 1 disables this functionality.
+	// progress to be collected. A value of 0 disables this functionality.
 	// +kubebuilder:default:=5
+	// +kubebuilder:validation:Minimum:=0
 	ProgressIntervalSeconds int `json:"progressIntervalSeconds,omitempty"`
+
+	// CreateDestDir will ensure that the destination directory exists before performing data
+	// movement.  This will cause a number of stat commends to determine the source and destination
+	// file types, so that the correct pathing for the destination can be determined. Then, a mkdir
+	// is issued.
+	// +kubebuilder:default:=true
+	CreateDestDir bool `json:"createDestDir"`
 }
 
 // +kubebuilder:object:root=true
