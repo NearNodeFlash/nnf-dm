@@ -21,7 +21,7 @@ ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
 ARG NNFMFU_VERSION=master
 
 # Build the manager binary
-FROM golang:1.21-alpine as builder
+FROM golang:1.21-alpine AS builder
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -48,7 +48,7 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 ###############################################################################
-FROM builder as testing
+FROM builder AS testing
 
 WORKDIR /workspace
 
