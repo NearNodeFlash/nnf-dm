@@ -270,10 +270,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 
 	// Prepare Destination Directory
-	if err = r.prepareDestination(ctx, dm, mpiHostfile, log); err != nil {
+	if err = r.prepareDestination(ctx, profile, mpiHostfile, dm, log); err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
 
 	// Build command
 	cmdArgs, err := buildDMCommand(ctx, profile, mpiHostfile, dm)
@@ -595,43 +594,48 @@ func buildDMCommand(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementPro
 	return strings.Split(cmd, " "), nil
 }
 
-func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, mpiHostfile string, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
 	// These functions interact with the filesystem, so they can't run in the test env
-	if !isTestEnv() {
-		// Determine the destination directory based on the source and path
-		log.Info("Determining destination directory based on source/dest file types")
-		destDir, err := getDestinationDir(dm, mpiHostfile, log)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
-		}
-
-		// See if an index mount directory on the destination is required
-		log.Info("Determining if index mount directory is required")
-		indexMount, err := r.checkIndexMountDir(ctx, dm)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
-		}
-
-		// Account for index mount directory on the destDir and the dm dest path
-		// This updates the destination on dm
-		if indexMount != "" {
-			log.Info("Index mount directory is required", "indexMountdir", indexMount)
-			d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
-			if err != nil {
-				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
-			}
-			destDir = d
-			log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
-		}
-
-		// Create the destination directory
-		log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
-		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
-			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
-		}
+	// Also, if the profile disables destination creation, skip it
+	if isTestEnv() || !profile.Data.CreateDestDir {
+		return nil
 	}
 
+	// Determine the destination directory based on the source and path
+	log.Info("Determining destination directory based on source/dest file types")
+	destDir, err := getDestinationDir(dm, mpiHostfile, log)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+	}
+
+	// See if an index mount directory on the destination is required
+	log.Info("Determining if index mount directory is required")
+	indexMount, err := r.checkIndexMountDir(ctx, dm)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+	}
+
+	// Account for index mount directory on the destDir and the dm dest path
+	// This updates the destination on dm
+	if indexMount != "" {
+		log.Info("Index mount directory is required", "indexMountdir", indexMount)
+		d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+		}
+		destDir = d
+		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
+	}
+
+	// Create the destination directory
+	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
+	if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
+		return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+	}
+
+	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
 	return nil
+
 }
 
 // Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
