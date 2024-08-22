@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -42,7 +43,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/yaml"
 )
 
 // This is dumped into a temporary file and then ran as a bash script.
@@ -56,10 +56,8 @@ var _ = Describe("Data Movement Test", func() {
 
 	Describe("Reconciler Tests", func() {
 		var dm *nnfv1alpha1.NnfDataMovement
-		var cm *corev1.ConfigMap
-		var dmCfg *dmConfig
-		var dmCfgProfile dmConfigProfile
-		createCm := true
+		var dmProfile *nnfv1alpha1.NnfDataMovementProfile
+		createDmProfile := true
 		var tmpDir string
 		var srcPath string
 		var destPath string
@@ -85,7 +83,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		BeforeEach(func() {
 			var err error
-			createCm = true
+			createDmProfile = true
 			testLabel = fmt.Sprintf("%s-%s", testLabelKey, uuid.NewString())
 
 			tmpDir, err = os.MkdirTemp("/tmp", "dm-test")
@@ -104,16 +102,21 @@ var _ = Describe("Data Movement Test", func() {
 			}
 			k8sClient.Create(context.TODO(), ns)
 
-			// Default config map data
-			dmCfg = &dmConfig{
-				Profiles: map[string]dmConfigProfile{
-					nnfv1alpha1.DataMovementProfileDefault: {
-						Command: defaultCommand,
+			// Default DM profile
+			dmProfile = &nnfv1alpha1.NnfDataMovementProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default",
+					Namespace: corev1.NamespaceDefault,
+					Labels: map[string]string{
+						testLabelKey: testLabel,
 					},
 				},
-				ProgressIntervalSeconds: 1,
+				Data: nnfv1alpha1.NnfDataMovementProfileData{
+					Command:                 defaultCommand,
+					ProgressIntervalSeconds: 1,
+					Default:                 true,
+				},
 			}
-			dmCfgProfile = dmCfg.Profiles[nnfv1alpha1.DataMovementProfileDefault]
 
 			dm = &nnfv1alpha1.NnfDataMovement{
 				ObjectMeta: metav1.ObjectMeta{
@@ -133,37 +136,22 @@ var _ = Describe("Data Movement Test", func() {
 					UserId:  0,
 					GroupId: 0,
 					Cancel:  false,
+					ProfileReference: corev1.ObjectReference{
+						Kind:      reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name(),
+						Name:      dmProfile.Name,
+						Namespace: dmProfile.Namespace,
+					},
 				},
 			}
 		})
 
 		JustBeforeEach(func() {
-			// Create CM and verify label
-			if createCm {
-				// allow test to override the values in the default cfg profile
-				dmCfg.Profiles[nnfv1alpha1.DataMovementProfileDefault] = dmCfgProfile
-
-				// Convert the config to raw
-				b, err := yaml.Marshal(dmCfg)
-				Expect(err).ToNot(HaveOccurred())
-
-				cm = &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      configMapName,
-						Namespace: v1alpha1.DataMovementNamespace,
-						Labels: map[string]string{
-							testLabelKey: testLabel,
-						},
-					},
-					Data: map[string]string{
-						configMapKeyData: string(b),
-					},
-				}
-
-				Expect(k8sClient.Create(context.TODO(), cm)).To(Succeed())
+			// Create DM Profile and verify label
+			if createDmProfile {
+				Expect(k8sClient.Create(context.TODO(), dmProfile)).To(Succeed())
 				Eventually(func(g Gomega) string {
-					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-					return cm.Labels[testLabelKey]
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dmProfile), dmProfile)).To(Succeed())
+					return dmProfile.Labels[testLabelKey]
 				}).Should(Equal(testLabel))
 			}
 
@@ -186,10 +174,10 @@ var _ = Describe("Data Movement Test", func() {
 			}
 
 			// Remove configmap
-			if createCm {
-				Expect(k8sClient.Delete(context.TODO(), cm)).To(Succeed())
+			if createDmProfile {
+				Expect(k8sClient.Delete(context.TODO(), dmProfile)).To(Succeed())
 				Eventually(func() error {
-					return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)
+					return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dmProfile), dmProfile)
 				}).ShouldNot(Succeed())
 			}
 
@@ -199,7 +187,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when a data movement operation succeeds", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "sleep 1"
+				dmProfile.Data.Command = "sleep 1"
 			})
 			It("should have a state and status of 'Finished' and 'Success'", func() {
 				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
@@ -214,7 +202,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when a data movement command has no progress output", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "sleep 1"
+				dmProfile.Data.Command = "sleep 1"
 			})
 			It("CommandStatus should not have a ProgressPercentage", func() {
 				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
@@ -232,7 +220,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when the dm configmap has specified an overrideCmd", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "ls -l"
+				dmProfile.Data.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -242,13 +230,13 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmProfile.Data.Command))
 			})
 		})
 
 		Context("when the dm configmap does not have $HOSTFILE in the command", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "ls -l"
+				dmProfile.Data.Command = "ls -l"
 			})
 			It("should use that command instead of the default mpirun", func() {
 				Eventually(func(g Gomega) string {
@@ -258,14 +246,14 @@ var _ = Describe("Data Movement Test", func() {
 						cmd = dm.Status.CommandStatus.Command
 					}
 					return cmd
-				}).Should(Equal(cmdBashPrefix + dmCfgProfile.Command))
+				}).Should(Equal(cmdBashPrefix + dmProfile.Data.Command))
 			})
 		})
 
 		Context("when the dm config map has specified a dmProgressInterval of less than 1s", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "sleep .5"
-				dmCfg.ProgressIntervalSeconds = 0
+				dmProfile.Data.Command = "sleep .5"
+				dmProfile.Data.ProgressIntervalSeconds = 0
 			})
 
 			It("the data movement should skip progress collection", func() {
@@ -288,8 +276,8 @@ var _ = Describe("Data Movement Test", func() {
 		Context("when the dm config map has specified to store Stdout", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
-				dmCfgProfile.Command = "echo " + output
-				dmCfgProfile.StoreStdout = true
+				dmProfile.Data.Command = "echo " + output
+				dmProfile.Data.StoreStdout = true
 			})
 
 			It("should store the output in Status.Message", func() {
@@ -311,8 +299,8 @@ var _ = Describe("Data Movement Test", func() {
 		Context("when the dm config map has specified to not store Stdout", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
-				dmCfgProfile.Command = "echo " + output
-				dmCfgProfile.StoreStdout = false
+				dmProfile.Data.Command = "echo " + output
+				dmProfile.Data.StoreStdout = false
 			})
 
 			It("should not store anything in Status.Message", func() {
@@ -334,7 +322,7 @@ var _ = Describe("Data Movement Test", func() {
 		Context("when the UserConfig has specified to store Stdout", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
-				dmCfgProfile.Command = "echo " + output
+				dmProfile.Data.Command = "echo " + output
 				dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
 					StoreStdout: true,
 				}
@@ -359,7 +347,7 @@ var _ = Describe("Data Movement Test", func() {
 		Context("when the UserConfig has specified not to store Stdout", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
-				dmCfgProfile.Command = "echo " + output
+				dmProfile.Data.Command = "echo " + output
 				dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
 					StoreStdout: false,
 				}
@@ -383,7 +371,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when there is no dm config map", func() {
 			BeforeEach(func() {
-				createCm = false
+				createDmProfile = false
 			})
 
 			It("should requeue and not start running", func() {
@@ -395,15 +383,27 @@ var _ = Describe("Data Movement Test", func() {
 		})
 
 		Context("when a non-default profile is supplied (and present)", func() {
-			p := "test-profile"
+			p := &nnfv1alpha1.NnfDataMovementProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-profile",
+					Namespace: corev1.NamespaceDefault,
+				},
+			}
 			cmd := "sleep .1"
 
 			BeforeEach(func() {
-				dmCfgProfile = dmConfigProfile{
-					Command: cmd,
+				p.Data.Command = cmd
+				dm.Spec.ProfileReference = corev1.ObjectReference{
+					Kind:      reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name(),
+					Name:      p.Name,
+					Namespace: p.Namespace,
 				}
-				dmCfg.Profiles[p] = dmCfgProfile
-				dm.Spec.Profile = p
+
+				Expect(k8sClient.Create(context.TODO(), p)).To(Succeed(), "create nnfDataMovementProfile")
+
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(p), p)).To(Succeed())
+				}, "3s", "1s").Should(Succeed(), "wait for create of NnfDataMovementProfile")
 			})
 			It("should use that profile to perform data movement", func() {
 
@@ -417,21 +417,33 @@ var _ = Describe("Data Movement Test", func() {
 				}))
 
 				By("verify that profile is used")
-				Expect(dm.Spec.Profile).To(Equal(p))
+				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
+					Fields{
+						"Kind":      Equal(reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name()),
+						"Name":      Equal(p.Name),
+						"Namespace": Equal(p.Namespace),
+					},
+				))
 				Expect(dm.Status.CommandStatus.Command).To(Equal(cmdBashPrefix + cmd))
 			})
 		})
 
 		Context("when a non-default profile is supplied (and NOT present)", func() {
-			m := "missing-test-profile"
+			m := &nnfv1alpha1.NnfDataMovementProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "missing-test-profile",
+					Namespace: corev1.NamespaceDefault,
+				},
+			}
 			cmd := "sleep .1"
 
 			BeforeEach(func() {
-				dmCfgProfile = dmConfigProfile{
-					Command: cmd,
+				m.Data.Command = cmd
+				dm.Spec.ProfileReference = corev1.ObjectReference{
+					Kind:      reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name(),
+					Name:      m.Name,
+					Namespace: m.Namespace,
 				}
-				dmCfg.Profiles["test-profile"] = dmCfgProfile
-				dm.Spec.Profile = m
 			})
 			It("should use that profile to perform data movement and fail", func() {
 
@@ -445,13 +457,19 @@ var _ = Describe("Data Movement Test", func() {
 				}))
 
 				By("verify that profile is used")
-				Expect(dm.Spec.Profile).To(Equal(m))
+				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
+					Fields{
+						"Kind":      Equal(reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name()),
+						"Name":      Equal(m.Name),
+						"Namespace": Equal(m.Namespace),
+					},
+				))
 			})
 		})
 
 		Context("when a data movement command fails", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "false"
+				dmProfile.Data.Command = "false"
 			})
 			It("should have a State/Status of 'Finished'/'Failed'", func() {
 				Eventually(func(g Gomega) nnfv1alpha1.NnfDataMovementStatus {
@@ -470,7 +488,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				// Set cancel on creation so that data movement doesn't start
 				dm.Spec.Cancel = true
-				dmCfgProfile.Command = "false"
+				dmProfile.Data.Command = "false"
 			})
 
 			It("should have a State/Status of 'Finished'/'Cancelled' and StartTime/EndTime should be set to now", func() {
@@ -530,14 +548,14 @@ var _ = Describe("Data Movement Test", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				commandWithArgs = fmt.Sprintf("/bin/bash %s %d %f", scriptFilePath, commandDuration, commandIntervalInSec)
-				dmCfgProfile.Command = commandWithArgs
+				dmProfile.Data.Command = commandWithArgs
 			})
 
 			It("should update progress by parsing the output of the command", func() {
 				startTime := metav1.NowMicro()
 
-				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(cm), cm)).To(Succeed())
-				Expect(dmCfgProfile.Command).To(Equal(commandWithArgs))
+				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dmProfile), dmProfile)).To(Succeed())
+				Expect(dmProfile.Data.Command).To(Equal(commandWithArgs))
 
 				By("ensuring that we do not have a progress to start")
 				Eventually(func(g Gomega) *int32 {
@@ -614,8 +632,8 @@ var _ = Describe("Data Movement Test", func() {
 				_, err := os.Stat(scriptFilePath)
 				Expect(err).ToNot(HaveOccurred())
 
-				dmCfgProfile.Command = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
-				dmCfg.ProgressIntervalSeconds = 1
+				dmProfile.Data.Command = fmt.Sprintf("/bin/bash %s 10 .25", scriptFilePath)
+				dmProfile.Data.ProgressIntervalSeconds = 1
 			})
 
 			It("LastMessage should not include multiple lines of output", func() {
@@ -635,7 +653,7 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("when a data movement operation is cancelled", func() {
 			BeforeEach(func() {
-				dmCfgProfile.Command = "sleep 5"
+				dmProfile.Data.Command = "sleep 5"
 			})
 			It("should have a state and status of 'Finished' and 'Cancelled'", func() {
 				By("ensuring the data movement started")
@@ -737,11 +755,10 @@ var _ = Describe("Data Movement Test", func() {
 			}
 			When("$HOSTFILE is present", func() {
 				It("should create the hostfile", func() {
-					profile := dmConfigProfile{
-						Command: "mpirun --hostfile $HOSTFILE dcp src dest",
-					}
+					profile := nnfv1alpha1.NnfDataMovementProfile{}
+					profile.Data.Command = "mpirun --hostfile $HOSTFILE dcp src dest"
 
-					hostfile, err := createMpiHostfile(profile, hosts, &dm)
+					hostfile, err := createMpiHostfile(&profile, hosts, &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(len(hostfile)).Should((BeNumerically(">", 0)))
 					info, err := os.Stat(hostfile)
@@ -773,9 +790,9 @@ var _ = Describe("Data Movement Test", func() {
 
 			When("DCPOptions are specified", func() {
 				It("should inject the extra options before the $SRC argument to dcp", func() {
-					profile := dmConfigProfile{
-						Command: defaultCommand,
-					}
+					profile := nnfv1alpha1.NnfDataMovementProfile{}
+					profile.Data.Command = defaultCommand
+
 					dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
 						DCPOptions: "--extra opts",
 					}
@@ -783,7 +800,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := buildDMCommand(context.TODO(), profile, "/tmp/hostfile", &dm)
+					cmd, err := buildDMCommand(context.TODO(), &profile, "/tmp/hostfile", &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -794,17 +811,19 @@ var _ = Describe("Data Movement Test", func() {
 					func(numSlots *int) {
 						profileSlots, profileMaxSlots := 3, 8
 
-						profile := dmConfigProfile{
-							Command:  defaultCommand,
-							Slots:    profileSlots,
-							MaxSlots: profileMaxSlots,
+						profile := nnfv1alpha1.NnfDataMovementProfile{
+							Data: nnfv1alpha1.NnfDataMovementProfileData{
+								Command:  defaultCommand,
+								Slots:    profileSlots,
+								MaxSlots: profileMaxSlots,
+							},
 						}
 						dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
 							Slots:    numSlots,
 							MaxSlots: numSlots,
 						}
 
-						hostfilePath, err := createMpiHostfile(profile, hosts, &dm)
+						hostfilePath, err := createMpiHostfile(&profile, hosts, &dm)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(hostfilePath).ToNot(BeEmpty())
 						DeferCleanup(func() {
