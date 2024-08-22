@@ -50,7 +50,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/yaml"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
@@ -61,20 +60,47 @@ import (
 
 const (
 	finalizer = "dm.cray.hpe.com"
-
-	InitiatorLabel = "dm.cray.hpe.com/initiator"
-
-	// DM ConfigMap Info
-	configMapName      = "nnf-dm-config"
-	configMapNamespace = nnfv1alpha1.DataMovementNamespace
-
-	// DM ConfigMap Data Keys
-	configMapKeyData = "nnf-dm-config.yaml"
 )
 
 // Regex to scrape the progress output of the `dcp` command. Example output:
 // Copied 1.000 GiB (10%) in 1.001 secs (4.174 GiB/s) 9 secs left ..."
 var progressRe = regexp.MustCompile(`Copied.+\(([[:digit:]]{1,3})%\)`)
+
+// Regexes to scrape the stats output of the `dcp` command once it's done. Example output:
+/*
+Copied 18.626 GiB (100%) in 171.434 secs (111.259 MiB/s) done
+Copy data: 18.626 GiB (20000000000 bytes)
+Copy rate: 111.258 MiB/s (20000000000 bytes in 171.434 seconds)
+Syncing data to disk.
+Sync completed in 0.017 seconds.
+Fixing permissions.
+Updated 2 items in 0.003 seconds (742.669 items/sec)
+Syncing directory updates to disk.
+Sync completed in 0.001 seconds.
+Started: Jul-25-2024,16:44:33
+Completed: Jul-25-2024,16:47:25
+Seconds: 171.458
+Items: 2
+  Directories: 1
+  Files: 1
+  Links: 0
+Data: 18.626 GiB (20000000000 bytes)
+Rate: 111.243 MiB/s (20000000000 bytes in 171.458 seconds)
+*/
+type statsRegex struct {
+	name  string
+	regex *regexp.Regexp
+}
+
+var dcpStatsRegexes = []statsRegex{
+	{"seconds", regexp.MustCompile(`Seconds: ([[:digit:].]+)`)},
+	{"items", regexp.MustCompile(`Items: ([[:digit:]]+)`)},
+	{"dirs", regexp.MustCompile(`Directories: ([[:digit:]]+)`)},
+	{"files", regexp.MustCompile(`Files: ([[:digit:]]+)`)},
+	{"links", regexp.MustCompile(`Files: ([[:digit:]]+)`)},
+	{"data", regexp.MustCompile(`Data: (.*)`)},
+	{"rate", regexp.MustCompile(`Rate: (.*)`)},
+}
 
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
@@ -95,21 +121,6 @@ type dataMovementCancelContext struct {
 	cancel context.CancelFunc
 }
 
-// Configuration that matches the nnf-dm-config ConfigMap
-type dmConfig struct {
-	Profiles                map[string]dmConfigProfile `yaml:"profiles"`
-	ProgressIntervalSeconds int                        `yaml:"progressIntervalSeconds,omitempty"`
-}
-
-// Each profile can have different settings
-type dmConfigProfile struct {
-	Slots       int    `yaml:"slots,omitempty"`
-	MaxSlots    int    `yaml:"maxSlots,omitempty"`
-	Command     string `yaml:"command"`
-	LogStdout   bool   `yaml:"logStdout"`
-	StoreStdout bool   `yaml:"storeStdout"`
-}
-
 // Invalid error is a non-recoverable error type that implies the Data Movement resource is invalid
 type invalidError struct {
 	err error
@@ -127,6 +138,7 @@ func (i *invalidError) Unwrap() error { return i.err }
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovements/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfdatamovementprofiles,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfstorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nnf.cray.hpe.com,resources=nnfnodestorages,verbs=get;list;watch
 //+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=clientmounts,verbs=get;list
@@ -242,29 +254,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		cancel: cancel,
 	})
 
-	// Get DM Config map
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: configMapNamespace,
-		},
+	// Get DM Profile
+	profile, err := r.getDMProfile(ctx, dm)
+	if err != nil {
+		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get profile for data movement").WithError(err).WithMajor()
 	}
-	if err := r.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get data movement config map: %v", client.ObjectKeyFromObject(configMap)).WithError(err).WithMajor()
-	}
-
-	cfg := dmConfig{}
-	if err := yaml.Unmarshal([]byte(configMap.Data[configMapKeyData]), &cfg); err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("invalid data for config map: %v", client.ObjectKeyFromObject(configMap)).WithError(err).WithFatal()
-	}
-	log.Info("Using config map", "config", cfg)
-
-	// Ensure requested DM profile exists
-	profile, found := cfg.Profiles[dm.Spec.Profile]
-	if !found {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithUserMessage("'%s' profile not found in config map: %v", dm.Spec.Profile, client.ObjectKeyFromObject(configMap)).WithUser().WithFatal()
-	}
-	log.Info("Using profile", "profile name", dm.Spec.Profile, "profile", profile)
+	log.Info("Using profile", "profile", profile)
 
 	// Create the hostfile. This is needed for preparing the destination and the data movement
 	// command itself.
@@ -275,10 +270,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 
 	// Prepare Destination Directory
-	if err = r.prepareDestination(ctx, dm, mpiHostfile, log); err != nil {
+	if err = r.prepareDestination(ctx, profile, mpiHostfile, dm, log); err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
 
 	// Build command
 	cmdArgs, err := buildDMCommand(ctx, profile, mpiHostfile, dm)
@@ -317,7 +311,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// While the command is running, capture and process the output. Read lines until EOF to
 		// ensure we have the latest output. Then use the last regex match to obtain the most recent
 		// progress.
-		progressCollectInterval := time.Duration(cfg.ProgressIntervalSeconds) * time.Second
+		progressCollectInterval := time.Duration(profile.Data.ProgressIntervalSeconds) * time.Second
 		if progressCollectionEnabled(progressCollectInterval) {
 			go func() {
 				var elapsed metav1.Duration
@@ -337,15 +331,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						}
 
 						// If it's a progress line, grab the percentage
-						match := progressRe.FindStringSubmatch(line)
-						if len(match) > 0 {
-							progress, err := strconv.Atoi(match[1])
-							if err != nil {
-								log.Error(err, "failed to parse progress output", "match", match)
+						if err := parseDcpProgress(line, &cmdStatus); err != nil {
+							log.Error(err, "failed to parse progress", "line", line)
+							return
+						}
+
+						// Collect stats only when finished
+						if cmdStatus.ProgressPercentage != nil && *cmdStatus.ProgressPercentage >= 100 {
+							if err := parseDcpStats(line, &cmdStatus); err != nil {
+								log.Error(err, "failed to parse stats", "line", line)
 								return
 							}
-							progressInt32 := int32(progress)
-							cmdStatus.ProgressPercentage = &progressInt32
 						}
 
 						// Always update LastMessage and timing
@@ -424,12 +420,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
 			// Profile or DM request has enabled stdout logging
-			if profile.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
+			if profile.Data.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
 				log.Info("Data movement operation output", "output", combinedOutBuf.String())
 			}
 
 			// Profile or DM request has enabled storing stdout
-			if profile.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
+			if profile.Data.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
 				dm.Status.Message = combinedOutBuf.String()
 			}
 		}
@@ -462,7 +458,100 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
+func parseDcpProgress(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+	match := progressRe.FindStringSubmatch(line)
+	if len(match) > 0 {
+		progress, err := strconv.Atoi(match[1])
+		if err != nil {
+			return fmt.Errorf("failed to parse progress output: %w", err)
+		}
+		progressInt32 := int32(progress)
+		cmdStatus.ProgressPercentage = &progressInt32
+	}
+
+	return nil
+}
+
+// Go through the list of dcp stat regexes, parse them, and put them in their appropriate place in cmdStatus
+func parseDcpStats(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+	for _, s := range dcpStatsRegexes {
+		match := s.regex.FindStringSubmatch(line)
+		if len(match) > 0 {
+			matched := true // default case will set this to false
+
+			// Each regex is parsed depending on its type (e.g. float, int, string) and then stored
+			// in a different place in cmdStatus
+			switch s.name {
+			case "seconds":
+				cmdStatus.Seconds = match[1]
+			case "items":
+				items, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Items output: %w", err)
+				}
+				i32 := int32(items)
+				cmdStatus.Items = &i32
+			case "dirs":
+				dirs, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Directories output: %w", err)
+				}
+				i32 := int32(dirs)
+				cmdStatus.Directories = &i32
+			case "files":
+				files, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Directories output: %w", err)
+				}
+				i32 := int32(files)
+				cmdStatus.Files = &i32
+			case "links":
+				links, err := strconv.Atoi(match[1])
+				if err != nil {
+					return fmt.Errorf("failed to parse Links output: %w", err)
+				}
+				i32 := int32(links)
+				cmdStatus.Links = &i32
+			case "data":
+				cmdStatus.Data = match[1]
+			case "rate":
+				cmdStatus.Rate = match[1]
+			default:
+				matched = false // if we got here then nothing happened, so try the next regex
+			}
+
+			// if one of the regexes matched, then we're done
+			if matched {
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *DataMovementReconciler) getDMProfile(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*nnfv1alpha1.NnfDataMovementProfile, error) {
+
+	var profile *nnfv1alpha1.NnfDataMovementProfile
+
+	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name() {
+		return profile, fmt.Errorf("invalid NnfDataMovementProfile kind %s", dm.Spec.ProfileReference.Kind)
+	}
+
+	profile = &nnfv1alpha1.NnfDataMovementProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dm.Spec.ProfileReference.Name,
+			Namespace: dm.Spec.ProfileReference.Namespace,
+		},
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(profile), profile); err != nil {
+		return nil, err
+	}
+
+	return profile, nil
+}
+
+func buildDMCommand(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
 	log := log.FromContext(ctx)
 	userConfig := dm.Spec.UserConfig != nil
 
@@ -472,7 +561,7 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile strin
 		return []string{"true"}, nil
 	}
 
-	cmd := profile.Command
+	cmd := profile.Data.Command
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", dm.Spec.UserId))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", dm.Spec.GroupId))
@@ -493,11 +582,11 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile strin
 					cmd = cmd[:idx] + opts + " " + cmd[idx:]
 				} else {
 					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
-						"command", profile.Command, "DCPOptions", opts)
+						"command", profile.Data.Command, "DCPOptions", opts)
 				}
 			} else {
 				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
-					"command", profile.Command, "DCPOptions", opts)
+					"command", profile.Data.Command, "DCPOptions", opts)
 			}
 		}
 	}
@@ -505,43 +594,48 @@ func buildDMCommand(ctx context.Context, profile dmConfigProfile, hostfile strin
 	return strings.Split(cmd, " "), nil
 }
 
-func (r *DataMovementReconciler) prepareDestination(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, mpiHostfile string, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
 	// These functions interact with the filesystem, so they can't run in the test env
-	if !isTestEnv() {
-		// Determine the destination directory based on the source and path
-		log.Info("Determining destination directory based on source/dest file types")
-		destDir, err := getDestinationDir(dm, mpiHostfile, log)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
-		}
-
-		// See if an index mount directory on the destination is required
-		log.Info("Determining if index mount directory is required")
-		indexMount, err := r.checkIndexMountDir(ctx, dm)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
-		}
-
-		// Account for index mount directory on the destDir and the dm dest path
-		// This updates the destination on dm
-		if indexMount != "" {
-			log.Info("Index mount directory is required", "indexMountdir", indexMount)
-			d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
-			if err != nil {
-				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
-			}
-			destDir = d
-			log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
-		}
-
-		// Create the destination directory
-		log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
-		if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
-			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
-		}
+	// Also, if the profile disables destination creation, skip it
+	if isTestEnv() || !profile.Data.CreateDestDir {
+		return nil
 	}
 
+	// Determine the destination directory based on the source and path
+	log.Info("Determining destination directory based on source/dest file types")
+	destDir, err := getDestinationDir(dm, mpiHostfile, log)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+	}
+
+	// See if an index mount directory on the destination is required
+	log.Info("Determining if index mount directory is required")
+	indexMount, err := r.checkIndexMountDir(ctx, dm)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+	}
+
+	// Account for index mount directory on the destDir and the dm dest path
+	// This updates the destination on dm
+	if indexMount != "" {
+		log.Info("Index mount directory is required", "indexMountdir", indexMount)
+		d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+		}
+		destDir = d
+		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
+	}
+
+	// Create the destination directory
+	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
+	if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
+		return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+	}
+
+	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
 	return nil
+
 }
 
 // Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
@@ -796,12 +890,12 @@ func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log 
 }
 
 // Create an MPI hostfile given settings from a profile and user config from the dm
-func createMpiHostfile(profile dmConfigProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+func createMpiHostfile(profile *nnfv1alpha1.NnfDataMovementProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// Create MPI hostfile only if included in the provided command
-	slots := profile.Slots
-	maxSlots := profile.MaxSlots
+	slots := profile.Data.Slots
+	maxSlots := profile.Data.MaxSlots
 
 	// Allow the user to override the slots and max_slots in the hostfile.
 	if userConfig && dm.Spec.UserConfig.Slots != nil && *dm.Spec.UserConfig.Slots >= 0 {
