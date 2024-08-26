@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // This is dumped into a temporary file and then ran as a bash script.
@@ -800,7 +801,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := buildDMCommand(context.TODO(), &profile, "/tmp/hostfile", &dm)
+					cmd, err := buildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -902,7 +903,9 @@ var _ = Describe("Data Movement Test", func() {
 						},
 					}
 
-					destDir, err := getDestinationDir(dm, "", logr.Logger{})
+					dmProfile := &nnfv1alpha1.NnfDataMovementProfile{}
+
+					destDir, err := getDestinationDir(dmProfile, dm, "", logr.Logger{})
 					destDir = strings.Replace(destDir, tmpDir, "", -1) // remove tmpdir from the path
 					Expect(err).ToNot(HaveOccurred())
 					Expect(destDir).To(Equal(expected))
@@ -1008,7 +1011,9 @@ var _ = Describe("Data Movement Test", func() {
 						},
 					}
 
-					newDestDir, err := handleIndexMountDir(destDir, idxMount, dm, "", logr.Logger{})
+					dmProfile := &nnfv1alpha1.NnfDataMovementProfile{}
+
+					newDestDir, err := handleIndexMountDir(dmProfile, dm, destDir, idxMount, "", logr.Logger{})
 					Expect(err).ToNot((HaveOccurred()))
 
 					// Remove any tmpDir paths before verifying
