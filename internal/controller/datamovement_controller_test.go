@@ -788,16 +788,34 @@ var _ = Describe("Data Movement Test", func() {
 				},
 			}
 
-			When("DCPOptions are specified", func() {
-				It("should inject the extra options before the $SRC argument to dcp", func() {
+			When("MpirunOptions are specified", func() {
+				It("should inject the extra options after the `mpirun` command", func() {
 					profile := nnfv1alpha1.NnfDataMovementProfile{}
 					profile.Data.Command = defaultCommand
 
 					dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
-						DCPOptions: "--extra opts",
+						MpirunOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
-						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d --extra opts %s %s",
+						"mpirun --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
+						expectedUid, expectedGid, srcPath, destPath)
+
+					cmd, err := buildDMCommand(context.TODO(), &profile, "/tmp/hostfile", &dm)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
+				})
+			})
+
+			When("DcpOptions are specified", func() {
+				It("should inject the extra options after the `dcp` command", func() {
+					profile := nnfv1alpha1.NnfDataMovementProfile{}
+					profile.Data.Command = defaultCommand
+
+					dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{
+						DcpOptions: "--extra opts",
+					}
+					expectedCmdRegex := fmt.Sprintf(
+						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --extra opts --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
 					cmd, err := buildDMCommand(context.TODO(), &profile, "/tmp/hostfile", &dm)

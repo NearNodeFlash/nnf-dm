@@ -98,28 +98,31 @@ message DataMovementCreateRequest {
     // If True, the data movement command runs `/bin/true` rather than perform actual data movement
     bool dryrun = 4;
 
-    // Extra options to pass to `dcp` if present in the Data Movement command.
-    string dcpOptions = 5;
+    // Extra options to pass to `mpirun` if present in the Data Movement command.
+    string mpirunOptions = 5;
 
-    // If true, enable server-side logging of stdout when the command is successful. Failures output is always logged.
-    bool logStdout = 6;
+    // Extra options to pass to `dcp` if present in the Data Movement command.
+    string dcpOptions = 6;
+
+    // If true, enable server-side logging of stdout when the command is successful. Failure output is always logged.
+    bool logStdout = 7;
 
     // If true, store stdout in DataMovementStatusResponse.Message when the command is successful. Failure output is always contained in the message.
-    bool storeStdout = 7;
+    bool storeStdout = 8;
 
     // The number of slots specified in the MPI hostfile. A value of 0 disables the use of slots in
     // the hostfile. -1 will defer to the server side configuration.
-    int32 slots = 8;
+    int32 slots = 9;
 
     // The number of max_slots specified in the MPI hostfile. A value of 0 disables the use of
     // max_slots in the hostfile. -1 will defer to the server side configuration.
-    int32 maxSlots = 9;
+    int32 maxSlots = 10;
 
     // The name of the data movement configuration profile to use. The above parameters (e.g. slots,
     // logStdout) will override the settings defined by the profile. This profile must exist on the
     // server otherwise the data movement operation will be invalid. Empty will default to the
     // default profile.
-    string profile = 10;
+    string profile = 11;
 }
 
 // The Data Movement Create Response to indicate the status of of the Data Movement Request.
