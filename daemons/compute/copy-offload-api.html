@@ -425,13 +425,6 @@
                 </tr>
               
                 <tr>
-                  <td>mpirunOptions</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Extra options to pass to `mpirun` if present in the Data Movement command. </p></td>
-                </tr>
-              
-                <tr>
                   <td>dcpOptions</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -476,6 +469,13 @@ max_slots in the hostfile. -1 will defer to the server side configuration. </p><
 logStdout) will override the settings defined by the profile. This profile must exist on the
 server otherwise the data movement operation will be invalid. Empty will default to the
 default profile. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mpirunOptions</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Extra options to pass to `mpirun` if present in the Data Movement command. </p></td>
                 </tr>
               
             </tbody>
