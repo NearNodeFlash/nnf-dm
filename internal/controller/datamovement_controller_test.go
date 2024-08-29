@@ -801,7 +801,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := buildDMCommand(context.TODO(), &profile, "/tmp/hostfile", &dm)
+					cmd, err := buildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
