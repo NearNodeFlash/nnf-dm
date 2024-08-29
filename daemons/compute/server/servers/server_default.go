@@ -401,7 +401,8 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha1.NnfDataMovement) {
 	dm.Spec.UserConfig = &nnfv1alpha1.NnfDataMovementConfig{}
 	dm.Spec.UserConfig.Dryrun = req.Dryrun
-	dm.Spec.UserConfig.DCPOptions = req.DcpOptions
+	dm.Spec.UserConfig.MpirunOptions = req.MpirunOptions
+	dm.Spec.UserConfig.DcpOptions = req.DcpOptions
 	dm.Spec.UserConfig.LogStdout = req.LogStdout
 	dm.Spec.UserConfig.StoreStdout = req.StoreStdout
 

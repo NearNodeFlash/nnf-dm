@@ -569,23 +569,33 @@ func buildDMCommand(profile *nnfv1alpha1.NnfDataMovementProfile, hostfile string
 
 	// Allow the user to override settings
 	if userConfig {
+		// Add extra mpirun options from the user
+		if len(dm.Spec.UserConfig.MpirunOptions) > 0 {
+			opts := dm.Spec.UserConfig.MpirunOptions
+
+			// Insert the extra mpirun options after `mpirun`
+			idx := strings.Index(cmd, "mpirun")
+			if idx != -1 {
+				idx += len("mpirun")
+				cmd = cmd[:idx] + " " + opts + cmd[idx:]
+			} else {
+				log.Info("spec.config.mpirunOptions is set but `mpirun` is not in the DM command",
+					"command", profile.Data.Command, "MpirunOptions", opts)
+			}
+		}
 
 		// Add extra DCP options from the user
-		if len(dm.Spec.UserConfig.DCPOptions) > 0 {
-			opts := dm.Spec.UserConfig.DCPOptions
+		if len(dm.Spec.UserConfig.DcpOptions) > 0 {
+			opts := dm.Spec.UserConfig.DcpOptions
 
-			// Insert the extra dcp options before the src argument
-			if strings.Contains(cmd, "dcp") {
-				idx := strings.Index(cmd, dm.Spec.Source.Path)
-				if idx != -1 {
-					cmd = cmd[:idx] + opts + " " + cmd[idx:]
-				} else {
-					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
-						"command", profile.Data.Command, "DCPOptions", opts)
-				}
+			// Insert the extra dcp options after `dcp`
+			idx := strings.Index(cmd, "dcp")
+			if idx != -1 {
+				idx += len("dcp")
+				cmd = cmd[:idx] + " " + opts + cmd[idx:]
 			} else {
-				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
-					"command", profile.Data.Command, "DCPOptions", opts)
+				log.Info("spec.config.dpcOptions is set but `dcp` is not found in the DM command",
+					"command", profile.Data.Command, "DcpOptions", opts)
 			}
 		}
 	}
