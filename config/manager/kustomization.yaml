@@ -15,7 +15,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newTag: 0.1.5
+  newName: "null"
+  newTag: 0.1.6
 - name: nnf-mfu
   newName: "null"
   newTag: 0.1.2
