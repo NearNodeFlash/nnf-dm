@@ -17,4 +17,5 @@ images:
 - name: controller
   newTag: 0.1.5
 - name: nnf-mfu
+  newName: "null"
   newTag: 0.1.2
