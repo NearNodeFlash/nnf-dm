@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 
     {
         // Create an offload request
-        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION", false, "", false, false, -1, -1, "");
+        CreateRequest createRequest("YOUR-SOURCE", "YOUR-DESTINATION", false, "", "", false, false, -1, -1, "");
         CreateResponse createResponse;
 
         RPCStatus status = client.Create(workflow, createRequest, &createResponse);

@@ -47,6 +47,7 @@ func main() {
 	maxWaitTime := flag.Int64("max-wait-time", 0, "maximum time to wait for status completion, in seconds.")
 	count := flag.Int("count", 1, "number of requests to create")
 	cancelExpiryTime := flag.Duration("cancel", -time.Second, "duration after create to cancel request")
+	mpirunOptions := flag.String("mpirun-options", "", "extra options to provide to mpirun")
 	dcpOptions := flag.String("dcp-options", "", "extra options to provide to dcp")
 	logStdout := flag.Bool("log-stdout", false, "enable server-side logging of stdout on successful dm")
 	storeStdout := flag.Bool("store-stdout", false, "store stdout in status message on successful dm")
@@ -102,7 +103,7 @@ func main() {
 
 			log.Printf("Creating request %d of %d...", i+1, *count)
 			createResponse, err := createRequest(ctx, c, *workflow, *namespace,
-				*source, *destination, *dryrun, *dcpOptions,
+				*source, *destination, *dryrun, *mpirunOptions, *dcpOptions,
 				*logStdout, *storeStdout, *slots, *maxSlots,
 				*profile)
 			if err != nil {
@@ -220,7 +221,7 @@ func versionRequest(ctx context.Context, client pb.DataMoverClient) (*pb.DataMov
 }
 
 func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, namespace,
-	source, destination string, dryrun bool, dcpOptions string, logStdout, storeStdout bool,
+	source, destination string, dryrun bool, mpirunOptions, dcpOptions string, logStdout, storeStdout bool,
 	slots, maxSlots int, profile string) (*pb.DataMovementCreateResponse, error) {
 
 	rsp, err := client.Create(ctx, &pb.DataMovementCreateRequest{
@@ -228,15 +229,16 @@ func createRequest(ctx context.Context, client pb.DataMoverClient, workflow, nam
 			Name:      workflow,
 			Namespace: namespace,
 		},
-		Source:      source,
-		Destination: destination,
-		Dryrun:      dryrun,
-		DcpOptions:  dcpOptions,
-		LogStdout:   logStdout,
-		StoreStdout: storeStdout,
-		Slots:       int32(slots),
-		MaxSlots:    int32(maxSlots),
-		Profile:     profile,
+		Source:        source,
+		Destination:   destination,
+		Dryrun:        dryrun,
+		MpirunOptions: mpirunOptions,
+		DcpOptions:    dcpOptions,
+		LogStdout:     logStdout,
+		StoreStdout:   storeStdout,
+		Slots:         int32(slots),
+		MaxSlots:      int32(maxSlots),
+		Profile:       profile,
 	})
 
 	if err != nil {

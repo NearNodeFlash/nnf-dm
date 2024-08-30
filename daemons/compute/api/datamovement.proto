@@ -101,7 +101,7 @@ message DataMovementCreateRequest {
     // Extra options to pass to `dcp` if present in the Data Movement command.
     string dcpOptions = 5;
 
-    // If true, enable server-side logging of stdout when the command is successful. Failures output is always logged.
+    // If true, enable server-side logging of stdout when the command is successful. Failure output is always logged.
     bool logStdout = 6;
 
     // If true, store stdout in DataMovementStatusResponse.Message when the command is successful. Failure output is always contained in the message.
@@ -120,6 +120,10 @@ message DataMovementCreateRequest {
     // server otherwise the data movement operation will be invalid. Empty will default to the
     // default profile.
     string profile = 10;
+
+    // Extra options to pass to `mpirun` if present in the Data Movement command.
+    string mpirunOptions = 11;
+
 }
 
 // The Data Movement Create Response to indicate the status of of the Data Movement Request.

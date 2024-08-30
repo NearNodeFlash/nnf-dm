@@ -435,7 +435,7 @@
                   <td>logStdout</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p>If true, enable server-side logging of stdout when the command is successful. Failures output is always logged. </p></td>
+                  <td><p>If true, enable server-side logging of stdout when the command is successful. Failure output is always logged. </p></td>
                 </tr>
               
                 <tr>
@@ -469,6 +469,13 @@ max_slots in the hostfile. -1 will defer to the server side configuration. </p><
 logStdout) will override the settings defined by the profile. This profile must exist on the
 server otherwise the data movement operation will be invalid. Empty will default to the
 default profile. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mpirunOptions</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Extra options to pass to `mpirun` if present in the Data Movement command. </p></td>
                 </tr>
               
             </tbody>

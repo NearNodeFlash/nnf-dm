@@ -270,12 +270,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("MPI Hostfile preview", "first line", peekMpiHostfile(mpiHostfile))
 
 	// Prepare Destination Directory
-	if err = r.prepareDestination(ctx, profile, mpiHostfile, dm, log); err != nil {
+	if err = r.prepareDestination(ctx, profile, dm, mpiHostfile, log); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Build command
-	cmdArgs, err := buildDMCommand(ctx, profile, mpiHostfile, dm)
+	cmdArgs, err := buildDMCommand(profile, mpiHostfile, dm, log)
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
@@ -551,8 +551,7 @@ func (r *DataMovementReconciler) getDMProfile(ctx context.Context, dm *nnfv1alph
 	return profile, nil
 }
 
-func buildDMCommand(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
-	log := log.FromContext(ctx)
+func buildDMCommand(profile *nnfv1alpha1.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) ([]string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// If Dryrun is enabled, just use the "true" command
@@ -570,23 +569,33 @@ func buildDMCommand(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementPro
 
 	// Allow the user to override settings
 	if userConfig {
+		// Add extra mpirun options from the user
+		if len(dm.Spec.UserConfig.MpirunOptions) > 0 {
+			opts := dm.Spec.UserConfig.MpirunOptions
+
+			// Insert the extra mpirun options after `mpirun`
+			idx := strings.Index(cmd, "mpirun")
+			if idx != -1 {
+				idx += len("mpirun")
+				cmd = cmd[:idx] + " " + opts + cmd[idx:]
+			} else {
+				log.Info("spec.config.mpirunOptions is set but `mpirun` is not in the DM command",
+					"command", profile.Data.Command, "MpirunOptions", opts)
+			}
+		}
 
 		// Add extra DCP options from the user
-		if len(dm.Spec.UserConfig.DCPOptions) > 0 {
-			opts := dm.Spec.UserConfig.DCPOptions
+		if len(dm.Spec.UserConfig.DcpOptions) > 0 {
+			opts := dm.Spec.UserConfig.DcpOptions
 
-			// Insert the extra dcp options before the src argument
-			if strings.Contains(cmd, "dcp") {
-				idx := strings.Index(cmd, dm.Spec.Source.Path)
-				if idx != -1 {
-					cmd = cmd[:idx] + opts + " " + cmd[idx:]
-				} else {
-					log.Info("spec.config.dpcOptions is set but no source path is found in the DM command",
-						"command", profile.Data.Command, "DCPOptions", opts)
-				}
+			// Insert the extra dcp options after `dcp`
+			idx := strings.Index(cmd, "dcp")
+			if idx != -1 {
+				idx += len("dcp")
+				cmd = cmd[:idx] + " " + opts + cmd[idx:]
 			} else {
-				log.Info("spec.config.dpcOptions is set but no dcp command found in the DM command",
-					"command", profile.Data.Command, "DCPOptions", opts)
+				log.Info("spec.config.dpcOptions is set but `dcp` is not found in the DM command",
+					"command", profile.Data.Command, "DcpOptions", opts)
 			}
 		}
 	}
@@ -594,43 +603,49 @@ func buildDMCommand(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementPro
 	return strings.Split(cmd, " "), nil
 }
 
-func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, mpiHostfile string, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) error {
+func buildStatCommand(uid, gid uint32, cmd, hostfile, path string) string {
+	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
+	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", uid))
+	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", gid))
+	cmd = strings.ReplaceAll(cmd, "$PATH", path)
+
+	return cmd
+}
+
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
 	// These functions interact with the filesystem, so they can't run in the test env
-	// Also, if the profile disables destination creation, skip it
-	if isTestEnv() || !profile.Data.CreateDestDir {
-		return nil
-	}
-
-	// Determine the destination directory based on the source and path
-	log.Info("Determining destination directory based on source/dest file types")
-	destDir, err := getDestinationDir(dm, mpiHostfile, log)
-	if err != nil {
-		return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
-	}
-
-	// See if an index mount directory on the destination is required
-	log.Info("Determining if index mount directory is required")
-	indexMount, err := r.checkIndexMountDir(ctx, dm)
-	if err != nil {
-		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
-	}
-
-	// Account for index mount directory on the destDir and the dm dest path
-	// This updates the destination on dm
-	if indexMount != "" {
-		log.Info("Index mount directory is required", "indexMountdir", indexMount)
-		d, err := handleIndexMountDir(destDir, indexMount, dm, mpiHostfile, log)
+	if !isTestEnv() {
+		// Determine the destination directory based on the source and path
+		log.Info("Determining destination directory based on source/dest file types")
+		destDir, err := getDestinationDir(profile, dm, mpiHostfile, log)
 		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
 		}
-		destDir = d
-		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
-	}
 
-	// Create the destination directory
-	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
-	if err := createDestinationDir(destDir, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log); err != nil {
-		return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		// See if an index mount directory on the destination is required
+		log.Info("Determining if index mount directory is required")
+		indexMount, err := r.checkIndexMountDir(ctx, dm)
+		if err != nil {
+			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+		}
+
+		// Account for index mount directory on the destDir and the dm dest path
+		// This updates the destination on dm
+		if indexMount != "" {
+			log.Info("Index mount directory is required", "indexMountdir", indexMount)
+			d, err := handleIndexMountDir(profile, dm, destDir, indexMount, mpiHostfile, log)
+			if err != nil {
+				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			}
+			destDir = d
+			log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
+		}
+
+		// Create the destination directory
+		log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
+		if err := createDestinationDir(profile, dm, destDir, mpiHostfile, log); err != nil {
+			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		}
 	}
 
 	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
@@ -707,7 +722,7 @@ func extractIndexMountDir(path, namespace string) (string, error) {
 
 // Given a destination directory and index mount directory, apply the necessary changes to the
 // destination directory and the DM's destination path to account for index mount directories
-func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+func handleIndexMountDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, destDir, indexMount, mpiHostfile string, log logr.Logger) (string, error) {
 
 	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
 	// in the index mount directory without a trailing slash. If that's the case, there's nothing
@@ -723,11 +738,11 @@ func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMove
 	dmDest := idxMntDir
 
 	// Get the source to see if it's a file
-	srcIsFile, err := isSourceAFile(dm.Spec.Source.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	srcIsFile, err := isSourceAFile(profile, dm, mpiHostfile, log)
 	if err != nil {
 		return "", err
 	}
-	destIsFile := isDestAFile(dm.Spec.Destination.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	destIsFile := isDestAFile(profile, dm, mpiHostfile, log)
 	log.Info("Checking source and dest types", "srcIsFile", srcIsFile, "destIsFile", destIsFile)
 
 	// Account for file-file
@@ -749,21 +764,19 @@ func handleIndexMountDir(destDir, indexMount string, dm *nnfv1alpha1.NnfDataMove
 
 // Determine the directory path to create based on the source and destination.
 // Returns the mkdir directory and error.
-func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+func getDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
 	// Default to using the full path of dest
-	src := dm.Spec.Source.Path
-	dest := dm.Spec.Destination.Path
-	destDir := dest
+	destDir := dm.Spec.Destination.Path
 
-	srcIsFile, err := isSourceAFile(src, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+	srcIsFile, err := isSourceAFile(profile, dm, mpiHostfile, log)
 	if err != nil {
 		return "", err
 	}
 
 	// Account for file-file data movement - we don't want the full path
 	// ex: /path/to/a/file -> /path/to/a
-	if srcIsFile && isDestAFile(dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log) {
-		destDir = filepath.Dir(dest)
+	if srcIsFile && isDestAFile(profile, dm, mpiHostfile, log) {
+		destDir = filepath.Dir(dm.Spec.Destination.Path)
 	}
 
 	// We know it's a directory, so we don't care about the trailing slash
@@ -771,63 +784,50 @@ func getDestinationDir(dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log 
 }
 
 // Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
-func mpiStat(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
-	// Use setpriv to stat the path with the specified UID/GID. Only run it on 1 host (ie. -n 1)
-	cmd := fmt.Sprintf("mpirun --allow-run-as-root -n 1 --hostfile %s -- setpriv --euid %d --egid %d --clear-groups stat --cached never -c '%%F' %s",
-		mpiHostfile, uid, gid, path)
+func mpiStat(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
+	cmd := buildStatCommand(uid, gid, profile.Data.StatCommand, mpiHostfile, path)
 
 	output, err := command.Run(cmd, log)
 	if err != nil {
 		return output, fmt.Errorf("could not stat path ('%s'): %w", path, err)
 	}
-	log.Info("mpiStat", "path", path, "output", output)
+	log.Info("mpiStat", "command", cmd, "path", path, "output", output)
 
 	return output, nil
 }
 
-// Use mpirun to check if a file exists
-func mpiExists(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
-	_, err := mpiStat(path, uid, gid, mpiHostfile, log)
-	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return true, nil
-}
-
 // Use mpirun to determine if a given path is a directory
-func mpiIsDir(path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
-	output, err := mpiStat(path, uid, gid, mpiHostfile, log)
+func mpiIsDir(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+	output, err := mpiStat(profile, path, uid, gid, mpiHostfile, log)
 	if err != nil {
 		return false, err
 	}
 
 	if strings.Contains(strings.ToLower(output), "directory") {
-		log.Info("mpiIsDir", "directory", true)
+		log.Info("mpiIsDir", "path", path, "directory", true)
 		return true, nil
-	} else {
-		log.Info("mpiIsDir", "directory", true)
+	} else if strings.Contains(strings.ToLower(output), "file") {
+		log.Info("mpiIsDir", "path", path, "directory", false)
 		return false, nil
+	} else {
+		return false, fmt.Errorf("could not determine file type of path ('%s'): %s", path, output)
 	}
 }
 
 // Check to see if the source path is a file. The source must exist and will result in error if it
 // does not. Do not use mpi in the test environment.
-func isSourceAFile(src string, uid, gid uint32, mpiHostFile string, log logr.Logger) (bool, error) {
+func isSourceAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostFile string, log logr.Logger) (bool, error) {
 	var isDir bool
 	var err error
 
 	if isTestEnv() {
-		sf, err := os.Stat(src)
+		sf, err := os.Stat(dm.Spec.Source.Path)
 		if err != nil {
 			return false, fmt.Errorf("source file does not exist: %w", err)
 		}
 		isDir = sf.IsDir()
 	} else {
-		isDir, err = mpiIsDir(src, uid, gid, mpiHostFile, log)
+		isDir, err = mpiIsDir(profile, dm.Spec.Source.Path, dm.Spec.UserId, dm.Spec.GroupId, mpiHostFile, log)
 		if err != nil {
 			return false, err
 		}
@@ -839,9 +839,10 @@ func isSourceAFile(src string, uid, gid uint32, mpiHostFile string, log logr.Log
 // Check to see if the destination path is a file. If it exists, use stat to determine if it is a
 // file or a directory. If it doesn't exist, check for a trailing slash and make an assumption based
 // on that.
-func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logger) bool {
+func isDestAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostFile string, log logr.Logger) bool {
 	isFile := false
 	exists := true
+	dest := dm.Spec.Destination.Path
 
 	// Attempt to the get the destination file. The error is not important since an assumption can
 	// be made by checking if there is a trailing slash.
@@ -853,7 +854,7 @@ func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logg
 			exists = false
 		}
 	} else {
-		isDir, err := mpiIsDir(dest, uid, gid, mpiHostFile, log)
+		isDir, err := mpiIsDir(profile, dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostFile, log)
 		if err == nil { // file exists, so use mpiIsDir() result
 			isFile = !isDir
 		} else {
@@ -870,17 +871,32 @@ func isDestAFile(dest string, uid, gid uint32, mpiHostFile string, log logr.Logg
 	return isFile
 }
 
-func createDestinationDir(dest string, uid, gid uint32, mpiHostfile string, log logr.Logger) error {
+func createDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, dest, mpiHostfile string, log logr.Logger) error {
+
+	// Use mpirun to check if a file exists
+	mpiExists := func() (bool, error) {
+		_, err := mpiStat(profile, dest, dm.Spec.UserId, dm.Spec.GroupId, mpiHostfile, log)
+		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
+				return false, nil
+			}
+			return false, err
+		}
+
+		return true, nil
+	}
+
 	// Don't do anything if it already exists
-	if exists, err := mpiExists(dest, uid, gid, mpiHostfile, log); err != nil {
+	if exists, err := mpiExists(); err != nil {
 		return err
 	} else if exists {
 		return nil
 	}
 
+	// TODO mkdir command?
 	// Use setpriv to create the directory with the specified UID/GID
 	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
-		mpiHostfile, uid, gid, dest)
+		mpiHostfile, dm.Spec.UserId, dm.Spec.GroupId, dest)
 	output, err := command.Run(cmd, log)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
