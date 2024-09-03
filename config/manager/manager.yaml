@@ -82,6 +82,10 @@ spec:
             privileged: true
             capabilities:
               add: ['SETUID', 'SETGID', 'MKNOD']
+          volumeMounts:
+            - name:  worker-config
+              mountPath: /etc/ssh/sshd_config
+              subPath: sshd_config
         - name: manager
           command:
             - /manager
@@ -94,3 +98,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+      volumes:
+        - name: worker-config
+          configMap:
+            name: nnf-dm-worker-config
