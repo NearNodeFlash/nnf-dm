@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
@@ -98,7 +97,7 @@ var _ = Describe("Data Movement Test", func() {
 			// BeforeAll. Ignoring a Create() error is fine in this case.
 			ns := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: v1alpha1.DataMovementNamespace,
+					Name: nnfv1alpha1.DataMovementNamespace,
 				},
 			}
 			k8sClient.Create(context.TODO(), ns)
