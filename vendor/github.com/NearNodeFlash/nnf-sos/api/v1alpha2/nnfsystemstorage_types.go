@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
@@ -60,7 +60,7 @@ type NnfSystemStorageSpec struct {
 	// ComputesTarget specifies which computes to make the storage accessible to
 	// +kubebuilder:validation:Enum=all;even;odd;pattern
 	// +kubebuilder:default:=all
-	ComputesTarget NnfSystemStorageComputesTarget `json:"computesTarget"`
+	ComputesTarget NnfSystemStorageComputesTarget `json:"computesTarget,omitempty"`
 
 	// ComputesPattern is a list of compute node indexes (0-15) to make the storage accessible to. This
 	// is only used if ComputesTarget is "pattern"
@@ -76,7 +76,7 @@ type NnfSystemStorageSpec struct {
 	// Type is the file system type to use for the storage allocation
 	// +kubebuilder:validation:Enum=raw;xfs;gfs2
 	// +kubebuilder:default:=raw
-	Type string `json:"type"`
+	Type string `json:"type,omitempty"`
 
 	// StorageProfile is an object reference to the storage profile to use
 	StorageProfile corev1.ObjectReference `json:"storageProfile"`
@@ -100,6 +100,7 @@ type NnfSystemStorageStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // NnfSystemStorage is the Schema for the nnfsystemstorages API
 type NnfSystemStorage struct {
 	metav1.TypeMeta   `json:",inline"`

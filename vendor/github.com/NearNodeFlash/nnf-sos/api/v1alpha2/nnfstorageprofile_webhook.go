@@ -17,13 +17,12 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -44,7 +43,7 @@ func (r *NnfStorageProfile) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
-//+kubebuilder:webhook:path=/validate-nnf-cray-hpe-com-v1alpha1-nnfstorageprofile,mutating=false,failurePolicy=fail,sideEffects=None,groups=nnf.cray.hpe.com,resources=nnfstorageprofiles,verbs=create;update,versions=v1alpha1,name=vnnfstorageprofile.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-nnf-cray-hpe-com-v1alpha2-nnfstorageprofile,mutating=false,failurePolicy=fail,sideEffects=None,groups=nnf.cray.hpe.com,resources=nnfstorageprofiles,verbs=create;update,versions=v1alpha2,name=vnnfstorageprofile.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &NnfStorageProfile{}
 
@@ -142,35 +141,4 @@ func (r *NnfStorageProfile) validateLustreTargetMiscOptions(targetMiscOptions Nn
 	}
 
 	return nil
-}
-
-type VarHandler struct {
-	VarMap map[string]string
-}
-
-func NewVarHandler(vars map[string]string) *VarHandler {
-	v := &VarHandler{}
-	v.VarMap = vars
-	return v
-}
-
-// ListToVars splits the value of one of its variables, and creates a new
-// indexed variable for each of the items in the split.
-func (v *VarHandler) ListToVars(listVarName, newVarPrefix string) error {
-	theList, ok := v.VarMap[listVarName]
-	if !ok {
-		return fmt.Errorf("Unable to find the variable named %s", listVarName)
-	}
-
-	for i, val := range strings.Split(theList, " ") {
-		v.VarMap[fmt.Sprintf("%s%d", newVarPrefix, i+1)] = val
-	}
-	return nil
-}
-
-func (v *VarHandler) ReplaceAll(s string) string {
-	for key, value := range v.VarMap {
-		s = strings.ReplaceAll(s, key, value)
-	}
-	return s
 }

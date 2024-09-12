@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 const (
 	// DirectiveIndexLabel is a label applied to child objects of the workflow
