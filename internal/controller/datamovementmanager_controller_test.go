@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2022-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	nnfv1alpha2 "github.com/NearNodeFlash/nnf-sos/api/v1alpha2"
 )
 
 var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
@@ -44,7 +44,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	ns := &corev1.Namespace{}
 	deployment := &appsv1.Deployment{}
-	mgr := &nnfv1alpha1.NnfDataMovementManager{}
+	mgr := &nnfv1alpha2.NnfDataMovementManager{}
 	labels := map[string]string{"control-plane": "controller-manager"}
 
 	maxUnavailStr := "50%"
@@ -54,7 +54,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	BeforeEach(func() {
 		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: nnfv1alpha1.DataMovementNamespace,
+				Name: nnfv1alpha2.DataMovementNamespace,
 			},
 		}
 
@@ -65,7 +65,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		deployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: nnfv1alpha1.DataMovementNamespace,
+				Namespace: nnfv1alpha2.DataMovementNamespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -95,12 +95,12 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	BeforeEach(func() {
 		maxUnavailable := intstr.FromString(maxUnavailStr)
 		maxSurge := intstr.FromString(maxSurgeStr)
-		mgr = &nnfv1alpha1.NnfDataMovementManager{
+		mgr = &nnfv1alpha2.NnfDataMovementManager{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: nnfv1alpha1.DataMovementNamespace,
+				Namespace: nnfv1alpha2.DataMovementNamespace,
 			},
-			Spec: nnfv1alpha1.NnfDataMovementManagerSpec{
+			Spec: nnfv1alpha2.NnfDataMovementManagerSpec{
 				Selector: metav1.LabelSelector{
 					MatchLabels: labels,
 				},

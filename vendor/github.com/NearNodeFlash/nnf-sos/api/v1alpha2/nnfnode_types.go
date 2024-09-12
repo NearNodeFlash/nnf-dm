@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
@@ -98,6 +98,7 @@ type NnfDriveStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:storageversion
 //+kubebuilder:printcolumn:name="STATE",type="string",JSONPath=".spec.state",description="Current desired state"
 //+kubebuilder:printcolumn:name="HEALTH",type="string",JSONPath=".status.health",description="Health of node"
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.status",description="Current status of node"

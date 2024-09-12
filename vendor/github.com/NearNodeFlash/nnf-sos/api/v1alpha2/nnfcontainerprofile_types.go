@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2023-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	mpiv2beta1 "github.com/kubeflow/mpi-operator/pkg/apis/kubeflow/v2beta1"
@@ -116,6 +116,7 @@ type NnfContainerProfileStorage struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
 
 // NnfContainerProfile is the Schema for the nnfcontainerprofiles API
 type NnfContainerProfile struct {
@@ -126,6 +127,7 @@ type NnfContainerProfile struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
 
 // NnfContainerProfileList contains a list of NnfContainerProfile
 type NnfContainerProfileList struct {

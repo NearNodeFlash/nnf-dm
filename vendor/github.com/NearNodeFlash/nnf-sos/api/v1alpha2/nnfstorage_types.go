@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
@@ -88,7 +88,7 @@ type NnfStorageSpec struct {
 	// block device.
 	// +kubebuilder:validation:Enum=raw;lvm;zfs;xfs;gfs2;lustre
 	// +kubebuilder:default:=raw
-	FileSystemType string `json:"fileSystemType"`
+	FileSystemType string `json:"fileSystemType,omitempty"`
 
 	// User ID for file system
 	UserID uint32 `json:"userID"`
@@ -141,6 +141,7 @@ type NnfStorageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:storageversion
 //+kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 //+kubebuilder:printcolumn:name="ERROR",type="string",JSONPath=".status.error.severity"
