@@ -54,7 +54,7 @@ done
 
 shift $((OPTIND - 1))
 
-if [ "$#" -ne 2 ]; then
+if [[ "$#" -ne 2 ]]; then
   echo "Usage: $0 [--options] <user> <workflow>"
   exit 1
 fi
@@ -66,7 +66,8 @@ WORKFLOW=$2
 # testfile needs to present in this directory - create this manually (with the right perms too)
 # might need to have i number of testfiles
 # source=3d32f595-3bbd-4cef-a17c-e10c123c02bc-0
-source=$(kubectl get workflow ${WORKFLOW} -oyaml | yq '.metadata.uid')-0
+wf_yaml=$(kubectl get workflow "${WORKFLOW}" -oyaml)
+source=$(echo "${wf_yaml}" -oyaml | yq '.metadata.uid')-0
 testfile=/mnt/nnf/${source}/testfile
 
 if [[ -n "${CREATE}" ]]; then
@@ -82,7 +83,7 @@ if [[ -n "${CREATE}" ]]; then
   echo -n "Creating ${NUM_REQUESTS} requests..."
   for ((i = 1; i <= NUM_REQUESTS; i++)); do
     echo "
-apiVersion: nnf.cray.hpe.com/v1alpha1
+apiVersion: nnf.cray.hpe.com/v1alpha2
 kind: NnfDataMovement
 metadata:
   name: ${WORKFLOW}-${i}
@@ -115,8 +116,8 @@ spec:
   if [[ -n "${WAIT}" ]]; then
     echo -n "Waiting for completion of all data movement resources..."
     while :; do
-      num_done=$(kubectl get nnfdatamovements -A --no-headers | grep Success | wc -l)
-      if [[ "$num_done" -eq "${NUM_REQUESTS}" ]]; then
+      num_done=$(kubectl get nnfdatamovements -A --no-headers | grep -c Success || true)
+      if [[ "${num_done}" -eq "${NUM_REQUESTS}" ]]; then
         break
       fi
     done
@@ -127,14 +128,14 @@ fi
 
 if [[ -n "${DELETE_ALL}" ]]; then
   echo -n "Deleting all nnfdatamovements..."
-  kubectl get nnfdatamovements -n nnf-dm-system --no-headers | awk '{print $1}' | xargs -n 1 -P 0 kubectl delete -n nnf-dm-system nnfdatamovement
+  kubectl get nnfdatamovements -n nnf-dm-system --no-headers | awk '{print $1}' | xargs -n 1 -P 0 kubectl delete -n nnf-dm-system nnfdatamovement || true
   echo "done"
 elif [[ -n "${DELETE_SUCCESS}" ]]; then
   echo -n "Deleting Successful nnfdatamovements..."
-  kubectl get nnfdatamovements -n nnf-dm-system --no-headers | grep Success | awk '{print $1}' | xargs -n 1 -P 0 kubectl delete -n nnf-dm-system nnfdatamovement
+  kubectl get nnfdatamovements -n nnf-dm-system --no-headers | grep Success | awk '{print $1}' | xargs -n 1 -P 0 kubectl delete -n nnf-dm-system nnfdatamovement || true
   echo "done"
 fi
 
 if [[ -n "${GET_FAILED}" ]]; then
-  kubectl get nnfdatamovements -A -oyaml | yq '.items[].status'
+  kubectl get nnfdatamovements -A -oyaml | yq '.items[].status' || true
 fi
