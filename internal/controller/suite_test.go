@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2024 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -41,7 +41,7 @@ import (
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	_ "github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases"
 
-	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	nnfv1alpha2 "github.com/NearNodeFlash/nnf-sos/api/v1alpha2"
 	_ "github.com/NearNodeFlash/nnf-sos/config/crd/bases"
 	//+kubebuilder:scaffold:imports
 )
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	err = lusv1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = nnfv1alpha1.AddToScheme(scheme.Scheme)
+	err = nnfv1alpha2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

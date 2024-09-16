@@ -53,7 +53,7 @@ import (
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
-	nnfv1alpha1 "github.com/NearNodeFlash/nnf-sos/api/v1alpha1"
+	nnfv1alpha2 "github.com/NearNodeFlash/nnf-sos/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-sos/pkg/command"
 	"github.com/go-logr/logr"
 )
@@ -155,7 +155,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	metrics.NnfDmDataMovementReconcilesTotal.Inc()
 
-	dm := &nnfv1alpha1.NnfDataMovement{}
+	dm := &nnfv1alpha2.NnfDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -165,8 +165,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			resourceError, ok := err.(*dwsv1alpha2.ResourceErrorInfo)
 			if ok {
 				if resourceError.Severity != dwsv1alpha2.SeverityMinor {
-					dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-					dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonInvalid
+					dm.Status.State = nnfv1alpha2.DataMovementConditionTypeFinished
+					dm.Status.Status = nnfv1alpha2.DataMovementConditionReasonInvalid
 				}
 			}
 			dm.Status.SetResourceErrorAndLog(err, log)
@@ -207,7 +207,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Prevent gratuitous wakeups for a resource that is already finished.
-	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeFinished {
+	if dm.Status.State == nnfv1alpha2.DataMovementConditionTypeFinished {
 		return ctrl.Result{}, nil
 	}
 
@@ -221,7 +221,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Make sure if the DM is already running that we don't start up another command
-	if dm.Status.State == nnfv1alpha1.DataMovementConditionTypeRunning {
+	if dm.Status.State == nnfv1alpha2.DataMovementConditionTypeRunning {
 
 		// If we're currently tracking the resource, then we know for certain the
 		// resource is running and there's nothing further we need to do.
@@ -284,8 +284,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
-	dm.Status.State = nnfv1alpha1.DataMovementConditionTypeRunning
-	cmdStatus := nnfv1alpha1.NnfDataMovementCommandStatus{}
+	dm.Status.State = nnfv1alpha2.DataMovementConditionTypeRunning
+	cmdStatus := nnfv1alpha2.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
@@ -354,13 +354,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 					// Update the CommandStatus in the DM resource after we parsed all the lines
 					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						dm := &nnfv1alpha1.NnfDataMovement{}
+						dm := &nnfv1alpha2.NnfDataMovement{}
 						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 							return client.IgnoreNotFound(err)
 						}
 
 						if dm.Status.CommandStatus == nil {
-							dm.Status.CommandStatus = &nnfv1alpha1.NnfDataMovementCommandStatus{}
+							dm.Status.CommandStatus = &nnfv1alpha2.NnfDataMovementCommandStatus{}
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
@@ -401,18 +401,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Command is finished, update status
 		now := metav1.NowMicro()
 		dm.Status.EndTime = &now
-		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonSuccess
+		dm.Status.State = nnfv1alpha2.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha2.DataMovementConditionReasonSuccess
 
 		// On cancellation or failure, log the output. On failure, also store the output in the
 		// Status.Message. When successful, check the profile/UserConfig config options to log
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Error(err, "Data movement operation cancelled", "output", combinedOutBuf.String())
-			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+			dm.Status.Status = nnfv1alpha2.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())
-			dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonFailed
+			dm.Status.Status = nnfv1alpha2.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
 			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
@@ -435,7 +435,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		status := dm.Status.DeepCopy()
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			dm := &nnfv1alpha1.NnfDataMovement{}
+			dm := &nnfv1alpha2.NnfDataMovement{}
 			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -458,7 +458,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func parseDcpProgress(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+func parseDcpProgress(line string, cmdStatus *nnfv1alpha2.NnfDataMovementCommandStatus) error {
 	match := progressRe.FindStringSubmatch(line)
 	if len(match) > 0 {
 		progress, err := strconv.Atoi(match[1])
@@ -473,7 +473,7 @@ func parseDcpProgress(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommand
 }
 
 // Go through the list of dcp stat regexes, parse them, and put them in their appropriate place in cmdStatus
-func parseDcpStats(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandStatus) error {
+func parseDcpStats(line string, cmdStatus *nnfv1alpha2.NnfDataMovementCommandStatus) error {
 	for _, s := range dcpStatsRegexes {
 		match := s.regex.FindStringSubmatch(line)
 		if len(match) > 0 {
@@ -530,15 +530,15 @@ func parseDcpStats(line string, cmdStatus *nnfv1alpha1.NnfDataMovementCommandSta
 	return nil
 }
 
-func (r *DataMovementReconciler) getDMProfile(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (*nnfv1alpha1.NnfDataMovementProfile, error) {
+func (r *DataMovementReconciler) getDMProfile(ctx context.Context, dm *nnfv1alpha2.NnfDataMovement) (*nnfv1alpha2.NnfDataMovementProfile, error) {
 
-	var profile *nnfv1alpha1.NnfDataMovementProfile
+	var profile *nnfv1alpha2.NnfDataMovementProfile
 
-	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha1.NnfDataMovementProfile{}).Name() {
+	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name() {
 		return profile, fmt.Errorf("invalid NnfDataMovementProfile kind %s", dm.Spec.ProfileReference.Kind)
 	}
 
-	profile = &nnfv1alpha1.NnfDataMovementProfile{
+	profile = &nnfv1alpha2.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Spec.ProfileReference.Name,
 			Namespace: dm.Spec.ProfileReference.Namespace,
@@ -551,7 +551,7 @@ func (r *DataMovementReconciler) getDMProfile(ctx context.Context, dm *nnfv1alph
 	return profile, nil
 }
 
-func buildDMCommand(profile *nnfv1alpha1.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha1.NnfDataMovement, log logr.Logger) ([]string, error) {
+func buildDMCommand(profile *nnfv1alpha2.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha2.NnfDataMovement, log logr.Logger) ([]string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// If Dryrun is enabled, just use the "true" command
@@ -612,7 +612,7 @@ func buildStatCommand(uid, gid uint32, cmd, hostfile, path string) string {
 	return cmd
 }
 
-func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
+func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
 	// These functions interact with the filesystem, so they can't run in the test env
 	if !isTestEnv() {
 		// Determine the destination directory based on the source and path
@@ -656,26 +656,26 @@ func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile
 // Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
 // then we need to account for a Fan-In situation and create index mount directories on the
 // destination. Returns the index mount directory from the source path.
-func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
-	var storage *nnfv1alpha1.NnfStorage
-	var nodeStorage *nnfv1alpha1.NnfNodeStorage
+func (r *DataMovementReconciler) checkIndexMountDir(ctx context.Context, dm *nnfv1alpha2.NnfDataMovement) (string, error) {
+	var storage *nnfv1alpha2.NnfStorage
+	var nodeStorage *nnfv1alpha2.NnfNodeStorage
 
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha2.NnfStorage{}).Name() {
 		// The source storage reference is NnfStorage - this came from copy_in/copy_out directives
 		storageRef := dm.Spec.Source.StorageReference
 
-		storage = &nnfv1alpha1.NnfStorage{}
+		storage = &nnfv1alpha2.NnfStorage{}
 		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 			if apierrors.IsNotFound(err) {
 				return "", newInvalidError("could not retrieve NnfStorage for checking index mounts: %s", err.Error())
 			}
 			return "", err
 		}
-	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfNodeStorage{}).Name() {
+	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha2.NnfNodeStorage{}).Name() {
 		// The source storage reference is NnfNodeStorage - this came from copy_offload
 		storageRef := dm.Spec.Source.StorageReference
 
-		nodeStorage = &nnfv1alpha1.NnfNodeStorage{}
+		nodeStorage = &nnfv1alpha2.NnfNodeStorage{}
 		if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, nodeStorage); err != nil {
 			if apierrors.IsNotFound(err) {
 				return "", newInvalidError("could not retrieve NnfNodeStorage for checking index mounts: %s", err.Error())
@@ -722,7 +722,7 @@ func extractIndexMountDir(path, namespace string) (string, error) {
 
 // Given a destination directory and index mount directory, apply the necessary changes to the
 // destination directory and the DM's destination path to account for index mount directories
-func handleIndexMountDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, destDir, indexMount, mpiHostfile string, log logr.Logger) (string, error) {
+func handleIndexMountDir(profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, destDir, indexMount, mpiHostfile string, log logr.Logger) (string, error) {
 
 	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
 	// in the index mount directory without a trailing slash. If that's the case, there's nothing
@@ -764,7 +764,7 @@ func handleIndexMountDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1a
 
 // Determine the directory path to create based on the source and destination.
 // Returns the mkdir directory and error.
-func getDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+func getDestinationDir(profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
 	// Default to using the full path of dest
 	destDir := dm.Spec.Destination.Path
 
@@ -784,7 +784,7 @@ func getDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alp
 }
 
 // Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
-func mpiStat(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
+func mpiStat(profile *nnfv1alpha2.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
 	cmd := buildStatCommand(uid, gid, profile.Data.StatCommand, mpiHostfile, path)
 
 	output, err := command.Run(cmd, log)
@@ -797,7 +797,7 @@ func mpiStat(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid 
 }
 
 // Use mpirun to determine if a given path is a directory
-func mpiIsDir(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+func mpiIsDir(profile *nnfv1alpha2.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
 	output, err := mpiStat(profile, path, uid, gid, mpiHostfile, log)
 	if err != nil {
 		return false, err
@@ -816,7 +816,7 @@ func mpiIsDir(profile *nnfv1alpha1.NnfDataMovementProfile, path string, uid, gid
 
 // Check to see if the source path is a file. The source must exist and will result in error if it
 // does not. Do not use mpi in the test environment.
-func isSourceAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostFile string, log logr.Logger) (bool, error) {
+func isSourceAFile(profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, mpiHostFile string, log logr.Logger) (bool, error) {
 	var isDir bool
 	var err error
 
@@ -839,7 +839,7 @@ func isSourceAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.
 // Check to see if the destination path is a file. If it exists, use stat to determine if it is a
 // file or a directory. If it doesn't exist, check for a trailing slash and make an assumption based
 // on that.
-func isDestAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, mpiHostFile string, log logr.Logger) bool {
+func isDestAFile(profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, mpiHostFile string, log logr.Logger) bool {
 	isFile := false
 	exists := true
 	dest := dm.Spec.Destination.Path
@@ -871,7 +871,7 @@ func isDestAFile(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.Nn
 	return isFile
 }
 
-func createDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1alpha1.NnfDataMovement, dest, mpiHostfile string, log logr.Logger) error {
+func createDestinationDir(profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, dest, mpiHostfile string, log logr.Logger) error {
 
 	// Use mpirun to check if a file exists
 	mpiExists := func() (bool, error) {
@@ -906,7 +906,7 @@ func createDestinationDir(profile *nnfv1alpha1.NnfDataMovementProfile, dm *nnfv1
 }
 
 // Create an MPI hostfile given settings from a profile and user config from the dm
-func createMpiHostfile(profile *nnfv1alpha1.NnfDataMovementProfile, hosts []string, dm *nnfv1alpha1.NnfDataMovement) (string, error) {
+func createMpiHostfile(profile *nnfv1alpha2.NnfDataMovementProfile, hosts []string, dm *nnfv1alpha2.NnfDataMovement) (string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// Create MPI hostfile only if included in the provided command
@@ -999,15 +999,15 @@ func progressCollectionEnabled(collectInterval time.Duration) bool {
 	return collectInterval >= 1*time.Second
 }
 
-func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) error {
+func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha2.NnfDataMovement) error {
 	log := log.FromContext(ctx)
 
 	// Check for the scenario where a request is canceled but not deleted before the DM has started.
 	// If so, record it as cancelled and do nothing more with the data movement operation
 	if dm.Status.StartTime.IsZero() && !dm.DeletionTimestamp.IsZero() {
 		now := metav1.NowMicro()
-		dm.Status.State = nnfv1alpha1.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha1.DataMovementConditionReasonCancelled
+		dm.Status.State = nnfv1alpha2.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha2.DataMovementConditionReasonCancelled
 		dm.Status.StartTime = &now
 		dm.Status.EndTime = &now
 
@@ -1042,7 +1042,7 @@ func isTestEnv() bool {
 }
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
-func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha1.NnfDataMovement) ([]string, error) {
+func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nnfv1alpha2.NnfDataMovement) ([]string, error) {
 	// If this is a node data movement request simply reference the localhost
 	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() {
 		return []string{"localhost"}, nil
@@ -1050,15 +1050,15 @@ func (r *DataMovementReconciler) getStorageNodeNames(ctx context.Context, dm *nn
 
 	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
 	var storageRef corev1.ObjectReference
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha2.NnfStorage{}).Name() {
 		storageRef = dm.Spec.Source.StorageReference
-	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha1.NnfStorage{}).Name() {
+	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha2.NnfStorage{}).Name() {
 		storageRef = dm.Spec.Destination.StorageReference
 	} else {
 		return nil, newInvalidError("Neither source or destination is of NNF Storage type")
 	}
 
-	storage := &nnfv1alpha1.NnfStorage{}
+	storage := &nnfv1alpha2.NnfStorage{}
 	if err := r.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, newInvalidError("NNF Storage not found: %s", err.Error())
@@ -1113,9 +1113,9 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 
 	// Get the Rabbit DM Worker Pods
 	listOptions := []client.ListOption{
-		client.InNamespace(nnfv1alpha1.DataMovementNamespace),
+		client.InNamespace(nnfv1alpha2.DataMovementNamespace),
 		client.MatchingLabels(map[string]string{
-			nnfv1alpha1.DataMovementWorkerLabel: "true",
+			nnfv1alpha2.DataMovementWorkerLabel: "true",
 		}),
 	}
 
@@ -1126,7 +1126,7 @@ func (r *DataMovementReconciler) getWorkerHostnames(ctx context.Context, nodes [
 
 	nodeNameToHostnameMap := map[string]string{}
 	for _, pod := range pods.Items {
-		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + nnfv1alpha1.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
+		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + nnfv1alpha2.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
 	}
 
 	hostnames := make([]string, len(nodes))
@@ -1153,7 +1153,7 @@ func filterByNamespace(namespace string) predicate.Predicate {
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	maxReconciles := runtime.GOMAXPROCS(0)
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha1.NnfDataMovement{}).
+		For(&nnfv1alpha2.NnfDataMovement{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxReconciles}).
 		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)
