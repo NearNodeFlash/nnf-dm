@@ -63,7 +63,7 @@ ENV CGO_ENABLED=0
 ENTRYPOINT [ "make", "test" ]
 
 ###############################################################################
-FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION
+FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION AS production
 
 # The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
 # do not change them unless you know what it is you are doing
@@ -82,3 +82,23 @@ ARG NNFMFU_TAG_BASE
 ARG NNFMFU_VERSION
 LABEL nnf-mfu="$NNFMFU_TAG_BASE:$NNFMFU_VERSION"
 
+###############################################################################
+# Use the nnf-mfu-debug image as a base
+FROM $NNFMFU_TAG_BASE-debug:$NNFMFU_VERSION AS debug
+
+# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
+# do not change them unless you know what it is you are doing
+RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
+    && echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
+# Copy the executable and execute
+WORKDIR /
+COPY --from=builder /workspace/manager .
+
+ENTRYPOINT ["/manager"]
+
+# Make it easy to figure out which nnf-mfu was used.
+#   docker inspect --format='{{json .Config.Labels}}' image:tag
+ARG NNFMFU_TAG_BASE
+ARG NNFMFU_VERSION
+LABEL nnf-mfu="$NNFMFU_TAG_BASE-debug:$NNFMFU_VERSION"
