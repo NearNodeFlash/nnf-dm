@@ -47,6 +47,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
+IMAGE_TARGET ?= production
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
@@ -163,12 +164,21 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: VERSION ?= $(shell cat .version)
 docker-build: .version ## Build docker image with the manager.
-	${CONTAINER_TOOL} build -t $(IMAGE_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
+	${CONTAINER_TOOL} build --target $(IMAGE_TARGET) -t $(IMAGE_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
+
+.PHONY: docker-build-debug
+docker-build-debug: IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)-debug
+docker-build-debug: IMAGE_TARGET := debug
+docker-build-debug: docker-build
 
 .PHONY: docker-push
 docker-push: VERSION ?= $(shell cat .version)
 docker-push: .version ## Push docker image with the manager.
 	${CONTAINER_TOOL} push $(IMAGE_TAG_BASE):$(VERSION)
+
+.PHONY: docker-push-debug
+docker-push-debug: IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)-debug
+docker-push-debug: docker-push
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -184,9 +194,14 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
 	$(CONTAINER_TOOL) buildx use project-v3-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag $(IMAGE_TAG_BASE):$(VERSION) -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --target $(IMAGE_TARGET) --tag $(IMAGE_TAG_BASE):$(VERSION) -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm Dockerfile.cross
+
+.PHONY: docker-buildx-debug
+docker-buildx-debug: IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)-debug
+docker-buildx-debug: IMAGE_TARGET := debug
+docker-buildx-debug: docker-buildx
 
 kind-push: VERSION ?= $(shell cat .version)
 kind-push: .version ## Push docker image to kind
@@ -196,6 +211,10 @@ kind-push: .version ## Push docker image to kind
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
 	${CONTAINER_TOOL} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 	kind load docker-image gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+
+kind-push-debug: VERSION ?= $(shell cat .version)
+kind-push-debug: IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)-debug
+kind-push-debug: kind-push
 
 minikube-push: VERSION ?= $(shell cat .version)
 minikube-push: .version
