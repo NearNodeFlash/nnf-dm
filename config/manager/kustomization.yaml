@@ -1,5 +1,6 @@
 resources:
 - manager.yaml
+- worker-sshd-config.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
@@ -16,7 +17,7 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/nearnodeflash/nnf-dm
-  newTag: 0.1.6
+  newTag: 0.1.8
 - name: nnf-mfu
   newName: ghcr.io/nearnodeflash/nnf-mfu
   newTag: 0.1.2
