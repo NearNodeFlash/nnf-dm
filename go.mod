@@ -3,8 +3,8 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.21
 
 require (
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240913195900-b3285e54755e
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240913201015-2fe131e04231
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240925185149-26d9d6071a1c
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20240925191626-b418b8044027
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
@@ -73,7 +73,7 @@ require (
 )
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20240913193141-737bcd946a02
+	github.com/DataWorkflowServices/dws v0.0.1-0.20240916174522-9062a91241cd
 	go.openly.dev/pointy v1.3.0
 )
 
