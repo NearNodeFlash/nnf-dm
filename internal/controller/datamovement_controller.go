@@ -613,39 +613,42 @@ func buildStatCommand(uid, gid uint32, cmd, hostfile, path string) string {
 }
 
 func (r *DataMovementReconciler) prepareDestination(ctx context.Context, profile *nnfv1alpha2.NnfDataMovementProfile, dm *nnfv1alpha2.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
-	// These functions interact with the filesystem, so they can't run in the test env
-	if !isTestEnv() {
-		// Determine the destination directory based on the source and path
-		log.Info("Determining destination directory based on source/dest file types")
-		destDir, err := getDestinationDir(profile, dm, mpiHostfile, log)
+	// These functions interact with the filesystem, so they can't run in the test env.  Also, if
+	// the profile disables destination creation, skip it
+	if isTestEnv() || !profile.Data.CreateDestDir {
+		return nil
+	}
+
+	// Determine the destination directory based on the source and path
+	log.Info("Determining destination directory based on source/dest file types")
+	destDir, err := getDestinationDir(profile, dm, mpiHostfile, log)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+	}
+
+	// See if an index mount directory on the destination is required
+	log.Info("Determining if index mount directory is required")
+	indexMount, err := r.checkIndexMountDir(ctx, dm)
+	if err != nil {
+		return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+	}
+
+	// Account for index mount directory on the destDir and the dm dest path
+	// This updates the destination on dm
+	if indexMount != "" {
+		log.Info("Index mount directory is required", "indexMountdir", indexMount)
+		d, err := handleIndexMountDir(profile, dm, destDir, indexMount, mpiHostfile, log)
 		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine source type").WithError(err).WithFatal()
+			return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
 		}
+		destDir = d
+		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
+	}
 
-		// See if an index mount directory on the destination is required
-		log.Info("Determining if index mount directory is required")
-		indexMount, err := r.checkIndexMountDir(ctx, dm)
-		if err != nil {
-			return dwsv1alpha2.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
-		}
-
-		// Account for index mount directory on the destDir and the dm dest path
-		// This updates the destination on dm
-		if indexMount != "" {
-			log.Info("Index mount directory is required", "indexMountdir", indexMount)
-			d, err := handleIndexMountDir(profile, dm, destDir, indexMount, mpiHostfile, log)
-			if err != nil {
-				return dwsv1alpha2.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
-			}
-			destDir = d
-			log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
-		}
-
-		// Create the destination directory
-		log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
-		if err := createDestinationDir(profile, dm, destDir, mpiHostfile, log); err != nil {
-			return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
-		}
+	// Create the destination directory
+	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
+	if err := createDestinationDir(profile, dm, destDir, mpiHostfile, log); err != nil {
+		return dwsv1alpha2.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 	}
 
 	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
