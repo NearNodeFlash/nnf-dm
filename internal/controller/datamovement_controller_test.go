@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	nnfv1alpha2 "github.com/NearNodeFlash/nnf-sos/api/v1alpha2"
+	nnfv1alpha3 "github.com/NearNodeFlash/nnf-sos/api/v1alpha3"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -55,8 +55,8 @@ var defaultCommand = "mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --prog
 var _ = Describe("Data Movement Test", func() {
 
 	Describe("Reconciler Tests", func() {
-		var dm *nnfv1alpha2.NnfDataMovement
-		var dmProfile *nnfv1alpha2.NnfDataMovementProfile
+		var dm *nnfv1alpha3.NnfDataMovement
+		var dmProfile *nnfv1alpha3.NnfDataMovementProfile
 		createDmProfile := true
 		var tmpDir string
 		var srcPath string
@@ -97,13 +97,13 @@ var _ = Describe("Data Movement Test", func() {
 			// BeforeAll. Ignoring a Create() error is fine in this case.
 			ns := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: nnfv1alpha2.DataMovementNamespace,
+					Name: nnfv1alpha3.DataMovementNamespace,
 				},
 			}
 			k8sClient.Create(context.TODO(), ns)
 
 			// Default DM profile
-			dmProfile = &nnfv1alpha2.NnfDataMovementProfile{
+			dmProfile = &nnfv1alpha3.NnfDataMovementProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default",
 					Namespace: corev1.NamespaceDefault,
@@ -111,14 +111,14 @@ var _ = Describe("Data Movement Test", func() {
 						testLabelKey: testLabel,
 					},
 				},
-				Data: nnfv1alpha2.NnfDataMovementProfileData{
+				Data: nnfv1alpha3.NnfDataMovementProfileData{
 					Command:                 defaultCommand,
 					ProgressIntervalSeconds: 1,
 					Default:                 true,
 				},
 			}
 
-			dm = &nnfv1alpha2.NnfDataMovement{
+			dm = &nnfv1alpha3.NnfDataMovement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "dm-test",
 					Namespace: corev1.NamespaceDefault,
@@ -126,18 +126,18 @@ var _ = Describe("Data Movement Test", func() {
 						testLabelKey: testLabel,
 					},
 				},
-				Spec: nnfv1alpha2.NnfDataMovementSpec{
-					Source: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+				Spec: nnfv1alpha3.NnfDataMovementSpec{
+					Source: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: srcPath,
 					},
-					Destination: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					Destination: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: destPath,
 					},
 					UserId:  0,
 					GroupId: 0,
 					Cancel:  false,
 					ProfileReference: corev1.ObjectReference{
-						Kind:      reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name(),
+						Kind:      reflect.TypeOf(nnfv1alpha3.NnfDataMovementProfile{}).Name(),
 						Name:      dmProfile.Name,
 						Namespace: dmProfile.Namespace,
 					},
@@ -190,12 +190,12 @@ var _ = Describe("Data Movement Test", func() {
 				dmProfile.Data.Command = "sleep 1"
 			})
 			It("should have a state and status of 'Finished' and 'Success'", func() {
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 			})
 		})
@@ -205,12 +205,12 @@ var _ = Describe("Data Movement Test", func() {
 				dmProfile.Data.Command = "sleep 1"
 			})
 			It("CommandStatus should not have a ProgressPercentage", func() {
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
@@ -259,12 +259,12 @@ var _ = Describe("Data Movement Test", func() {
 			It("the data movement should skip progress collection", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that CommandStatus is empty")
@@ -283,12 +283,12 @@ var _ = Describe("Data Movement Test", func() {
 			It("should store the output in Status.Message", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that Message is equal to the output")
@@ -306,12 +306,12 @@ var _ = Describe("Data Movement Test", func() {
 			It("should not store anything in Status.Message", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that Message is equal to the output")
@@ -323,7 +323,7 @@ var _ = Describe("Data Movement Test", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
 				dmProfile.Data.Command = "echo " + output
-				dm.Spec.UserConfig = &nnfv1alpha2.NnfDataMovementConfig{
+				dm.Spec.UserConfig = &nnfv1alpha3.NnfDataMovementConfig{
 					StoreStdout: true,
 				}
 			})
@@ -331,12 +331,12 @@ var _ = Describe("Data Movement Test", func() {
 			It("should store the output in Status.Message", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that Message is equal to the output")
@@ -348,7 +348,7 @@ var _ = Describe("Data Movement Test", func() {
 			output := "this is not a test"
 			BeforeEach(func() {
 				dmProfile.Data.Command = "echo " + output
-				dm.Spec.UserConfig = &nnfv1alpha2.NnfDataMovementConfig{
+				dm.Spec.UserConfig = &nnfv1alpha3.NnfDataMovementConfig{
 					StoreStdout: false,
 				}
 			})
@@ -356,12 +356,12 @@ var _ = Describe("Data Movement Test", func() {
 			It("should not store anything in Status.Message", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that Message is equal to the output")
@@ -378,12 +378,12 @@ var _ = Describe("Data Movement Test", func() {
 				Consistently(func(g Gomega) string {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status.State
-				}).ShouldNot(Equal(nnfv1alpha2.DataMovementConditionTypeRunning))
+				}).ShouldNot(Equal(nnfv1alpha3.DataMovementConditionTypeRunning))
 			})
 		})
 
 		Context("when a non-default profile is supplied (and present)", func() {
-			p := &nnfv1alpha2.NnfDataMovementProfile{
+			p := &nnfv1alpha3.NnfDataMovementProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-profile",
 					Namespace: corev1.NamespaceDefault,
@@ -394,7 +394,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				p.Data.Command = cmd
 				dm.Spec.ProfileReference = corev1.ObjectReference{
-					Kind:      reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name(),
+					Kind:      reflect.TypeOf(nnfv1alpha3.NnfDataMovementProfile{}).Name(),
 					Name:      p.Name,
 					Namespace: p.Namespace,
 				}
@@ -408,18 +408,18 @@ var _ = Describe("Data Movement Test", func() {
 			It("should use that profile to perform data movement", func() {
 
 				By("completing the data movement successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "3s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("verify that profile is used")
 				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
 					Fields{
-						"Kind":      Equal(reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name()),
+						"Kind":      Equal(reflect.TypeOf(nnfv1alpha3.NnfDataMovementProfile{}).Name()),
 						"Name":      Equal(p.Name),
 						"Namespace": Equal(p.Namespace),
 					},
@@ -429,7 +429,7 @@ var _ = Describe("Data Movement Test", func() {
 		})
 
 		Context("when a non-default profile is supplied (and NOT present)", func() {
-			m := &nnfv1alpha2.NnfDataMovementProfile{
+			m := &nnfv1alpha3.NnfDataMovementProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "missing-test-profile",
 					Namespace: corev1.NamespaceDefault,
@@ -440,7 +440,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				m.Data.Command = cmd
 				dm.Spec.ProfileReference = corev1.ObjectReference{
-					Kind:      reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name(),
+					Kind:      reflect.TypeOf(nnfv1alpha3.NnfDataMovementProfile{}).Name(),
 					Name:      m.Name,
 					Namespace: m.Namespace,
 				}
@@ -448,18 +448,18 @@ var _ = Describe("Data Movement Test", func() {
 			It("should use that profile to perform data movement and fail", func() {
 
 				By("having a State/Status of 'Finished'/'Invalid'")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}).Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonInvalid),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonInvalid),
 				}))
 
 				By("verify that profile is used")
 				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
 					Fields{
-						"Kind":      Equal(reflect.TypeOf(nnfv1alpha2.NnfDataMovementProfile{}).Name()),
+						"Kind":      Equal(reflect.TypeOf(nnfv1alpha3.NnfDataMovementProfile{}).Name()),
 						"Name":      Equal(m.Name),
 						"Namespace": Equal(m.Namespace),
 					},
@@ -472,12 +472,12 @@ var _ = Describe("Data Movement Test", func() {
 				dmProfile.Data.Command = "false"
 			})
 			It("should have a State/Status of 'Finished'/'Failed'", func() {
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}).Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonFailed),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonFailed),
 				}))
 			})
 		})
@@ -510,12 +510,12 @@ var _ = Describe("Data Movement Test", func() {
 				}, "10s").ShouldNot(BeNil())
 
 				By("Checking the Status fields")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, "10s").Should(MatchFields(IgnoreExtras, Fields{
-					"State":     Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status":    Equal(nnfv1alpha2.DataMovementConditionReasonCancelled),
+					"State":     Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status":    Equal(nnfv1alpha3.DataMovementConditionReasonCancelled),
 					"StartTime": HaveField("Time", BeTemporally(">", nowMicro.Time)),
 					"EndTime":   HaveField("Time", BeTemporally(">", nowMicro.Time)),
 				}))
@@ -594,12 +594,12 @@ var _ = Describe("Data Movement Test", func() {
 				elapsedTime := time.Since(startTime.Time)
 
 				By("ensuring state/status of 'Finished'/'Success'")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}, commandIntervalInSec*3).Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonSuccess),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonSuccess),
 				}))
 
 				By("ensuring the LastMessage contains the 100% done output")
@@ -660,7 +660,7 @@ var _ = Describe("Data Movement Test", func() {
 				Eventually(func(g Gomega) string {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status.State
-				}).Should(Equal(nnfv1alpha2.DataMovementConditionTypeRunning))
+				}).Should(Equal(nnfv1alpha3.DataMovementConditionTypeRunning))
 
 				By("setting the cancel flag to true")
 				Eventually(func(g Gomega) error {
@@ -670,12 +670,12 @@ var _ = Describe("Data Movement Test", func() {
 				}).Should(Succeed())
 
 				By("verifying that it was cancelled successfully")
-				Eventually(func(g Gomega) nnfv1alpha2.NnfDataMovementStatus {
+				Eventually(func(g Gomega) nnfv1alpha3.NnfDataMovementStatus {
 					g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(dm), dm)).To(Succeed())
 					return dm.Status
 				}).Should(MatchFields(IgnoreExtras, Fields{
-					"State":  Equal(nnfv1alpha2.DataMovementConditionTypeFinished),
-					"Status": Equal(nnfv1alpha2.DataMovementConditionReasonCancelled),
+					"State":  Equal(nnfv1alpha3.DataMovementConditionTypeFinished),
+					"Status": Equal(nnfv1alpha3.DataMovementConditionReasonCancelled),
 				}))
 			})
 		})
@@ -741,21 +741,21 @@ var _ = Describe("Data Movement Test", func() {
 
 		Context("$HOSTFILE creation", func() {
 			hosts := []string{"one", "two", "three"}
-			dm := nnfv1alpha2.NnfDataMovement{
-				Spec: nnfv1alpha2.NnfDataMovementSpec{
+			dm := nnfv1alpha3.NnfDataMovement{
+				Spec: nnfv1alpha3.NnfDataMovementSpec{
 					UserId:  1000,
 					GroupId: 2000,
-					Source: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					Source: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: "/src/",
 					},
-					Destination: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					Destination: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: "/dest/",
 					},
 				},
 			}
 			When("$HOSTFILE is present", func() {
 				It("should create the hostfile", func() {
-					profile := nnfv1alpha2.NnfDataMovementProfile{}
+					profile := nnfv1alpha3.NnfDataMovementProfile{}
 					profile.Data.Command = "mpirun --hostfile $HOSTFILE dcp src dest"
 
 					hostfile, err := createMpiHostfile(&profile, hosts, &dm)
@@ -775,14 +775,14 @@ var _ = Describe("Data Movement Test", func() {
 			expectedGid := 2000
 			srcPath := "/src/"
 			destPath := "/dest/"
-			dm := nnfv1alpha2.NnfDataMovement{
-				Spec: nnfv1alpha2.NnfDataMovementSpec{
+			dm := nnfv1alpha3.NnfDataMovement{
+				Spec: nnfv1alpha3.NnfDataMovementSpec{
 					UserId:  uint32(expectedUid),
 					GroupId: uint32(expectedGid),
-					Source: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					Source: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: srcPath,
 					},
-					Destination: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					Destination: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 						Path: destPath,
 					},
 				},
@@ -790,10 +790,10 @@ var _ = Describe("Data Movement Test", func() {
 
 			When("MpirunOptions are specified", func() {
 				It("should inject the extra options after the `mpirun` command", func() {
-					profile := nnfv1alpha2.NnfDataMovementProfile{}
+					profile := nnfv1alpha3.NnfDataMovementProfile{}
 					profile.Data.Command = defaultCommand
 
-					dm.Spec.UserConfig = &nnfv1alpha2.NnfDataMovementConfig{
+					dm.Spec.UserConfig = &nnfv1alpha3.NnfDataMovementConfig{
 						MpirunOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
@@ -808,10 +808,10 @@ var _ = Describe("Data Movement Test", func() {
 
 			When("DcpOptions are specified", func() {
 				It("should inject the extra options after the `dcp` command", func() {
-					profile := nnfv1alpha2.NnfDataMovementProfile{}
+					profile := nnfv1alpha3.NnfDataMovementProfile{}
 					profile.Data.Command = defaultCommand
 
-					dm.Spec.UserConfig = &nnfv1alpha2.NnfDataMovementConfig{
+					dm.Spec.UserConfig = &nnfv1alpha3.NnfDataMovementConfig{
 						DcpOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
@@ -829,14 +829,14 @@ var _ = Describe("Data Movement Test", func() {
 					func(numSlots *int) {
 						profileSlots, profileMaxSlots := 3, 8
 
-						profile := nnfv1alpha2.NnfDataMovementProfile{
-							Data: nnfv1alpha2.NnfDataMovementProfileData{
+						profile := nnfv1alpha3.NnfDataMovementProfile{
+							Data: nnfv1alpha3.NnfDataMovementProfileData{
 								Command:  defaultCommand,
 								Slots:    profileSlots,
 								MaxSlots: profileMaxSlots,
 							},
 						}
-						dm.Spec.UserConfig = &nnfv1alpha2.NnfDataMovementConfig{
+						dm.Spec.UserConfig = &nnfv1alpha3.NnfDataMovementConfig{
 							Slots:    numSlots,
 							MaxSlots: numSlots,
 						}
@@ -907,12 +907,12 @@ var _ = Describe("Data Movement Test", func() {
 						newDest += "/"
 					}
 
-					dm := &nnfv1alpha2.NnfDataMovement{
-						Spec: nnfv1alpha2.NnfDataMovementSpec{
-							Source: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					dm := &nnfv1alpha3.NnfDataMovement{
+						Spec: nnfv1alpha3.NnfDataMovementSpec{
+							Source: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 								Path: newSrc,
 							},
-							Destination: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+							Destination: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 								Path: newDest,
 							},
 							UserId:  1234,
@@ -920,7 +920,7 @@ var _ = Describe("Data Movement Test", func() {
 						},
 					}
 
-					dmProfile := &nnfv1alpha2.NnfDataMovementProfile{}
+					dmProfile := &nnfv1alpha3.NnfDataMovementProfile{}
 
 					destDir, err := getDestinationDir(dmProfile, dm, "", logr.Logger{})
 					destDir = strings.Replace(destDir, tmpDir, "", -1) // remove tmpdir from the path
@@ -1017,18 +1017,18 @@ var _ = Describe("Data Movement Test", func() {
 					}
 
 					// We need a DM to stuff the paths and check the updated destination after account for index mount
-					dm := &nnfv1alpha2.NnfDataMovement{
-						Spec: nnfv1alpha2.NnfDataMovementSpec{
-							Source: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+					dm := &nnfv1alpha3.NnfDataMovement{
+						Spec: nnfv1alpha3.NnfDataMovementSpec{
+							Source: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 								Path: newSrc,
 							},
-							Destination: &nnfv1alpha2.NnfDataMovementSpecSourceDestination{
+							Destination: &nnfv1alpha3.NnfDataMovementSpecSourceDestination{
 								Path: newDest,
 							},
 						},
 					}
 
-					dmProfile := &nnfv1alpha2.NnfDataMovementProfile{}
+					dmProfile := &nnfv1alpha3.NnfDataMovementProfile{}
 
 					newDestDir, err := handleIndexMountDir(dmProfile, dm, destDir, idxMount, "", logr.Logger{})
 					Expect(err).ToNot((HaveOccurred()))
