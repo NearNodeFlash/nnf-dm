@@ -17,21 +17,23 @@
  * limitations under the License.
  */
 
-package v1alpha2
+// Package v1alpha3 contains API Schema definitions for the nnf v1alpha3 API group
+// +kubebuilder:object:generate=true
+// +groupName=nnf.cray.hpe.com
+package v1alpha3
 
 import (
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-// log is for logging in this package.
-var nnfnodelog = logf.Log.WithName("nnfnode-resource")
+var (
+	// GroupVersion is group version used to register these objects
+	GroupVersion = schema.GroupVersion{Group: "nnf.cray.hpe.com", Version: "v1alpha3"}
 
-// SetupWebhookWithManager will setup the manager to manage the webhooks
-func (r *NnfNode) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)
