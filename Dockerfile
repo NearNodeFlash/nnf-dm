@@ -18,7 +18,7 @@
 # These ARGs must be before the first FROM. This allows them to be valid for
 # use in FROM instructions.
 ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
-ARG NNFMFU_VERSION=0.1.2
+ARG NNFMFU_VERSION=0.1.3
 
 # Build the manager binary
 FROM golang:1.21-alpine AS builder

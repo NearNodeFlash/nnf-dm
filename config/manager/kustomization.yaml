@@ -20,4 +20,4 @@ images:
   newTag: 0.1.10
 - name: nnf-mfu
   newName: ghcr.io/nearnodeflash/nnf-mfu
-  newTag: 0.1.2
+  newTag: 0.1.3
