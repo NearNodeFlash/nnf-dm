@@ -708,7 +708,6 @@ var _ = Describe("Data Movement Test", func() {
 	Describe("Unit Tests (without Reconciler)", func() {
 
 		Context("MPI hostfile creation", func() {
-			hosts := []string{"node1", "node2"}
 			DescribeTable("setting hosts, slots, and maxSlots",
 				func(hosts []string, slots, maxSlots int, expected string) {
 					hostfilePath, err := writeMpiHostfile("my-dm", hosts, slots, maxSlots)
@@ -720,10 +719,13 @@ var _ = Describe("Data Movement Test", func() {
 					Expect(err).To(BeNil())
 					Expect(string(contents)).To(Equal(expected))
 				},
-				Entry("with no slots or max_slots", hosts, 0, 0, "node1\nnode2\n"),
-				Entry("with only slots", hosts, 4, 0, "node1 slots=4\nnode2 slots=4\n"),
-				Entry("with only max_slots", hosts, 0, 4, "node1 max_slots=4\nnode2 max_slots=4\n"),
-				Entry("with both slots and max_slots", hosts, 4, 4, "node1 slots=4 max_slots=4\nnode2 slots=4 max_slots=4\n"),
+				Entry("with no slots or max_slots", []string{"node1", "node2"}, 0, 0, "node1\nnode2\n"),
+				Entry("with only slots", []string{"node1", "node2"}, 4, 0, "node1 slots=4\nnode2 slots=4\n"),
+				Entry("with only max_slots", []string{"node1", "node2"}, 0, 4, "node1 max_slots=4\nnode2 max_slots=4\n"),
+				Entry("with both slots and max_slots", []string{"node1", "node2"}, 4, 4, "node1 slots=4 max_slots=4\nnode2 slots=4 max_slots=4\n"),
+				Entry("with duplicate hosts (1 dup host)", []string{"node1", "node1"}, 2, 4, "node1 slots=2 max_slots=4\n"),
+				Entry("with duplicate hosts (2 dup hosts)", []string{"node1", "node1", "node2", "node2"}, 2, 4, "node1 slots=2 max_slots=4\nnode2 slots=2 max_slots=4\n"),
+				Entry("with duplicate hosts (1 dup host, no slots)", []string{"node1", "node1", "node1", "node2"}, 0, 0, "node1\nnode2\n"),
 			)
 		})
 
