@@ -954,7 +954,15 @@ func writeMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (strin
 	// node0 slots=2 max_slots=20
 	// node1 slots=2 max_slots=20
 	// https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+	unique_hosts := map[string]int{}
 	for _, host := range hosts {
+		// hostfiles cannot list a host more than once - this can happen when there are multiple
+		// OSTs on a single rabbit. Move on if a host is already present.
+		if _, found := unique_hosts[host]; found {
+			continue
+		}
+		unique_hosts[host] = 1
+
 		if _, err := f.WriteString(host); err != nil {
 			return "", err
 		}
