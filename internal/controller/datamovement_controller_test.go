@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	nnfv1alpha3 "github.com/NearNodeFlash/nnf-sos/api/v1alpha3"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -43,6 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	. "github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
+	nnfv1alpha3 "github.com/NearNodeFlash/nnf-sos/api/v1alpha3"
 )
 
 // This is dumped into a temporary file and then ran as a bash script.
@@ -710,7 +712,7 @@ var _ = Describe("Data Movement Test", func() {
 		Context("MPI hostfile creation", func() {
 			DescribeTable("setting hosts, slots, and maxSlots",
 				func(hosts []string, slots, maxSlots int, expected string) {
-					hostfilePath, err := writeMpiHostfile("my-dm", hosts, slots, maxSlots)
+					hostfilePath, err := WriteMpiHostfile("my-dm", hosts, slots, maxSlots)
 					defer os.RemoveAll(filepath.Dir(hostfilePath))
 					Expect(err).To(BeNil())
 					Expect(hostfilePath).ToNot(Equal(""))
@@ -733,10 +735,10 @@ var _ = Describe("Data Movement Test", func() {
 			It("should return the first line of the hostfile", func() {
 				hosts := []string{"one", "two", "three"}
 				slots, maxSlots := 16, 32
-				hostfilePath, err := writeMpiHostfile("my-dm", hosts, slots, maxSlots)
+				hostfilePath, err := WriteMpiHostfile("my-dm", hosts, slots, maxSlots)
 				Expect(err).ToNot(HaveOccurred())
 
-				actual := peekMpiHostfile(hostfilePath)
+				actual := PeekMpiHostfile(hostfilePath)
 				Expect(actual).To(Equal("one slots=16 max_slots=32\n"))
 			})
 		})
@@ -760,7 +762,7 @@ var _ = Describe("Data Movement Test", func() {
 					profile := nnfv1alpha3.NnfDataMovementProfile{}
 					profile.Data.Command = "mpirun --hostfile $HOSTFILE dcp src dest"
 
-					hostfile, err := createMpiHostfile(&profile, hosts, &dm)
+					hostfile, err := CreateMpiHostfile(&profile, hosts, &dm)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(len(hostfile)).Should((BeNumerically(">", 0)))
 					info, err := os.Stat(hostfile)
@@ -802,7 +804,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := buildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
+					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -820,7 +822,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --extra opts --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := buildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
+					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -843,7 +845,7 @@ var _ = Describe("Data Movement Test", func() {
 							MaxSlots: numSlots,
 						}
 
-						hostfilePath, err := createMpiHostfile(&profile, hosts, &dm)
+						hostfilePath, err := CreateMpiHostfile(&profile, hosts, &dm)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(hostfilePath).ToNot(BeEmpty())
 						DeferCleanup(func() {
@@ -924,7 +926,7 @@ var _ = Describe("Data Movement Test", func() {
 
 					dmProfile := &nnfv1alpha3.NnfDataMovementProfile{}
 
-					destDir, err := getDestinationDir(dmProfile, dm, "", logr.Logger{})
+					destDir, err := GetDestinationDir(dmProfile, dm, "", logr.Logger{})
 					destDir = strings.Replace(destDir, tmpDir, "", -1) // remove tmpdir from the path
 					Expect(err).ToNot(HaveOccurred())
 					Expect(destDir).To(Equal(expected))
@@ -967,7 +969,7 @@ var _ = Describe("Data Movement Test", func() {
 			DescribeTable("",
 				func(path, expected string, expectError bool) {
 
-					idxMount, err := extractIndexMountDir(path, ns)
+					idxMount, err := ExtractIndexMountDir(path, ns)
 					Expect(idxMount).To(Equal(expected))
 					if expectError {
 						Expect(err).To(HaveOccurred())
@@ -1032,7 +1034,7 @@ var _ = Describe("Data Movement Test", func() {
 
 					dmProfile := &nnfv1alpha3.NnfDataMovementProfile{}
 
-					newDestDir, err := handleIndexMountDir(dmProfile, dm, destDir, idxMount, "", logr.Logger{})
+					newDestDir, err := HandleIndexMountDir(dmProfile, dm, destDir, idxMount, "", logr.Logger{})
 					Expect(err).ToNot((HaveOccurred()))
 
 					// Remove any tmpDir paths before verifying
