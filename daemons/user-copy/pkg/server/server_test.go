@@ -70,53 +70,105 @@ func TestHello(t *testing.T) {
 }
 
 func TestListRequests(t *testing.T) {
-	t.Run("returns status-no-content", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodGet, "/list", nil)
-		response := httptest.NewRecorder()
+	testCases := []struct {
+		name       string
+		method     string
+		wantText   string
+		wantStatus int
+	}{
+		{
+			name:       "returns status-no-content",
+			method:     http.MethodGet,
+			wantText:   "\n",
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "returns status-not-implemented for POST",
+			method:     http.MethodPost,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+		{
+			name:       "returns status-not-implemented for PUT",
+			method:     http.MethodPut,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+	}
 
-		crLog := setupLog()
-		drvr := &driver.Driver{Log: crLog}
-		httpHandler := &UserHttp{Log: crLog, Drvr: drvr}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			request, _ := http.NewRequest(test.method, "/list", nil)
+			response := httptest.NewRecorder()
 
-		httpHandler.ListRequests(response, request)
+			crLog := setupLog()
+			drvr := &driver.Driver{Log: crLog}
+			httpHandler := &UserHttp{Log: crLog, Drvr: drvr}
 
-		res := response.Result()
-		got := response.Body.String()
-		want := "\n"
-		statusWant := http.StatusNoContent
+			httpHandler.ListRequests(response, request)
 
-		if res.StatusCode != statusWant {
-			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
-		}
-		if got != want {
-			t.Errorf("got %q, want %q", got, want)
-		}
-	})
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
 }
 
 func TestCancelRequest(t *testing.T) {
-	t.Run("returns status-no-content", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodDelete, "/cancel/foo", nil)
-		response := httptest.NewRecorder()
+	testCases := []struct {
+		name       string
+		method     string
+		wantText   string
+		wantStatus int
+	}{
+		{
+			name:       "returns status-no-content",
+			method:     http.MethodDelete,
+			wantText:   "\n",
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "returns status-not-implemented for GET",
+			method:     http.MethodGet,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+		{
+			name:       "returns status-not-implemented for PUT",
+			method:     http.MethodPut,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+	}
 
-		crLog := setupLog()
-		drvr := &driver.Driver{Log: crLog}
-		httpHandler := &UserHttp{Log: crLog, Drvr: drvr}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			request, _ := http.NewRequest(test.method, "/cancel/foo", nil)
+			response := httptest.NewRecorder()
 
-		httpHandler.CancelRequest(response, request)
+			crLog := setupLog()
+			drvr := &driver.Driver{Log: crLog}
+			httpHandler := &UserHttp{Log: crLog, Drvr: drvr}
 
-		res := response.Result()
-		got := response.Body.String()
-		want := "\n"
-		statusWant := http.StatusNoContent
+			httpHandler.CancelRequest(response, request)
 
-		if res.StatusCode != statusWant {
-			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
-		}
-		if got != want {
-			t.Errorf("got %q, want %q", got, want)
-		}
-	})
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
 }
 
 func TestTrialRequest(t *testing.T) {

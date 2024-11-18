@@ -1,0 +1,14 @@
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+namePrefix: nnf-dm-
+
+resources:
+- user_copy_service_account.yaml
+- user_copy_role.yaml
+- user_copy_role_binding.yaml
+
+configurations:
+  - kustomizeconfig.yaml

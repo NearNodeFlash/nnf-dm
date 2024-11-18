@@ -100,6 +100,7 @@ func main() {
 		fmt.Println("Did not find NNF_NODE_NAME")
 		os.Exit(1)
 	}
+	slog.Info("Ready", "node", rabbitName)
 
 	crLog, clnt := setupLogAndClient()
 	clientSanity(crLog, clnt)
