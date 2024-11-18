@@ -209,8 +209,6 @@ kind-push: .version ## Push docker image to kind
 	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
 	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
-	${CONTAINER_TOOL} pull gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
-	kind load docker-image gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
 
 kind-push-debug: VERSION ?= $(shell cat .version)
 kind-push-debug: IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)-debug
