@@ -866,7 +866,7 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return "", fmt.Errorf("no client mounts found on node '%s'", s.namespace)
+		return "", fmt.Errorf("no client mounts found for node '%s'", s.namespace)
 	}
 
 	for _, clientMount := range clientMounts.Items {
@@ -899,7 +899,7 @@ func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMo
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return nil, nil, fmt.Errorf("no client mounts found on node '%s'", s.name)
+		return nil, nil, fmt.Errorf("no client mounts found for node '%s'", s.name)
 	}
 
 	for _, clientMount := range clientMounts.Items {

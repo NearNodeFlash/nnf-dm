@@ -184,6 +184,11 @@ build-user-copy-docker-with: VERSION ?= $(shell cat .version)
 build-user-copy-docker-with: .version ## Build docker image with the manager.
 	${CONTAINER_TOOL} build --platform linux/$(GOARCH) --target $(IMAGE_USER_COPY_TARGET) -t $(IMAGE_USER_COPY_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
 
+.PHONY: kind-push-user-copy
+kind-push-user-copy: VERSION ?= $(shell cat .version)
+kind-push-user-copy: .version
+	kind load docker-image $(IMAGE_USER_COPY_TAG_BASE):$(VERSION)
+
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
@@ -231,9 +236,6 @@ docker-buildx-debug: docker-buildx
 
 kind-push: VERSION ?= $(shell cat .version)
 kind-push: .version ## Push docker image to kind
-	# Nnf-dm is used on all nodes. It's on the management node for the
-	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
-	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
 
 kind-push-debug: VERSION ?= $(shell cat .version)

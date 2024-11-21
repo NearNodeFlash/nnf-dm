@@ -122,14 +122,6 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Create a Go routine with a cancel context, let that Go routine run
-	// the copy command. Keep the context in a list that main() can see.
-	// The copy can be cancelled by sending a new message to main(), which will
-	// look up the context and cancel it.
-	// Or, the status of the copy can be found by sending a message to main(),
-	// which will look up the context and get to the NnfDataMovement and report
-	// its status.
-
 	err = drvrReq.Drive(context.TODO(), dmreq, dm)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)

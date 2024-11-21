@@ -205,11 +205,6 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 		},
 	})
 
-	if dmreq.Dryrun {
-		crLog.Info("Out before driveWithContext")
-		return nil
-	}
-
 	if err := r.driveWithContext(ctx, ctxCancel, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
@@ -591,7 +586,7 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return "", fmt.Errorf("no client mounts found on node '%s'", drvr.RabbitName)
+		return "", fmt.Errorf("no client mounts found for node '%s'", drvr.RabbitName)
 	}
 
 	for _, clientMount := range clientMounts.Items {
@@ -625,7 +620,7 @@ func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMReques
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return nil, nil, fmt.Errorf("no client mounts found on node '%s'", drvr.RabbitName)
+		return nil, nil, fmt.Errorf("no client mounts found for node '%s'", dmreq.ComputeName)
 	}
 
 	for _, clientMount := range clientMounts.Items {
