@@ -43,7 +43,7 @@ import (
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 	"github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/server"
-	nnfv1alpha3 "github.com/NearNodeFlash/nnf-sos/api/v1alpha3"
+	nnfv1alpha4 "github.com/NearNodeFlash/nnf-sos/api/v1alpha4"
 )
 
 var (
@@ -53,7 +53,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha3.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha4.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha2.AddToScheme(scheme))
 }
 
