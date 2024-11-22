@@ -31,7 +31,6 @@ import (
 	"github.com/go-logr/logr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -76,23 +75,19 @@ func setupLogAndClient() (logr.Logger, client.Client) {
 	return crLog, clnt
 }
 
-func clientSanity(crLog logr.Logger, clnt client.Client) {
+func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 	// Sanity check the client connection.
-	systemConfig := &dwsv1alpha2.SystemConfiguration{}
-	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "default", Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
-		crLog.Error(err, "Failed to retrieve system config")
+	nnfNode := &nnfv1alpha4.NnfNode{}
+	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "nnf-nlc", Namespace: rabbitName}, nnfNode); err != nil {
+		crLog.Error(err, "Failed to retrieve my own NnfNode")
 		os.Exit(1)
 	}
-	slog.Info("Found system config", "UID", systemConfig.UID)
 }
 
 func main() {
 	port := "8080"
-	setupOnly := false
 
 	flag.StringVar(&port, "port", port, "Port for server.")
-	flag.BoolVar(&setupOnly, "setup-only", setupOnly, "Stop after setup.")
-
 	flag.Parse()
 
 	rabbitName = os.Getenv("NNF_NODE_NAME")
@@ -100,14 +95,14 @@ func main() {
 		fmt.Println("Did not find NNF_NODE_NAME")
 		os.Exit(1)
 	}
-	slog.Info("Ready", "node", rabbitName)
 
 	crLog, clnt := setupLogAndClient()
-	clientSanity(crLog, clnt)
+	clientSanity(crLog, clnt, rabbitName)
+	slog.Info("Ready", "node", rabbitName, "port", port)
 
 	// Make one of these for this server, and use it in all requests.
 	drvr := &driver.Driver{Client: clnt, Log: crLog, RabbitName: rabbitName}
-	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, SetupOnly: setupOnly}
+	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr}
 
 	http.HandleFunc("/hello", httpHandler.Hello)
 	http.HandleFunc("/trial", httpHandler.TrialRequest)

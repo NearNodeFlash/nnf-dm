@@ -33,10 +33,9 @@ import (
 )
 
 type UserHttp struct {
-	Log       logr.Logger
-	Drvr      *driver.Driver
-	SetupOnly bool
-	InTest    bool
+	Log    logr.Logger
+	Drvr   *driver.Driver
+	InTest bool
 }
 
 func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
@@ -108,17 +107,6 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	dm, err := drvrReq.Create(context.TODO(), dmreq)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	if user.SetupOnly {
-		user.Log.Info("Stopping after setup")
-		user.Log.Info("NnfDataMovement", "name", dm.GetName())
-		user.Log.Info("NnfDataMovement.Spec", "value", fmt.Sprintf("%+v", dm.Spec))
-		user.Log.Info("NnfDataMovement.Spec.UserConfig", "value", fmt.Sprintf("%+v", dm.Spec.UserConfig))
-		user.Log.Info("NnfDataMovement.Spec.Source", "value", fmt.Sprintf("%+v", dm.Spec.Source))
-		user.Log.Info("NnfDataMovement.Spec.Destination", "value", fmt.Sprintf("%+v", dm.Spec.Destination))
-		fmt.Fprintf(w, "{\"name\": \"%s\"}\n", dm.GetName())
 		return
 	}
 
