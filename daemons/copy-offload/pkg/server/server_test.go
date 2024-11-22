@@ -33,7 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/driver"
+	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 )
 
 func setupLog() logr.Logger {

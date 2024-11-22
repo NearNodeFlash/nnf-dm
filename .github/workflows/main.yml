@@ -188,7 +188,7 @@ jobs:
 #        target: debug
 #        tags: ${{ steps.meta.outputs.tags }}
 
-  user_copy_production:
+  copy_offload_production:
     runs-on: ubuntu-latest
 
     steps:
@@ -231,7 +231,7 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: |
-          ghcr.io/${{ env.REPO_NAME }}-user-copy
+          ghcr.io/${{ env.REPO_NAME }}-copy-offload
         tags: |
           # For merge to master branch, tag example: 'master'
           type=ref,event=branch
@@ -269,16 +269,16 @@ jobs:
     #  if: ${{ env.DO_TEST == 'true' }}
     #  run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
 
-    - name: "Build the user copy Docker image"
+    - name: "Build the copy-offload Docker image"
       id: docker_build
       uses: docker/build-push-action@v6
       with:
         push: true
-        target: user_copy_production
+        target: copy_offload_production
         tags: ${{ steps.meta.outputs.tags }}
 
   create_release:
-    needs: [production, debug, user_copy_production]
+    needs: [production, debug, copy_offload_production]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

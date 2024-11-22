@@ -40,8 +40,8 @@ import (
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
-	"github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/driver"
-	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/server"
+	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
+	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
 	nnfv1alpha4 "github.com/NearNodeFlash/nnf-sos/api/v1alpha4"
 )
 

@@ -28,7 +28,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/NearNodeFlash/nnf-dm/daemons/user-copy/pkg/driver"
+	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	"github.com/go-logr/logr"
 )
 

@@ -47,9 +47,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
-IMAGE_USER_COPY_TAG_BASE = $(IMAGE_TAG_BASE)-user-copy
+IMAGE_COPY_OFFLOAD_TAG_BASE = $(IMAGE_TAG_BASE)-copy-offload
 IMAGE_TARGET ?= production
-IMAGE_USER_COPY_TARGET = user_copy_$(IMAGE_TARGET)
+IMAGE_COPY_OFFLOAD_TARGET = copy_offload_$(IMAGE_TARGET)
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
@@ -160,34 +160,34 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	CGO_ENABLED=0 go run cmd/main.go
 
-##@ Build the user-copy container's daemon outside the container.
-.PHONY: build-user-copy-local
-build-user-copy-local: GOOS = $(shell go env GOOS)
-build-user-copy-local: GOARCH = $(shell go env GOARCH)
-build-user-copy-local: build-user-copy-with
+##@ Build the copy-offload container's daemon outside the container.
+.PHONY: build-copy-offload-local
+build-copy-offload-local: GOOS = $(shell go env GOOS)
+build-copy-offload-local: GOARCH = $(shell go env GOARCH)
+build-copy-offload-local: build-copy-offload-with
 
-.PHONY: build-user-copy-with
-build-user-copy-with: $(LOCALBIN)
-build-user-copy-with: fmt vet ## Build standalone user-dm daemon
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-user-copy daemons/user-copy/cmd/main.go
+.PHONY: build-copy-offload-with
+build-copy-offload-with: $(LOCALBIN)
+build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
 
-.PHONY: build-user-copy-docker-local
-build-user-copy-docker-local: GOARCH = $(shell go env GOARCH)
-build-user-copy-docker-local: build-user-copy-docker-with
+.PHONY: build-copy-offload-docker-local
+build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
+build-copy-offload-docker-local: build-copy-offload-docker-with
 
-.PHONY: build-user-copy-docker-amd64
-build-user-copy-docker-amd64: GOARCH = amd64
-build-user-copy-docker-amd64: build-user-copy-docker-with
+.PHONY: build-copy-offload-docker-amd64
+build-copy-offload-docker-amd64: GOARCH = amd64
+build-copy-offload-docker-amd64: build-copy-offload-docker-with
 
-.PHONY: build-user-copy-docker-with
-build-user-copy-docker-with: VERSION ?= $(shell cat .version)
-build-user-copy-docker-with: .version ## Build docker image with the manager.
-	${CONTAINER_TOOL} build --platform linux/$(GOARCH) --target $(IMAGE_USER_COPY_TARGET) -t $(IMAGE_USER_COPY_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
+.PHONY: build-copy-offload-docker-with
+build-copy-offload-docker-with: VERSION ?= $(shell cat .version)
+build-copy-offload-docker-with: .version ## Build docker image with the manager.
+	${CONTAINER_TOOL} build --platform linux/$(GOARCH) --target $(IMAGE_COPY_OFFLOAD_TARGET) -t $(IMAGE_COPY_OFFLOAD_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
 
-.PHONY: kind-push-user-copy
-kind-push-user-copy: VERSION ?= $(shell cat .version)
-kind-push-user-copy: .version
-	kind load docker-image $(IMAGE_USER_COPY_TAG_BASE):$(VERSION)
+.PHONY: kind-push-copy-offload
+kind-push-copy-offload: VERSION ?= $(shell cat .version)
+kind-push-copy-offload: .version
+	kind load docker-image $(IMAGE_COPY_OFFLOAD_TAG_BASE):$(VERSION)
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
