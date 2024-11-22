@@ -1,5 +1,5 @@
 name: NNF-DM Library Build
-on: push
+#on: push
 
 jobs:
   lib_build:

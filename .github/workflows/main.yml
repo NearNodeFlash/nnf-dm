@@ -9,6 +9,9 @@ env:
   # DO_TEST - true to build and run unit tests, false to skip the tests
   DO_TEST: true
 
+  # DO_DEBUG_BUILD: build a debug version of the main container.
+  DO_DEBUG_BUILD: false
+
 jobs:
   production:
     runs-on: ubuntu-latest
@@ -101,6 +104,7 @@ jobs:
 
   debug:
     runs-on: ubuntu-latest
+    if: ${{ env.DO_DEBUG_BUILD == 'true' }}
 
     steps:
     - name: "Build context"
@@ -166,19 +170,19 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    #- name: "Build the test Docker image"
-    #  id: docker_build_test_target
-    #  if: ${{ env.DO_TEST == 'true' }}
-    #  uses: docker/build-push-action@v6
-    #  with:
-    #    push: false
-    #    target: ${{ env.TEST_TARGET }}
-    #    tags: ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+    - name: "Build the test Docker image"
+      id: docker_build_test_target
+      if: ${{ env.DO_TEST == 'true' }}
+      uses: docker/build-push-action@v6
+      with:
+        push: false
+        target: ${{ env.TEST_TARGET }}
+        tags: ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
 
-    #- name: "Run the Docker image unit tests"
-    #  id: docker_test
-    #  if: ${{ env.DO_TEST == 'true' }}
-    #  run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+    - name: "Run the Docker image unit tests"
+      id: docker_test
+      if: ${{ env.DO_TEST == 'true' }}
+      run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
 
     - name: "Build the debug Docker image"
       id: docker_build
