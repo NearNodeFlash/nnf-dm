@@ -42,7 +42,7 @@ func setupLog() logr.Logger {
 	ctrl.SetLogger(zaplogger)
 
 	// controllerruntime logger.
-	crLog := ctrl.Log.WithName("user-copy-test")
+	crLog := ctrl.Log.WithName("copy-offload-test")
 	return crLog
 }
 

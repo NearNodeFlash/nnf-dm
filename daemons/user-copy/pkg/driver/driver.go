@@ -49,8 +49,8 @@ import (
 
 var (
 	// The name prefix used for generating NNF Data Movement operations.
-	nameBase     = "nnf-user-copy-"
-	nodeNameBase = "nnf-user-copy-node-"
+	nameBase     = "nnf-copy-offload-"
+	nodeNameBase = "nnf-copy-offload-node-"
 )
 
 // Driver will have only one instance per process, shared by all threads

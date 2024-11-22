@@ -544,8 +544,10 @@ func createDestinationDir(profile *nnfv1alpha4.NnfDataMovementProfile, dm *nnfv1
 
 	// TODO mkdir command?
 	// Use setpriv to create the directory with the specified UID/GID
-	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
-		mpiHostfile, dm.Spec.UserId, dm.Spec.GroupId, dest)
+	//cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
+	//	mpiHostfile, dm.Spec.UserId, dm.Spec.GroupId, dest)
+	cmd := fmt.Sprintf("mpirun --hostfile %s -- mkdir -p %s", mpiHostfile, dest)
+
 	output, err := command.Run(cmd, log)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
