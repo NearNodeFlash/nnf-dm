@@ -149,7 +149,7 @@ func TestCancelRequest(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			request, _ := http.NewRequest(test.method, "/cancel/foo", nil)
+			request, _ := http.NewRequest(test.method, "/cancel/nnf-copy-offload-node-9ae2a136-4", nil)
 			response := httptest.NewRecorder()
 
 			crLog := setupLog()
@@ -172,8 +172,6 @@ func TestCancelRequest(t *testing.T) {
 }
 
 func TestTrialRequest(t *testing.T) {
-	t.Setenv("USING_HTTPTEST", "true")
-
 	testCases := []struct {
 		name       string
 		method     string
@@ -184,7 +182,7 @@ func TestTrialRequest(t *testing.T) {
 		{
 			name:       "returns status-no-content",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0/rabbit-node-1-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true, \"dcpOptions\": \"\", \"logStdout\": true, \"storeStdout\": false}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "\n",
 			wantStatus: http.StatusNoContent,
 		},
@@ -208,6 +206,8 @@ func TestTrialRequest(t *testing.T) {
 			wantStatus: http.StatusNotImplemented,
 		},
 	}
+
+	t.Setenv("USING_HTTPTEST", "true")
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
