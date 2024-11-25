@@ -249,7 +249,7 @@ func BuildDMCommand(profile *nnfv1alpha4.NnfDataMovementProfile, hostfile string
 	return strings.Split(cmd, " "), nil
 }
 
-func buildStatCommand(uid, gid uint32, cmd, hostfile, path string) string {
+func buildStatOrMkdirCommand(uid, gid uint32, cmd, hostfile, path string) string {
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", uid))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", gid))
@@ -434,7 +434,7 @@ func GetDestinationDir(profile *nnfv1alpha4.NnfDataMovementProfile, dm *nnfv1alp
 
 // Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
 func mpiStat(profile *nnfv1alpha4.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
-	cmd := buildStatCommand(uid, gid, profile.Data.StatCommand, mpiHostfile, path)
+	cmd := buildStatOrMkdirCommand(uid, gid, profile.Data.StatCommand, mpiHostfile, path)
 
 	output, err := command.Run(cmd, log)
 	if err != nil {
@@ -542,10 +542,7 @@ func createDestinationDir(profile *nnfv1alpha4.NnfDataMovementProfile, dm *nnfv1
 		return nil
 	}
 
-	// TODO mkdir command?
-	// Use setpriv to create the directory with the specified UID/GID
-	cmd := fmt.Sprintf("mpirun --allow-run-as-root --hostfile %s -- setpriv --euid %d --egid %d --clear-groups mkdir -p %s",
-		mpiHostfile, dm.Spec.UserId, dm.Spec.GroupId, dest)
+	cmd := buildStatOrMkdirCommand(dm.Spec.UserId, dm.Spec.GroupId, profile.Data.MkdirCommand, mpiHostfile, dest)
 	output, err := command.Run(cmd, log)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
