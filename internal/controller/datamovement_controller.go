@@ -339,7 +339,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Status.Message. When successful, check the profile/UserConfig config options to log
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
-			log.Error(err, "Data movement operation cancelled", "output", combinedOutBuf.String())
+			log.Info("Data movement operation cancelled", "output", combinedOutBuf.String())
 			dm.Status.Status = nnfv1alpha4.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())

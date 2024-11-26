@@ -28,6 +28,18 @@
             ]
         },
         {
+            "name": "Debug Copy-Offload server",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/daemons/copy-offload/cmd",
+            "env": {"NNF_NODE_NAME": "rabbit-node-1"},
+            "args" :[
+                "--port=8080",
+                "--mock",
+            ]
+        },
+        {
             "name": "Launch file",
             "type": "go",
             "request": "launch",

@@ -21,10 +21,7 @@ ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
 ARG NNFMFU_VERSION=master
 
 # Build the manager binary
-FROM golang:1.21-alpine AS builder
-
-ARG TARGETARCH
-ARG TARGETOS
+FROM golang:1.21-alpine AS builder_setup
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -40,6 +37,12 @@ COPY cmd/ cmd/
 COPY api/ api/
 COPY internal/ internal/
 
+###############################################################################
+FROM builder_setup AS builder
+
+ARG TARGETARCH
+ARG TARGETOS
+
 # Build
 # the GOARCH has a default value to allow the binary be built according to the host where the command
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
@@ -48,7 +51,24 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 ###############################################################################
+FROM builder_setup AS copy_offload_builder
+
+ARG TARGETARCH
+ARG TARGETOS
+
+COPY daemons/copy-offload/ daemons/copy-offload/
+
+# Build
+# the GOARCH has a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nnf-copy-offload daemons/copy-offload/cmd/main.go
+
+###############################################################################
 FROM builder AS testing
+
+COPY daemons/copy-offload/ daemons/copy-offload/
 
 WORKDIR /workspace
 
@@ -102,3 +122,24 @@ ENTRYPOINT ["/manager"]
 ARG NNFMFU_TAG_BASE
 ARG NNFMFU_VERSION
 LABEL nnf-mfu="$NNFMFU_TAG_BASE-debug:$NNFMFU_VERSION"
+
+###############################################################################
+FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION AS copy_offload_production
+
+# The following lines are from the mpiFileUtils (nnf-mfu) Dockerfile;
+# do not change them unless you know what it is you are doing
+RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
+    && echo "    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
+# Copy the executable and execute
+WORKDIR /
+COPY --from=copy_offload_builder /workspace/nnf-copy-offload .
+
+ENTRYPOINT ["/nnf-copy-offload"]
+
+# Make it easy to figure out which nnf-mfu was used.
+#   docker inspect --format='{{json .Config.Labels}}' image:tag
+ARG NNFMFU_TAG_BASE
+ARG NNFMFU_VERSION
+LABEL nnf-mfu="$NNFMFU_TAG_BASE:$NNFMFU_VERSION"
+

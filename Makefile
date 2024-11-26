@@ -47,7 +47,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/nnf-dm-bundle:$VERSION and cray.hpe.com/nnf-dm-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-dm
+IMAGE_COPY_OFFLOAD_TAG_BASE = $(IMAGE_TAG_BASE)-copy-offload
 IMAGE_TARGET ?= production
+IMAGE_COPY_OFFLOAD_TARGET = copy_offload_$(IMAGE_TARGET)
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
@@ -136,7 +138,7 @@ container-unit-test: .version ## Run tests inside a container image
 	${CONTAINER_TOOL} build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(CONTAINER_BUILDARGS) .
 	${CONTAINER_TOOL} run --rm -t --name $@-nnf-dm  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
-##@ Build
+##@ Build the controller manager.
 RPM_PLATFORM ?= linux/amd64
 RPM_TARGET ?= x86_64
 .PHONY: build-daemon-rpm
@@ -167,6 +169,35 @@ build: generate fmt vet ## Build manager binary.
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	CGO_ENABLED=0 go run cmd/main.go
+
+##@ Build the copy-offload container's daemon outside the container.
+.PHONY: build-copy-offload-local
+build-copy-offload-local: GOOS = $(shell go env GOOS)
+build-copy-offload-local: GOARCH = $(shell go env GOARCH)
+build-copy-offload-local: build-copy-offload-with
+
+.PHONY: build-copy-offload-with
+build-copy-offload-with: $(LOCALBIN)
+build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
+
+.PHONY: build-copy-offload-docker-local
+build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
+build-copy-offload-docker-local: build-copy-offload-docker-with
+
+.PHONY: build-copy-offload-docker-amd64
+build-copy-offload-docker-amd64: GOARCH = amd64
+build-copy-offload-docker-amd64: build-copy-offload-docker-with
+
+.PHONY: build-copy-offload-docker-with
+build-copy-offload-docker-with: VERSION ?= $(shell cat .version)
+build-copy-offload-docker-with: .version ## Build docker image with the manager.
+	${CONTAINER_TOOL} build --platform linux/$(GOARCH) --target $(IMAGE_COPY_OFFLOAD_TARGET) -t $(IMAGE_COPY_OFFLOAD_TAG_BASE):$(VERSION) $(CONTAINER_BUILDARGS) .
+
+.PHONY: kind-push-copy-offload
+kind-push-copy-offload: VERSION ?= $(shell cat .version)
+kind-push-copy-offload: .version
+	kind load docker-image $(IMAGE_COPY_OFFLOAD_TAG_BASE):$(VERSION)
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -215,9 +246,6 @@ docker-buildx-debug: docker-buildx
 
 kind-push: VERSION ?= $(shell cat .version)
 kind-push: .version ## Push docker image to kind
-	# Nnf-dm is used on all nodes. It's on the management node for the
-	# nnf-dm-controller-manager deployment, and on the rabbit nodes for
-	# the nnf-dm-rsyncnode daemonset that is created by that deployment.
 	kind load docker-image $(IMAGE_TAG_BASE):$(VERSION)
 
 kind-push-debug: VERSION ?= $(shell cat .version)
