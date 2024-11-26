@@ -461,11 +461,15 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		podSpec.NodeSelector = manager.Spec.Selector.MatchLabels
 		podSpec.Subdomain = serviceName
 
+		_, isTest := os.LookupEnv("NNF_TEST_ENVIRONMENT")
 		container, err := findManagerContainer(podSpec)
-		if err != nil {
+		// The test env doesn't build the full pod spec, so it may not have
+		// this container.
+		if err != nil && !isTest {
 			return err
+		} else if err == nil {
+			container.Env = append(container.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 		}
-		container.Env = append(container.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 
 		setupSSHAuthVolumes(manager, podSpec)
 
