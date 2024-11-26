@@ -83,8 +83,16 @@ type NnfSystemStorageSpec struct {
 	// +kubebuilder:default:=raw
 	Type string `json:"type,omitempty"`
 
+	// Shared will create one allocation per Rabbit rather than one allocation
+	// per compute node.
+	// +kubebuilder:default:=true
+	Shared bool `json:"shared"`
+
 	// StorageProfile is an object reference to the storage profile to use
 	StorageProfile corev1.ObjectReference `json:"storageProfile"`
+
+	// +kubebuilder:default:=false
+	IgnoreOfflineComputes bool `json:"ignoreOfflineComputes"`
 
 	// MakeClientMounts specifies whether to make ClientMount resources or just
 	// make the devices available to the client
