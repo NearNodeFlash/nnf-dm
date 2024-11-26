@@ -10,7 +10,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241017152925-afc4d0cf1a4b
 ## explicit; go 1.19
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241114160945-1b8980a4df2e => ../nnf-sos
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241126150252-02711232a9ab
 ## explicit; go 1.21
 github.com/NearNodeFlash/nnf-sos/api/v1alpha4
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
@@ -748,4 +748,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/NearNodeFlash/nnf-sos => ../nnf-sos
