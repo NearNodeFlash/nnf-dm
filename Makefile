@@ -62,6 +62,16 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.29.0
 
+# Tell Kustomize to deploy the default config, or an overlay.
+# To use the 'craystack' overlay:
+#   export KUBECONFIG=/my/craystack/kubeconfig.file
+#   make deploy OVERLAY=craystack
+#
+# To use the 'dp0' overlay:
+#   export KUBECONFIG=/my/dp0/kubeconfig.file
+#   make deploy OVERLAY=dp0
+OVERLAY ?= kind
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -222,13 +232,13 @@ minikube-push: .version
 
 edit-image: VERSION ?= $(shell cat .version)
 edit-image: .version
-	$(KUSTOMIZE_IMAGE_TAG) config/begin default $(IMAGE_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
+	$(KUSTOMIZE_IMAGE_TAG) config/begin $(OVERLAY) $(IMAGE_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
 
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	./deploy.sh undeploy $(KUSTOMIZE) config/default
+	./deploy.sh undeploy $(KUSTOMIZE) config/$(OVERLAY)
 
 # Let .version be phony so that a git update to the workarea can be reflected
 # in it each time it's needed.
