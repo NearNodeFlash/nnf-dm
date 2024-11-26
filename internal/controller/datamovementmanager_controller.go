@@ -27,6 +27,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 
 	"golang.org/x/crypto/ssh"
 
@@ -459,6 +460,12 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		podSpec := &podTemplateSpec.Spec
 		podSpec.NodeSelector = manager.Spec.Selector.MatchLabels
 		podSpec.Subdomain = serviceName
+
+		container, err := findManagerContainer(podSpec)
+		if err != nil {
+			return err
+		}
+		container.Env = append(container.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 
 		setupSSHAuthVolumes(manager, podSpec)
 
