@@ -143,7 +143,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		Name:      r.dmProfile.Name,
 		Namespace: r.dmProfile.Namespace,
 	}
-	crLog.Info("Using profile", "profile", r.dmProfile)
+	crLog.Info("Using NnfDataMovmentProfile", "name", r.dmProfile)
 
 	dm.Spec.UserId = workflow.Spec.UserID
 	dm.Spec.GroupId = workflow.Spec.GroupID
@@ -468,6 +468,7 @@ func setUserConfig(dmreq DMRequest, dm *nnfv1alpha4.NnfDataMovement) {
 	}
 }
 
+// createNnfNodeDataMovement creates an NnfDataMovement to be used with Lustre.
 func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha2.ClientMountInfo, computeClientMount *dwsv1alpha2.ClientMount) (*nnfv1alpha4.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
@@ -535,6 +536,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha2.ClientMount) (string, 
 	return dwIndex, nil
 }
 
+// createNnfNodeDataMovement creates an NnfDataMovement to be used with GFS2.
 func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha2.ClientMountInfo) (*nnfv1alpha4.NnfDataMovement, error) {
 	drvr := r.Drvr
 
