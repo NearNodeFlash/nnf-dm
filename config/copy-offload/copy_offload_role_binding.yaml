@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: user-copy-rolebinding
+  name: copy-offload-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: user-copy-role
+  name: copy-offload-role
 subjects:
 - kind: ServiceAccount
-  name: user-copy
+  name: copy-offload
   namespace: default

@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: user-copy-role
+  name: copy-offload-role
 rules:
 - apiGroups:
   - lus.cray.hpe.com
@@ -19,6 +19,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - dataworkflowservices.github.io
   resources:
@@ -26,32 +27,6 @@ rules:
   verbs:
   - get
   - list
-- apiGroups:
-  - dataworkflowservices.github.io
-  resources:
-  - clientmounts/status
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - dataworkflowservices.github.io
-  resources:
-  - systemconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
-  - nnfdatamovements
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - nnf.cray.hpe.com
@@ -64,14 +39,24 @@ rules:
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
-  - nnfdatamovements/finalizers
+  - nnfnodes
   verbs:
-  - update
+  - get
+  - list
+  - watch
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
-  - nnfdatamovements/status
+  - nnfnodestorages
   verbs:
   - get
-  - patch
-  - update
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfstorages
+  verbs:
+  - get
+  - list
+  - watch
