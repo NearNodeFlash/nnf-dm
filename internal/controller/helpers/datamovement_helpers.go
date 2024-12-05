@@ -458,6 +458,10 @@ func mpiIsDir(profile *nnfv1alpha4.NnfDataMovementProfile, path string, uid, gid
 	} else if strings.Contains(strings.ToLower(output), "file") {
 		log.Info("mpiIsDir", "path", path, "directory", false)
 		return false, nil
+	} else if os.Getenv("ENVIRONMENT") == "kind" && output == "symbolic link\n" {
+		// In KIND it will be a symlink to a directory.
+		log.Info("mpiIsDir using symlink in KIND", "path", path)
+		return true, nil
 	} else {
 		return false, fmt.Errorf("could not determine file type of path ('%s'): %s", path, output)
 	}
