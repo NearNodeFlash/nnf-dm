@@ -1,5 +1,5 @@
 resources:
-- ../default
+- ../top
 
 patches:
 # Arguments for the controller manager that are specific to kind
