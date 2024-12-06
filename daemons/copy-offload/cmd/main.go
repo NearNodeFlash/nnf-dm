@@ -141,7 +141,7 @@ func main() {
 		drvr.Client = clnt
 	}
 
-	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock)
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "skip-tls", skip_tls)
 
 	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, Mock: mock}
 

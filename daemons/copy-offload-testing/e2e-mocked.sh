@@ -23,11 +23,27 @@ set -o pipefail
 make build-copy-offload-local
 
 make -C ./daemons/lib-copy-offload tester
-CO="./daemons/lib-copy-offload/tester -s"
+CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
 SRVR="localhost:4000"
 PROTO="http"
 
-NNF_NODE_NAME=rabbit01 ./bin/nnf-copy-offload -addr "$SRVR" -mock -skip-tls &
+SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TLS:+-skip-tls}"
+unset CERTDIR
+unset CURLCERTS
+if [[ -z $SKIP_TLS ]]; then
+    PROTO="https"
+    CERTDIR=daemons/copy-offload-testing/certs
+    ./daemons/copy-offload-testing/gen_certs.sh $CERTDIR
+    cacert="$CERTDIR/server/server_cert.pem"
+    cakey="$CERTDIR/ca/private/ca_key.pem"
+    clientcert="$CERTDIR/client/client_cert.pem"
+
+    SRVR_CMD="$SRVR_CMD -cert $cacert -cakey $cakey -clientcert $clientcert"
+    CO="$CO -x $cacert -y $cakey -z $clientcert"
+    CURLCERTS="--cacert $cacert --key $cakey --cert $clientcert"
+fi
+
+NNF_NODE_NAME=rabbit01 $SRVR_CMD &
 srvr_pid=$!
 echo "Server pid is $srvr_pid, my pid is $$"
 
@@ -38,13 +54,17 @@ cleanup() {
     if [[ -n $srvr_pid ]]; then
         kill "$srvr_pid"
     fi
+    if [[ -d $CERTDIR ]]; then
+        rm -rf "$CERTDIR"
+    fi
     exit 1
 }
 
 echo "Waiting for daemon to start"
 while : ; do
     sleep 1
-    if curl "$PROTO://$SRVR/hello" 2> /dev/null; then
+    # shellcheck disable=SC2086
+    if curl $CURLCERTS "$PROTO://$SRVR/hello"; then
         break
     fi
 done
@@ -93,6 +113,9 @@ fi
 
 echo "Kill server $srvr_pid"
 kill "$srvr_pid"
+if [[ -d $CERTDIR ]]; then
+    rm -rf "$CERTDIR"
+fi
 echo "PASS: Success"
 exit 0
 

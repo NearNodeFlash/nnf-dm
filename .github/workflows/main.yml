@@ -189,6 +189,7 @@ jobs:
 #        tags: ${{ steps.meta.outputs.tags }}
 
   copy_offload_production:
+    needs: [production]
     runs-on: ubuntu-latest
 
     steps:
@@ -274,7 +275,10 @@ jobs:
         sudo apt-get install libcurl4-openssl-dev
         make -C ./daemons/lib-copy-offload libcopyoffload.a
 
-    - name: "E2E mock test"
+    - name: "E2E mock test, without TLS"
+      run: SKIP_TLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
+
+    - name: "E2E mock test, with TLS"
       run: ./daemons/copy-offload-testing/e2e-mocked.sh
 
     - name: "Build the copy-offload Docker image"

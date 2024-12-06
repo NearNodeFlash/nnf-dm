@@ -89,7 +89,7 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
         curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
+        //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
 
         curl_easy_setopt(curl, CURLOPT_CAINFO, cacert);
