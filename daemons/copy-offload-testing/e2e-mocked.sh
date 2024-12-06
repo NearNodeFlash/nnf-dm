@@ -30,11 +30,11 @@ srvr_pid=$!
 echo "Server pid is $srvr_pid, my pid is $$"
 
 trap cleanup SIGINT SIGQUIT SIGABRT SIGTERM
+# shellcheck disable=SC2317
 cleanup() {
     echo "FAIL: trap"
     if [[ -n $srvr_pid ]]; then
-        kill $srvr_pid
-        wait $srvr_pid
+        kill "$srvr_pid"
     fi
     exit 1
 }
@@ -50,56 +50,47 @@ done
 output=$($CO -l 0.0.0.0:4000)
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list before any jobs have been submitted"
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
 output=$($CO -c nnf-copy-offload-node-2 0.0.0.0:4000)
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel before any jobs have been submitted"
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
 job1=$($CO -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo 0.0.0.0:4000)
 if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
     echo "FAIL: Unexpected output from copy. Got ($job1)."
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
 output=$($CO -l 0.0.0.0:4000)
 if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
     echo "FAIL: Unexpected output from list. Got ($output)."
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
 output=$($CO -c "$job1" 0.0.0.0:4000)
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel $job1"
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
 output=$($CO -l 0.0.0.0:4000)
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list after all jobs have been removed"
-    kill $srvr_pid
-    wait $srvr_pid
+    kill "$srvr_pid"
     exit 1
 fi
 
-
-sleep 5
 echo "Kill server $srvr_pid"
-kill $srvr_pid
-wait $srvr_pid
+kill "$srvr_pid"
 echo "PASS: Success"
 exit 0
 
