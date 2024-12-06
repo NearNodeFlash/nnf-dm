@@ -226,6 +226,9 @@ jobs:
               exit 1; \
           fi
 
+    - name: "E2E mock test"
+      run: ./daemons/copy-offload-testing/e2e-mocked.sh
+
     - name: "Docker metadata"
       id: meta
       uses: docker/metadata-action@v5
