@@ -23,7 +23,12 @@
 
 struct copy_offload_s {
     CURL *curl;
+    int skip_tls;
     char **host_and_port;
+    char *cacert;
+    char *key;
+    char *clientcert;
+    char proto[6];
 
     /* The post-processed error message. If there was an error from libcurl, then
      * that error code and message will be in this buffer. If libcurl succeeded
@@ -42,7 +47,7 @@ COPY_OFFLOAD *copy_offload_init();
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
  */
-void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port);
+void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert);
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:
