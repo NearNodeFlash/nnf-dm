@@ -87,10 +87,12 @@ func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 }
 
 func main() {
-	port := "8080"
 	mock := false
 
-	flag.StringVar(&port, "port", port, "Port for server.")
+	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
+	//certFile := flag.String("cert", "cert.pem", "server certificate PEM file")
+	//keyFile := flag.String("key", "key.pem", "server key PEM file")
+	//clientCertFile := flag.String("clientcert", "clientcert.pem", "client certificate PEM file")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
 
@@ -108,16 +110,23 @@ func main() {
 		clientSanity(crLog, clnt, rabbitName)
 		drvr.Client = clnt
 	}
-	slog.Info("Ready", "node", rabbitName, "port", port, "mock", mock)
+
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock)
 
 	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, Mock: mock}
 
-	http.HandleFunc("/hello", httpHandler.Hello)
-	http.HandleFunc("/trial", httpHandler.TrialRequest)
-	http.HandleFunc("/cancel/", httpHandler.CancelRequest)
-	http.HandleFunc("/list", httpHandler.ListRequests)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hello", httpHandler.Hello)
+	mux.HandleFunc("/trial", httpHandler.TrialRequest)
+	mux.HandleFunc("/cancel/", httpHandler.CancelRequest)
+	mux.HandleFunc("/list", httpHandler.ListRequests)
 
-	err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	srv := &http.Server{
+		Addr:    *addr,
+		Handler: mux,
+	}
+
+	err := srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		slog.Info("the server is closed")
 	} else if err != nil {
