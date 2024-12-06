@@ -226,9 +226,6 @@ jobs:
               exit 1; \
           fi
 
-    - name: "E2E mock test"
-      run: ./daemons/copy-offload-testing/e2e-mocked.sh
-
     - name: "Docker metadata"
       id: meta
       uses: docker/metadata-action@v5
@@ -271,6 +268,14 @@ jobs:
     #  id: docker_test
     #  if: ${{ env.DO_TEST == 'true' }}
     #  run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+
+    - name: "Build lib-copy-offload"
+      run: |
+        sudo apt-get install libcurl4-openssl-dev
+        make -C ./daemons/lib-copy-offload libcopyoffload.a
+
+    - name: "E2E mock test"
+      run: ./daemons/copy-offload-testing/e2e-mocked.sh
 
     - name: "Build the copy-offload Docker image"
       id: docker_build
