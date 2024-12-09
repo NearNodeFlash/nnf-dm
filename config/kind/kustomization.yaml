@@ -1,0 +1,6 @@
+resources:
+- ../top
+
+patches:
+# Arguments for the controller manager that are specific to kind
+- path: manager_environment_deploy_patch.yaml
