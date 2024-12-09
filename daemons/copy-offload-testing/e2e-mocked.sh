@@ -23,9 +23,27 @@ set -o pipefail
 make build-copy-offload-local
 
 make -C ./daemons/lib-copy-offload tester
-CO=./daemons/lib-copy-offload/tester
+CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
+SRVR="localhost:4000"
+PROTO="http"
 
-NNF_NODE_NAME=rabbit01 ./bin/nnf-copy-offload -port 4000 -mock &
+SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TLS:+-skip-tls}"
+unset CERTDIR
+unset CURLCERTS
+if [[ -z $SKIP_TLS ]]; then
+    PROTO="https"
+    CERTDIR=daemons/copy-offload-testing/certs
+    ./daemons/copy-offload-testing/gen_certs.sh $CERTDIR
+    cacert="$CERTDIR/server/server_cert.pem"
+    cakey="$CERTDIR/ca/private/ca_key.pem"
+    clientcert="$CERTDIR/client/client_cert.pem"
+
+    SRVR_CMD="$SRVR_CMD -cert $cacert -cakey $cakey -clientcert $clientcert"
+    CO="$CO -x $cacert -y $cakey -z $clientcert"
+    CURLCERTS="--cacert $cacert --key $cakey --cert $clientcert"
+fi
+
+NNF_NODE_NAME=rabbit01 $SRVR_CMD &
 srvr_pid=$!
 echo "Server pid is $srvr_pid, my pid is $$"
 
@@ -36,53 +54,57 @@ cleanup() {
     if [[ -n $srvr_pid ]]; then
         kill "$srvr_pid"
     fi
+    if [[ -d $CERTDIR ]]; then
+        rm -rf "$CERTDIR"
+    fi
     exit 1
 }
 
 echo "Waiting for daemon to start"
 while : ; do
     sleep 1
-    if curl http://0.0.0.0:4000/hello 2> /dev/null; then
+    # shellcheck disable=SC2086
+    if curl $CURLCERTS "$PROTO://$SRVR/hello"; then
         break
     fi
 done
 
-output=$($CO -l 0.0.0.0:4000)
+output=$($CO -l "$SRVR")
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -c nnf-copy-offload-node-2 0.0.0.0:4000)
+output=$($CO -c nnf-copy-offload-node-2 "$SRVR")
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi
 
-job1=$($CO -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo 0.0.0.0:4000)
+job1=$($CO -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR")
 if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
     echo "FAIL: Unexpected output from copy. Got ($job1)."
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -l 0.0.0.0:4000)
+output=$($CO -l "$SRVR")
 if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
     echo "FAIL: Unexpected output from list. Got ($output)."
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -c "$job1" 0.0.0.0:4000)
+output=$($CO -c "$job1" "$SRVR")
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel $job1"
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -l 0.0.0.0:4000)
+output=$($CO -l "$SRVR")
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list after all jobs have been removed"
     kill "$srvr_pid"
@@ -91,6 +113,9 @@ fi
 
 echo "Kill server $srvr_pid"
 kill "$srvr_pid"
+if [[ -d $CERTDIR ]]; then
+    rm -rf "$CERTDIR"
+fi
 echo "PASS: Success"
 exit 0
 
