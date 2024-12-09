@@ -3,8 +3,8 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.21
 
 require (
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20240925185149-26d9d6071a1c
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241126150252-02711232a9ab
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20241209183639-2d8fdbd63dec
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241209195238-e03b38f0d341
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
@@ -22,7 +22,7 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241017152925-afc4d0cf1a4b // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241205165035-51a536434b0d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
