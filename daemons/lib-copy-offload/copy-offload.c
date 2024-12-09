@@ -69,13 +69,38 @@ COPY_OFFLOAD *copy_offload_init() {
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
  */
-void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port) {
+void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert) {
     CURL *curl = offload->curl;
-    if (host_and_port != NULL) {
+    if (host_and_port != NULL)
         offload->host_and_port = host_and_port;
-    }
+    offload->skip_tls = skip_tls;
+    if (cacert != NULL)
+        offload->cacert = cacert;
+    if (key != NULL)
+        offload->key = key;
+    if (clientcert != NULL)
+        offload->clientcert = clientcert;
+    strncpy(offload->proto, "http", sizeof(offload->proto));
 
     curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);
+    if (!skip_tls) {
+        strncpy(offload->proto, "https", sizeof(offload->proto));
+
+        curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
+        curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
+
+        curl_easy_setopt(curl, CURLOPT_CAINFO, cacert);
+        curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
+
+        curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
+        curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
+
+        curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
+        curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
+    }
 }
 
 /* Reset the handle so it can be used for the next command.
@@ -84,7 +109,7 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port) {
  */
 void copy_offload_reset(COPY_OFFLOAD *offload) {
     curl_easy_reset(offload->curl);
-    copy_offload_configure(offload, NULL);
+    copy_offload_configure(offload, NULL, offload->skip_tls, NULL, NULL, NULL);
 }
 
 /* Request verbose output from libcurl. */
@@ -138,7 +163,7 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
     int ret = 1;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s/list", *offload->host_and_port);
+    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/list", offload->proto, *offload->host_and_port);
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
@@ -162,7 +187,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name) {
     int ret = 1;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s/cancel/%s", *offload->host_and_port, job_name);
+    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/cancel/%s", offload->proto, *offload->host_and_port, job_name);
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
@@ -185,7 +210,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
     char postbuf[COPY_OFFLOAD_POST_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s/trial", *offload->host_and_port);
+    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/trial", offload->proto, *offload->host_and_port);
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     char *offload_req = "{\"computeName\": \"%s\", \"workflowName\": \"%s\", \"sourcePath\": \"%s\", \"destinationPath\": \"%s\", \"dmProfile\": \"copy-offload-nonmpi\", \"dryrun\": true, \"dcpOptions\": \"\", \"logStdout\": true, \"storeStdout\": false}";

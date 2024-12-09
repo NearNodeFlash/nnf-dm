@@ -34,17 +34,28 @@
  * Print the usage of the current command line tool
  */
 void usage(const char **argv) {
-    fprintf(stderr, "Usage: %s [-v] [-V] [-l | -c JOB_NAME] <server_ip>:<server_port>\n", argv[0]);
-    fprintf(stderr, "Usage: %s [-v] [-V] -o <-C> <-W> <-S> <-D> <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -l <server_ip>:<server_port>\n", argv[0]);
     fprintf(stderr, "    -l            List all active copy-offload requests.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -c JOB_NAME <server_ip>:<server_port>\n", argv[0]);
     fprintf(stderr, "    -c JOB_NAME   Cancel the specified copy-offload request.\n");
-    fprintf(stderr, "    -v            Request verbose output from this tool.\n");
-    fprintf(stderr, "    -V            Request verbose output from libcurl.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -o <-C> <-W> <-S> <-D> <server_ip>:<server_port>\n", argv[0]);
     fprintf(stderr, "    -o            Perform a copy-offload request, using the following args:\n");
     fprintf(stderr, "       -C COMPUTE_NAME    Name of the local compute node.\n");
     fprintf(stderr, "       -W WORKFLOW_NAME   Name of the associated Workflow.\n");
     fprintf(stderr, "       -S SOURCE_PATH     Local path to source file to be copied.\n");
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "COMMON_ARGS\n");
+    fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
+    fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
+    fprintf(stderr, "    -s                  Skip TLS configuration.\n");
+    fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
+    fprintf(stderr, "    -y KEY_FILE         CA/Server key file.\n");
+    fprintf(stderr, "    -z CLIENTCERT_FILE  CA/Server key file.\n");
+
+
 }
 
 /*
@@ -59,16 +70,20 @@ int main(int argc, const char **argv) {
     int l_opt = 0;
     int c_opt = 0;
     int o_opt = 0;
-    int v_opt = 0;
-    int V_opt = 0;
+    int verbose = 0;
+    int verbose_libcurl = 0;
     char *job_name = NULL;
     char *compute_name = NULL;
     char *workflow_name = NULL;
     char *source_path = NULL;
     char *dest_path = NULL;
+    char *cacert_path = NULL; /* CA/server cert - a self-signed certficate */
+    char *cakey_path = NULL;
+    char *clientcert_path = NULL;
+    int skip_tls = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlc:oC:W:S:D:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlsx:y:z:c:oC:W:S:D:")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -81,10 +96,13 @@ int main(int argc, const char **argv) {
                 o_opt = 1;
                 break;
             case 'v':
-                v_opt = 1;
+                verbose = 1;
                 break;
             case 'V':
-                V_opt = 1;
+                verbose_libcurl = 1;
+                break;
+            case 's':
+                skip_tls = 1;
                 break;
             case 'C':
                 compute_name = optarg;
@@ -97,6 +115,15 @@ int main(int argc, const char **argv) {
                 break;
             case 'D':
                 dest_path = optarg;
+                break;
+            case 'x':
+                cacert_path = optarg;
+                break;
+            case 'y':
+                cakey_path = optarg;
+                break;
+            case 'z':
+                clientcert_path = optarg;
                 break;
             default:
                 usage(argv);
@@ -118,8 +145,8 @@ int main(int argc, const char **argv) {
     }
 
     offload = copy_offload_init();
-    copy_offload_configure(offload, &host_and_port);
-    if (V_opt) {
+    copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path);
+    if (verbose_libcurl) {
         copy_offload_verbose(offload);
     }
 
@@ -145,7 +172,7 @@ int main(int argc, const char **argv) {
         exit(1);
     }
 
-    if (v_opt) {
+    if (verbose) {
         printf("ret %d, http_code %ld\n", ret, offload->http_code);
     }
     if (ret) {

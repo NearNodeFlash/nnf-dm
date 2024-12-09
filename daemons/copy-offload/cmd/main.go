@@ -21,9 +21,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -87,37 +88,81 @@ func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 }
 
 func main() {
-	port := "8080"
 	mock := false
+	skip_tls := false
+	var tlsConfig *tls.Config
 
-	flag.StringVar(&port, "port", port, "Port for server.")
+	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
+	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
+	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
+	clientCertFile := flag.String("clientcert", "clientcert.pem", "client certificate PEM file")
+	flag.BoolVar(&skip_tls, "skip-tls", skip_tls, "Skip setting up TLS.")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
 
 	rabbitName = os.Getenv("NNF_NODE_NAME")
 	if rabbitName == "" {
-		fmt.Println("Did not find NNF_NODE_NAME")
+		slog.Error("Did not find NNF_NODE_NAME")
 		os.Exit(1)
 	}
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
 	drvr := &driver.Driver{Log: crLog, RabbitName: rabbitName, Mock: mock}
+
+	if !skip_tls {
+		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+		if err != nil {
+			slog.Error("Error loading certificate and key file", "error", err.Error())
+			os.Exit(1)
+		}
+
+		// Trusted client certificate.
+		clientCert, err := os.ReadFile(*clientCertFile)
+		if err != nil {
+			slog.Error("Error reading the client certificate file", "error", err.Error())
+			os.Exit(1)
+		}
+		clientCertPool := x509.NewCertPool()
+		clientCertPool.AppendCertsFromPEM(clientCert)
+
+		tlsConfig = &tls.Config{
+			MinVersion:               tls.VersionTLS13,
+			PreferServerCipherSuites: true,
+			Certificates:             []tls.Certificate{serverTLSCert},
+			ClientCAs:                clientCertPool,
+			ClientAuth:               tls.RequireAndVerifyClientCert,
+		}
+	}
+
 	if !mock {
 		clnt := setupClient(crLog)
 		clientSanity(crLog, clnt, rabbitName)
 		drvr.Client = clnt
 	}
-	slog.Info("Ready", "node", rabbitName, "port", port, "mock", mock)
+
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "skip-tls", skip_tls)
 
 	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, Mock: mock}
 
-	http.HandleFunc("/hello", httpHandler.Hello)
-	http.HandleFunc("/trial", httpHandler.TrialRequest)
-	http.HandleFunc("/cancel/", httpHandler.CancelRequest)
-	http.HandleFunc("/list", httpHandler.ListRequests)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/hello", httpHandler.Hello)
+	mux.HandleFunc("/trial", httpHandler.TrialRequest)
+	mux.HandleFunc("/cancel/", httpHandler.CancelRequest)
+	mux.HandleFunc("/list", httpHandler.ListRequests)
 
-	err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	srv := &http.Server{
+		Addr:      *addr,
+		Handler:   mux,
+		TLSConfig: tlsConfig,
+	}
+
+	var err error
+	if !skip_tls {
+		err = srv.ListenAndServeTLS("", "")
+	} else {
+		err = srv.ListenAndServe()
+	}
 	if errors.Is(err, http.ErrServerClosed) {
 		slog.Info("the server is closed")
 	} else if err != nil {
