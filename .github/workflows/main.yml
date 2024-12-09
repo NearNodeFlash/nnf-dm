@@ -43,8 +43,9 @@ jobs:
     - name: "Verify auto-generated files"
       run: |
           make manifests generate
+          git status
           if [[ $(git status -s | wc -l) -gt 0 ]]; then \
-              git status; exit 1; \
+              exit 1; \
           fi
 
     - name: "Docker metadata"
