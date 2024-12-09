@@ -187,8 +187,109 @@ jobs:
         target: debug
         tags: ${{ steps.meta.outputs.tags }}
 
+  copy_offload_production:
+    needs: [production]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: "Build context"
+      run: |
+        echo "ref is ${{ github.ref }}"
+        echo "ref_type is ${{ github.ref_type }}"
+
+    - name: "Checkout repository"
+      id: checkout_repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: "Lowercase repository name for docker build"
+      id: lowercase-repository-name
+      run: echo "REPO_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+    - name: "Set tags for main/master"
+      id: set_tags
+      run: |
+        echo "VERSION_TAG=$(./git-version-gen | grep -v UNKNOWN)" >> ${GITHUB_ENV}
+        echo "TEST_TAG=$(git rev-parse HEAD)-test" >> ${GITHUB_ENV}
+        echo "SHA_TAG=$(git rev-parse HEAD)" >> ${GITHUB_ENV}
+        echo "${GITHUB_ENV}:"
+        cat ${GITHUB_ENV}
+      shell: bash
+
+    - name: "Verify auto-generated files"
+      run: |
+          make manifests generate
+          git status
+          if [[ $(git status -s | wc -l) -gt 0 ]]; then \
+              exit 1; \
+          fi
+
+    - name: "Docker metadata"
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/${{ env.REPO_NAME }}-copy-offload
+        tags: |
+          # For merge to master branch, tag example: 'master'
+          type=ref,event=branch
+          # For PR event, tag example: 'pr-3'
+          type=ref,event=pr
+          # For PR event or merge event, tag example: 1.0.1.12-5667
+          type=raw,value=${{ env.VERSION_TAG }}
+          # For PR event or merge, tag example: 566769e04d2436cf5f42ae4f46092c7dff6e668e
+          type=raw,value=${{ env.SHA_TAG }}
+          # For push to semver tag, tag example: 1.0.2
+          # This also sets 'latest'.
+          type=semver,pattern={{version}}
+          # For push to semver tag, tag example: 1.0
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: "Docker login"
+      id: docker_login
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: "Build the test Docker image"
+      id: docker_build_test_target
+      if: ${{ env.DO_TEST == 'true' }}
+      uses: docker/build-push-action@v6
+      with:
+        push: false
+        target: ${{ env.TEST_TARGET }}
+        tags: ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+
+    - name: "Run the Docker image unit tests"
+      id: docker_test
+      if: ${{ env.DO_TEST == 'true' }}
+      run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+
+    - name: "Build lib-copy-offload"
+      run: |
+        sudo apt-get install libcurl4-openssl-dev
+        make -C ./daemons/lib-copy-offload libcopyoffload.a
+
+    - name: "E2E mock test, without TLS"
+      run: SKIP_TLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
+
+    - name: "E2E mock test, with TLS"
+      run: ./daemons/copy-offload-testing/e2e-mocked.sh
+
+    - name: "Build the copy-offload Docker image"
+      id: docker_build
+      uses: docker/build-push-action@v6
+      with:
+        push: true
+        target: copy_offload_production
+        tags: ${{ steps.meta.outputs.tags }}
+
   create_release:
-    needs: production
+    needs: [production, debug, copy_offload_production]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
