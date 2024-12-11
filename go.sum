@@ -4,8 +4,8 @@ github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20241209183639-2d8fdbd63dec
 github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20241209183639-2d8fdbd63dec/go.mod h1:3JGfBMIfipAZbbAAesSvKzGmKGAh2Wu6pPGQWMP2f8w=
 github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241205165035-51a536434b0d h1:s+zaQp8959Z1KjAo/zRP05CRJUrHTKx2ItbR4C3ffQw=
 github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241205165035-51a536434b0d/go.mod h1:oxdwMqfttOF9dabJhqrWlirCnMk8/8eyLMwl+hducjk=
-github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241209195238-e03b38f0d341 h1:IM0wlIjsh0AFWs98MOjkaXDohiH3trmeRqdeUAPDdJs=
-github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241209195238-e03b38f0d341/go.mod h1:5wXbwDIublnrX22FCHB26PBxMOPY1J78lFh3LBY/vRE=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241211170601-b6a1ac55c9e4 h1:+koOgtNA8cXyIjiHOvqTxOGFgFtJiT2p3nZ3718mGk4=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241211170601-b6a1ac55c9e4/go.mod h1:5wXbwDIublnrX22FCHB26PBxMOPY1J78lFh3LBY/vRE=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
