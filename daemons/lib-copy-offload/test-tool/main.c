@@ -150,26 +150,24 @@ int main(int argc, const char **argv) {
         copy_offload_verbose(offload);
     }
 
+    char *output = NULL;
+
     if (l_opt) {
-        char *output = NULL;
         ret = copy_offload_list(offload, &output);
-        if (output != NULL) {
-            printf("%s\n", output);
-            free(output);
-        }
     } else if (c_opt) {
-        ret = copy_offload_cancel(offload, job_name);
+        ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
-        char *job_name = NULL;
-        ret = copy_offload_copy(offload, compute_name, workflow_name, source_path, dest_path, &job_name);
-        if (job_name != NULL) {
-            printf("%s\n", job_name);
-            free(job_name);
-        }
+        ret = copy_offload_copy(offload, compute_name, workflow_name, source_path, dest_path, &output);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
         exit(1);
+    }
+
+    if (output != NULL) {
+        printf("%s\n", output);
+        free(output);
+        output = NULL;
     }
 
     if (verbose) {

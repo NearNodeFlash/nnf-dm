@@ -19,6 +19,11 @@
 
 #include <curl/curl.h>
 
+// Define the API version. This applies to the request format sent by the client
+// as well as the response format sent by the server.
+// See validateVersion() in the server.
+#define COPY_OFFLOAD_API_VERSION "Accepts-version: 1.0"
+
 #define COPY_OFFLOAD_MSG_SIZE CURL_ERROR_SIZE * 2
 
 struct copy_offload_s {
@@ -67,18 +72,20 @@ void copy_offload_verbose(COPY_OFFLOAD *offload);
 int copy_offload_list(COPY_OFFLOAD *offload, char **output);
 
 /* Cancel a specific copy-offload request.
+ * Any output from the server, if present, will be placed in @output. The caller
+ * is responsible for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
-int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name);
+int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output);
 
 /* Submit a new copy-offload request.
- * The new job's name will be placed in @job_name. The caller is responsible
- * for calling free() on @job_name if *job_name is non-NULL.
+ * The new job's name will be placed in @output. The caller is responsible
+ * for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **job_name);
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **output);
 
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload);

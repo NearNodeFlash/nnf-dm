@@ -82,6 +82,10 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
         offload->clientcert = clientcert;
     strncpy(offload->proto, "http", sizeof(offload->proto));
 
+    struct curl_slist *chunk = NULL;
+    chunk = curl_slist_append(chunk, COPY_OFFLOAD_API_VERSION);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
     curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);
     if (!skip_tls) {
         strncpy(offload->proto, "https", sizeof(offload->proto));
@@ -167,21 +171,20 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
-    if (http_code == 200) {
-        if (chunk.response != NULL) {
-            *output = strdup(chunk.response);
-            // chop
-            char *newline = strchr(*output, '\n');
-            *newline = '\0';
-            free(chunk.response);
-        }
+    if (http_code == 200)
         ret = 0;
+    if (chunk.response != NULL) {
+        *output = strdup(chunk.response);
+        // chop
+        char *newline = strchr(*output, '\n');
+        *newline = '\0';
+        free(chunk.response);
     }
     return ret;
 }
 
 /* Cancel a specific copy-offload request. */
-int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name) {
+int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
@@ -192,18 +195,22 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name) {
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
     http_code = copy_offload_perform(offload, &chunk);
-    if (http_code == 204) {
+    if (http_code == 204)
         ret = 0;
-    } else if (chunk.response != NULL) {
+    if (chunk.response != NULL) {
+        *output = strdup(chunk.response);
+        // chop
+        char *newline = strchr(*output, '\n');
+        *newline = '\0';
         free(chunk.response);
     }
     return ret;
 }
 
 /* Submit a new copy-offload request.
- * The caller is responsible for calling free() on @job_name if *job_name is non-NULL.
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **job_name) {
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
@@ -222,9 +229,9 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         if (http_code == 200) {
             char *delim = strchr(chunk.response, '=');
             if (delim != NULL) {
-                *job_name = strdup(delim+1);
+                *output = strdup(delim+1);
                 // chop
-                char *newline = strchr(*job_name, '\n');
+                char *newline = strchr(*output, '\n');
                 *newline = '\0';
             }
             ret = 0;

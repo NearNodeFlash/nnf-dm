@@ -40,15 +40,40 @@ type UserHttp struct {
 	Mock   bool
 }
 
+func validateVersion(w http.ResponseWriter, req *http.Request) string {
+	// See COPY_OFFLOAD_API_VERSION in copy-offload.h.
+	// This applies to the format of the request sent by the client as well
+	// as the format of our response.
+	apiVersion := req.Header.Get("Accepts-version")
+	if apiVersion == "" || apiVersion != "1.0" {
+		// The RFC says Not Accceptable should return a list of valid versions.
+		http.Error(w, "Valid versions: 1.0", http.StatusNotAcceptable)
+		return ""
+	}
+	return apiVersion
+}
+
 func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
+	var apiVersion string
+	if req.Method != "GET" {
+		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = validateVersion(w, req); apiVersion == "" {
+		return
+	}
+
 	user.Log.Info("Hello")
 	fmt.Fprintf(w, "hello back at ya\n")
 }
 
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "GET" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = validateVersion(w, req); apiVersion == "" {
 		return
 	}
 
@@ -64,12 +89,15 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 }
 
 func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "DELETE" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	user.Log.Info("In DELETE", "url", req.URL)
+	if apiVersion = validateVersion(w, req); apiVersion == "" {
+		return
+	}
+	user.Log.Info("In DELETE", "version", apiVersion, "url", req.URL)
 	urlParts, err := url.Parse(req.URL.String())
 	if err != nil {
 		http.Error(w, "unable to parse URL", http.StatusBadRequest)
@@ -86,12 +114,15 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "POST" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	user.Log.Info("In TrialRequest", "url", req.URL)
+	if apiVersion = validateVersion(w, req); apiVersion == "" {
+		return
+	}
+	user.Log.Info("In TrialRequest", "version", apiVersion, "url", req.URL)
 
 	var dmreq driver.DMRequest
 	if err := json.NewDecoder(req.Body).Decode(&dmreq); err != nil {
