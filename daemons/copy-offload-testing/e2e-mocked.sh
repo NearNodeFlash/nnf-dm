@@ -64,7 +64,7 @@ echo "Waiting for daemon to start"
 while : ; do
     sleep 1
     # shellcheck disable=SC2086
-    if curl $CURLCERTS "$PROTO://$SRVR/hello"; then
+    if curl -H "Accepts-version: 1.0" $CURLCERTS "$PROTO://$SRVR/hello"; then
         break
     fi
 done

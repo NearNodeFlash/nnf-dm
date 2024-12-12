@@ -50,6 +50,7 @@ func setupLog() logr.Logger {
 func TestA_Hello(t *testing.T) {
 	t.Run("returns hello response", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
 		httpHandler := &UserHttp{Log: setupLog()}
@@ -104,6 +105,7 @@ func TestB_ListRequests(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			request, _ := http.NewRequest(test.method, "/list", nil)
+			request.Header.Set("Accepts-version", "1.0")
 			response := httptest.NewRecorder()
 
 			httpHandler.ListRequests(response, request)
@@ -155,6 +157,7 @@ func TestC_CancelRequest(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			request, _ := http.NewRequest(test.method, "/cancel/nnf-copy-offload-node-9ae2a136-4", nil)
+			request.Header.Set("Accepts-version", "1.0")
 			response := httptest.NewRecorder()
 
 			httpHandler.CancelRequest(response, request)
@@ -219,7 +222,7 @@ func TestD_TrialRequest(t *testing.T) {
 				readerBody = bytes.NewReader(test.body)
 			}
 			request, _ := http.NewRequest(test.method, "/trial", readerBody)
-
+			request.Header.Set("Accepts-version", "1.0")
 			response := httptest.NewRecorder()
 
 			httpHandler.TrialRequest(response, request)
@@ -282,7 +285,7 @@ func TestE_Lifecycle(t *testing.T) {
 				readerBody = bytes.NewReader(test.body)
 			}
 			request, _ := http.NewRequest(test.method, "/trial", readerBody)
-
+			request.Header.Set("Accepts-version", "1.0")
 			response := httptest.NewRecorder()
 
 			httpHandler.TrialRequest(response, request)
@@ -306,6 +309,7 @@ func TestE_Lifecycle(t *testing.T) {
 	stringWanted := strings.Join(listWanted, ",")
 	t.Run("list all jobs", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/list", nil)
+		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
 		httpHandler.ListRequests(response, request)
@@ -327,6 +331,7 @@ func TestE_Lifecycle(t *testing.T) {
 		// get a null pointer reference in CancelRequest(), where 'req' will
 		// be null.
 		request, _ := http.NewRequest(http.MethodDelete, "/cancel/nnf-copy-offload-node-0", nil)
+		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
 		httpHandler.CancelRequest(response, request)
@@ -345,6 +350,7 @@ func TestE_Lifecycle(t *testing.T) {
 	stringWanted = strings.Join(listWanted[1:], ",")
 	t.Run("list remaining jobs", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/list", nil)
+		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
 		httpHandler.ListRequests(response, request)
