@@ -45,7 +45,7 @@ func validateVersion(w http.ResponseWriter, req *http.Request) string {
 	// This applies to the format of the request sent by the client as well
 	// as the format of our response.
 	apiVersion := req.Header.Get("Accepts-version")
-	if apiVersion == "" || apiVersion != "1.0" {
+	if apiVersion != "1.0" {
 		// The RFC says Not Accceptable should return a list of valid versions.
 		http.Error(w, "Valid versions: 1.0", http.StatusNotAcceptable)
 		return ""
