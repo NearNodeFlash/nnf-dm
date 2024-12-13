@@ -158,6 +158,14 @@ static long copy_offload_perform(COPY_OFFLOAD *offload, struct memory *chunk) {
     return http_code;
 }
 
+/* Chop the newline from the end of the string. */
+static void chop(char **output) {
+    if (*output != NULL) {
+        char *newline = strchr(*output, '\n');
+        *newline = '\0';
+    }
+}
+
 /* List the active copy-offload requests.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
@@ -175,9 +183,7 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
         ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);
-        // chop
-        char *newline = strchr(*output, '\n');
-        *newline = '\0';
+        chop(output);
         free(chunk.response);
     }
     return ret;
@@ -199,9 +205,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
         ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);
-        // chop
-        char *newline = strchr(*output, '\n');
-        *newline = '\0';
+        chop(output);
         free(chunk.response);
     }
     return ret;
@@ -230,9 +234,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
             char *delim = strchr(chunk.response, '=');
             if (delim != NULL) {
                 *output = strdup(delim+1);
-                // chop
-                char *newline = strchr(*output, '\n');
-                *newline = '\0';
+                chop(output);
             }
             ret = 0;
         } else if (http_code != -1) {

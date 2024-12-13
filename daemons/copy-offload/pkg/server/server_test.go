@@ -368,6 +368,105 @@ func TestE_Lifecycle(t *testing.T) {
 	})
 }
 
+func TestF_BadAPIVersion(t *testing.T) {
+
+	crLog := setupLog()
+	drvr := &driver.Driver{Log: crLog, Mock: true}
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	testCases := []struct {
+		name           string
+		method         string
+		url            string
+		handler        func(http.ResponseWriter, *http.Request)
+		body           []byte
+		skipApiVersion bool
+	}{
+		{
+			name:    "bad api version for hello",
+			method:  http.MethodGet,
+			url:     "/hello",
+			handler: httpHandler.Hello,
+		},
+		{
+			name:           "skip api version for hello",
+			method:         http.MethodGet,
+			url:            "/hello",
+			handler:        httpHandler.Hello,
+			skipApiVersion: true,
+		},
+		{
+			name:    "bad api version for list",
+			method:  http.MethodGet,
+			url:     "/list",
+			handler: httpHandler.ListRequests,
+		},
+		{
+			name:           "skip api version for list",
+			method:         http.MethodGet,
+			url:            "/list",
+			handler:        httpHandler.ListRequests,
+			skipApiVersion: true,
+		},
+		{
+			name:    "bad api version for cancel",
+			method:  http.MethodDelete,
+			url:     "/cancel/nnf-copy-offload-node-9ae2a136-4",
+			handler: httpHandler.CancelRequest,
+		},
+		{
+			name:           "skip api version for cancel",
+			method:         http.MethodDelete,
+			url:            "/cancel/nnf-copy-offload-node-9ae2a136-4",
+			handler:        httpHandler.CancelRequest,
+			skipApiVersion: true,
+		},
+		{
+			name:    "bad api version for copy",
+			method:  http.MethodPost,
+			url:     "/trial",
+			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			handler: httpHandler.TrialRequest,
+		},
+		{
+			name:           "skip api version for copy",
+			method:         http.MethodPost,
+			url:            "/trial",
+			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			handler:        httpHandler.TrialRequest,
+			skipApiVersion: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			var readerBody io.Reader = nil
+			if len(test.body) > 0 {
+				readerBody = bytes.NewReader(test.body)
+			}
+			request, _ := http.NewRequest(test.method, test.url, readerBody)
+			if !test.skipApiVersion {
+				request.Header.Set("Accepts-version", "0.0")
+			}
+			response := httptest.NewRecorder()
+
+			test.handler(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+			statusWant := http.StatusNotAcceptable
+			wantPrefix := "Valid versions: "
+
+			if res.StatusCode != statusWant {
+				t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+			}
+			if !strings.HasPrefix(got, wantPrefix) {
+				t.Errorf("got %q, want \"%s[...]\"", got, wantPrefix)
+			}
+		})
+	}
+}
+
 // Just touch ginkgo, so it's here to interpret any ginkgo args from
 // "make test", so that doesn't fail on this test file.
 var _ = BeforeSuite(func() {})
