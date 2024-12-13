@@ -1,0 +1,60 @@
+---
+apiVersion: nnf.cray.hpe.com/v1alpha4
+kind: NnfContainerProfile
+metadata:
+  name: copy-offload-nonmpi
+  namespace: nnf-system
+data:
+  storages:
+    - name: DW_JOB_my_storage
+      optional: false
+    - name: DW_GLOBAL_lus
+      optional: false
+  numPorts: 1
+  spec:
+    containers:
+      - name: copy-offload-srvr
+        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:0.0.0.284-88236-dirty
+        command:
+          - /nnf-copy-offload
+          - --cert
+          - /etc/copy-offload-server/tls.crt
+          - --cakey
+          - /etc/copy-offload-server/tls.key
+          - --clientcert
+          - /etc/copy-offload-client/tls.crt
+          - --addr
+          - :$(NNF_CONTAINER_PORTS)
+        volumeMounts:
+          - name: copy-offload-server
+            mountPath: /etc/copy-offload-server
+            readOnly: true
+          - name: copy-offload-client
+            mountPath: /etc/copy-offload-client
+            readOnly: true
+    volumes:
+      - name: copy-offload-server
+        secret:
+          secretName: nnf-dm-copy-offload-server
+      - name: copy-offload-client
+        secret:
+          secretName: nnf-dm-copy-offload-client
+    serviceAccount: nnf-dm-copy-offload
+    serviceAccountName: nnf-dm-copy-offload
+  retryLimit: 2
+---
+apiVersion: dataworkflowservices.github.io/v1alpha2
+kind: Workflow
+metadata:
+  name: copy-offload-nonmpi
+  namespace: default
+spec:
+  desiredState: "Proposal"
+  dwDirectives:
+    - "#DW jobdw name=copyoff-gfs2 type=gfs2 capacity=50GB"
+    - "#DW container name=copyoff-container profile=copy-offload-nonmpi \
+      DW_JOB_my_storage=copyoff-gfs2 DW_GLOBAL_lus=/lus/foo/copyoff"
+  wlmID: "Bubbly WLM"
+  jobID: "fDeansJob3"
+  userID: 1050
+  groupID: 1051

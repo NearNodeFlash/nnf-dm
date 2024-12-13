@@ -1,0 +1,13 @@
+apiVersion: dataworkflowservices.github.io/v1alpha2
+kind: Servers
+metadata:
+  name: yellow-0
+  namespace: default
+spec:
+  allocationSets:
+  - label: gfs2
+    allocationSize: 1000000000
+    storage:
+    - name: kind-worker3
+      allocationCount: 1
+

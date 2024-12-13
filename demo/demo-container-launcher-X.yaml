@@ -1,0 +1,296 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2024-11-12T19:24:43Z"
+  generateName: demo-container-launcher-
+  labels:
+    batch.kubernetes.io/controller-uid: d47514a3-04f0-43c7-968b-847a308bb391
+    batch.kubernetes.io/job-name: demo-container-launcher
+    controller-uid: d47514a3-04f0-43c7-968b-847a308bb391
+    job-name: demo-container-launcher
+    training.kubeflow.org/job-name: demo-container
+    training.kubeflow.org/job-role: launcher
+    training.kubeflow.org/operator-name: mpi-operator
+  name: demo-container-launcher-2l5b7
+  namespace: default
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: demo-container-launcher
+    uid: d47514a3-04f0-43c7-968b-847a308bb391
+  resourceVersion: "7157796"
+  uid: d6327448-9299-448f-9b7e-c09799eb2585
+spec:
+  containers:
+  - command:
+    - mpirun
+    - --tag-output
+    - mpi_hello_world
+    - $(DW_JOB_my_storage)
+    env:
+    - name: NNF_CONTAINER_PORTS
+      value: "5000"
+    - name: DW_JOB_my_storage
+      value: /mnt/nnf/b81b9178-bd01-4238-a615-d44d80ad0eab-0
+    - name: NNF_CONTAINER_SUBDOMAIN
+      value: demo-container-worker
+    - name: NNF_CONTAINER_DOMAIN
+      value: default.svc.cluster.local
+    - name: NNF_CONTAINER_HOSTNAMES
+      value: demo-container-launcher demo-container-worker-0 demo-container-worker-1
+    - name: K_MPI_JOB_ROLE
+      value: launcher
+    - name: OMPI_MCA_orte_keep_fqdn_hostnames
+      value: "true"
+    - name: OMPI_MCA_orte_default_hostfile
+      value: /etc/mpi/hostfile
+    - name: OMPI_MCA_plm_rsh_args
+      value: -o ConnectionAttempts=10
+    - name: OMPI_MCA_orte_set_default_slots
+      value: "1"
+    - name: NVIDIA_VISIBLE_DEVICES
+    - name: NVIDIA_DRIVER_CAPABILITIES
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imagePullPolicy: IfNotPresent
+    name: nnf-container-example
+    resources: {}
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsGroup: 1051
+      runAsNonRoot: true
+      runAsUser: 1050
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/passwd
+      name: passwd
+      subPath: passwd
+    - mountPath: /mnt/nnf/b81b9178-bd01-4238-a615-d44d80ad0eab-0
+      name: my-storage
+    - mountPath: /home/mpiuser/.ssh
+      name: ssh-auth
+    - mountPath: /etc/mpi
+      name: mpi-job-config
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-khs8w
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  hostname: demo-container-launcher
+  initContainers:
+  - command:
+    - /bin/sh
+    - -c
+    - |
+      # tie the UID/GID to the user
+      sed -i '/^mpiuser/d' /etc/passwd
+      echo "mpiuser:x:1050:1051::/home/mpiuser:/bin/sh" >> /etc/passwd
+      cp /etc/passwd /config/
+      exit 0
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imagePullPolicy: IfNotPresent
+    name: mpi-init-passwd
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /config
+      name: passwd
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-khs8w
+      readOnly: true
+  - command:
+    - /bin/sh
+    - -c
+    - |
+      # use mpirun to contact workers
+      echo "contacting demo-container-worker-0.demo-container.default.svc,demo-container-worker-1.demo-container.default.svc..."
+      for i in $(seq 1 100); do
+         sleep 1
+         echo "attempt $i of 100..."
+         echo "mpirun -H demo-container-worker-0.demo-container.default.svc,demo-container-worker-1.demo-container.default.svc hostname"
+         mpirun -H demo-container-worker-0.demo-container.default.svc,demo-container-worker-1.demo-container.default.svc hostname
+         if [ $? -eq 0 ]; then
+            echo "successfully contacted demo-container-worker-0.demo-container.default.svc,demo-container-worker-1.demo-container.default.svc; done"
+            exit 0
+         fi
+      done
+      echo "failed to contact demo-container-worker-0.demo-container.default.svc,demo-container-worker-1.demo-container.default.svc"
+      exit 1
+    env:
+    - name: OMPI_MCA_orte_keep_fqdn_hostnames
+      value: "true"
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imagePullPolicy: IfNotPresent
+    name: mpi-wait-for-worker-2
+    resources: {}
+    securityContext:
+      runAsGroup: 1051
+      runAsNonRoot: true
+      runAsUser: 1050
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/passwd
+      name: passwd
+      subPath: passwd
+    - mountPath: /home/mpiuser/.ssh
+      name: ssh-auth
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-khs8w
+      readOnly: true
+  nodeName: rabbit-node-1
+  nodeSelector:
+    kubernetes.io/hostname: rabbit-node-1
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Never
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 1051
+  serviceAccount: default
+  serviceAccountName: default
+  subdomain: demo-container
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoSchedule
+    key: cray.nnf.node
+    operator: Equal
+    value: "true"
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir: {}
+    name: passwd
+  - hostPath:
+      path: /mnt/nnf/b81b9178-bd01-4238-a615-d44d80ad0eab-0
+      type: Directory
+    name: my-storage
+  - name: ssh-auth
+    secret:
+      defaultMode: 420
+      items:
+      - key: ssh-privatekey
+        path: id_rsa
+      - key: ssh-publickey
+        path: id_rsa.pub
+      - key: ssh-publickey
+        path: authorized_keys
+      secretName: demo-container-ssh
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: hostfile
+        mode: 292
+        path: hostfile
+      - key: discover_hosts.sh
+        mode: 365
+        path: discover_hosts.sh
+      name: demo-container-config
+    name: mpi-job-config
+  - name: kube-api-access-khs8w
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T19:25:11Z"
+    status: "False"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T19:25:03Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T19:25:09Z"
+    reason: PodFailed
+    status: "False"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T19:25:09Z"
+    reason: PodFailed
+    status: "False"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T19:24:43Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://633fcb46889261bfa84e9d57b0b3d0d595cdf801ce22cb39f887fa163006f940
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imageID: ghcr.io/nearnodeflash/nnf-container-example@sha256:f7f9e18f7579487d68b1a4f8925011efa40b1c639a5c9664f2f1ecfb5bc4ecdb
+    lastState: {}
+    name: nnf-container-example
+    ready: false
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://633fcb46889261bfa84e9d57b0b3d0d595cdf801ce22cb39f887fa163006f940
+        exitCode: 13
+        finishedAt: "2024-11-12T19:25:08Z"
+        reason: Error
+        startedAt: "2024-11-12T19:25:04Z"
+  hostIP: 10.1.1.5
+  hostIPs:
+  - ip: 10.1.1.5
+  initContainerStatuses:
+  - containerID: containerd://9280fefab87b7c044d6c6a3f47c99653f3171730537da76a919f8ff099563d4f
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imageID: ghcr.io/nearnodeflash/nnf-container-example@sha256:f7f9e18f7579487d68b1a4f8925011efa40b1c639a5c9664f2f1ecfb5bc4ecdb
+    lastState: {}
+    name: mpi-init-passwd
+    ready: true
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://9280fefab87b7c044d6c6a3f47c99653f3171730537da76a919f8ff099563d4f
+        exitCode: 0
+        finishedAt: "2024-11-12T19:24:54Z"
+        reason: Completed
+        startedAt: "2024-11-12T19:24:54Z"
+  - containerID: containerd://d73b037e777f6d0c6febc6f2c61787fbdd2388dfd973ef9801b45dc646b985bc
+    image: ghcr.io/nearnodeflash/nnf-container-example:master
+    imageID: ghcr.io/nearnodeflash/nnf-container-example@sha256:f7f9e18f7579487d68b1a4f8925011efa40b1c639a5c9664f2f1ecfb5bc4ecdb
+    lastState: {}
+    name: mpi-wait-for-worker-2
+    ready: true
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://d73b037e777f6d0c6febc6f2c61787fbdd2388dfd973ef9801b45dc646b985bc
+        exitCode: 0
+        finishedAt: "2024-11-12T19:25:03Z"
+        reason: Completed
+        startedAt: "2024-11-12T19:24:56Z"
+  phase: Failed
+  podIP: 10.42.2.31
+  podIPs:
+  - ip: 10.42.2.31
+  qosClass: BestEffort
+  startTime: "2024-11-12T19:24:43Z"
