@@ -15,11 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CC = /usr/bin/gcc
-AR = /usr/bin/ar
+CC ?= /usr/bin/gcc
+AR ?= /usr/bin/ar
 CFLAGS = -Wall -Werror -g -I/opt/homebrew/include -I/opt/homebrew/opt/curl/include
 LDFLAGS = -lcurl -L/opt/homebrew/lib -L/opt/homebrew/opt/curl/lib
-xLDFLAGS = -lcrypto -lcurl -L/opt/homebrew/lib -L/opt/homebrew/opt/curl/lib
 ARFLAGS = rcs
 
 all: libcopyoffload.a tester

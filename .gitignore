@@ -11,6 +11,7 @@ nnf-dm
 .version
 config/begin/*
 rpms/
+crossbin/
 
 # Test binary, build with `go test -c`
 *.test
