@@ -1,0 +1,11 @@
+apiVersion: dataworkflowservices.github.io/v1alpha2
+kind: Computes
+metadata:
+  name: yellow
+  namespace: default
+data:
+#- name: rabbit-compute-3
+- name: compute-04
+#- name: texas-lustre
+#- name: x9000c1s0b0n0
+

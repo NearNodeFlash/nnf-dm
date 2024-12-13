@@ -1,0 +1,11 @@
+spec:
+  allocationSets:
+    - allocationSize: 50000000000
+      label: gfs2
+      storage:
+        - allocationCount: 1
+          #name: rabbit-node-1
+          name: kind-worker2
+#        - allocationCount: 1
+#          #name: rabbit-node-2
+#          name: kind-worker3
