@@ -15,23 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CC ?= /usr/bin/gcc
-AR ?= /usr/bin/ar
-CFLAGS = -Wall -Werror -g -I/opt/homebrew/include -I/opt/homebrew/opt/curl/include
-LDFLAGS = -lcurl -L/opt/homebrew/lib -L/opt/homebrew/opt/curl/lib
-ARFLAGS = rcs
+FROM --platform=$BUILDPLATFORM gcc:12.4.0-bookworm AS builder
 
-all: libcopyoffload.a tester
+WORKDIR /workspace
 
-libcopyoffload.a: copy-offload.o
-	$(AR) $(ARFLAGS) libcopyoffload.a copy-offload.o
+COPY daemons/lib-copy-offload daemons/lib-copy-offload/
+COPY Makefile Makefile
 
-tester: test-tool/main.o libcopyoffload.a
-	$(CC) $(CFLAGS) -o tester test-tool/main.o -L. -lcopyoffload $(LDFLAGS)
+RUN CC=gcc make -C ./daemons/lib-copy-offload tester
 
-test-tool/main.o: test-tool/main.c copy-offload.h
-copy-offload.o: copy-offload.c copy-offload.h
-
-clean:
-	rm -f *.o core tester *.a
-	rm -f test-tool/*.o
+FROM scratch AS artifacts
+COPY --from=builder /workspace/daemons/lib-copy-offload/tester /
