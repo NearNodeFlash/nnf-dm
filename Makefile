@@ -181,6 +181,12 @@ build-copy-offload-with: $(LOCALBIN)
 build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
 
+CROSS_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-cross
+build-copy-offload-tester-cross: $(CROSSBIN)
+build-copy-offload-tester-cross: ## Build standalone tester binary for $CROSS_PLATFORM
+	${CONTAINER_TOOL} build --platform=$(CROSS_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.xplatform .
+
 .PHONY: build-copy-offload-docker-local
 build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
 build-copy-offload-docker-local: build-copy-offload-docker-with
@@ -294,6 +300,17 @@ $(RPMBIN):
 clean-rpmbin:
 	if [[ -d $(RPMBIN) ]]; then \
 	  rm -rf $(RPMBIN); \
+	fi
+
+## Location to place cross-compiled tools
+CROSSBIN ?= $(shell pwd)/crossbin
+$(CROSSBIN):
+	mkdir $(CROSSBIN)
+
+.PHONY: clean-crossbin
+clean-crossbin:
+	if [[ -d $(CROSSBIN) ]]; then \
+	  rm -rf $(CROSSBIN); \
 	fi
 
 ## Tool Binaries
