@@ -26,7 +26,11 @@ if [[ -z $CERTDIR ]]; then
     exit 1
 fi
 
-HOST=localhost
+SRVR_HOST="$2"
+SRVR_HOST=${SRVR_HOST:=localhost}
+
+CLIENT_HOST="$3"
+CLIENT_HOST=${CLIENT_HOST:=localhost}
 
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
@@ -45,7 +49,7 @@ SERVER_CSR=$SERVER_DIR/server_cert.csr
 
 echo "Generate a self-signed server certificate signing request and certificate"
 mkdir -p "$SERVER_DIR" && chmod 700 "$SERVER_DIR"
-openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$HOST"
+openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST"
 openssl x509 -req -days 1 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT"
 
 CLIENT_DIR="$CERTDIR"/client
@@ -54,7 +58,7 @@ CLIENT_CSR=$CLIENT_DIR/client_cert.csr
 
 echo "Generate a client certificate signing request and certificate"
 mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
-openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$HOST"
+openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
 openssl x509 -req -days 1 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
 
 exit 0

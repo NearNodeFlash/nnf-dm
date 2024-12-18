@@ -38,9 +38,16 @@ if [[ -z $SKIP_TLS ]]; then
     cakey="$CERTDIR/ca/private/ca_key.pem"
     clientcert="$CERTDIR/client/client_cert.pem"
 
-    SRVR_CMD="$SRVR_CMD -cert $cacert -cakey $cakey -clientcert $clientcert"
-    CO="$CO -x $cacert -y $cakey -z $clientcert"
-    CURLCERTS="--cacert $cacert --key $cakey --cert $clientcert"
+    SRVR_CMD="$SRVR_CMD -cert $cacert -cakey $cakey"
+    CO="$CO -x $cacert -y $cakey"
+    CURLCERTS="--cacert $cacert --key $cakey"
+
+    # Enable mTLS?
+    if [[ -z $SKIP_MTLS ]]; then
+        SRVR_CMD="$SRVR_CMD -clientcert $clientcert"
+        CO="$CO -z $clientcert"
+        CURLCERTS="$CURLCERTS --cert $clientcert"
+    fi
 fi
 
 NNF_NODE_NAME=rabbit01 $SRVR_CMD &
