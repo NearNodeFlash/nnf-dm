@@ -53,7 +53,7 @@ void usage(const char **argv) {
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
     fprintf(stderr, "    -y KEY_FILE         CA/Server key file.\n");
-    fprintf(stderr, "    -z CLIENTCERT_FILE  CA/Server key file.\n");
+    fprintf(stderr, "    -z CLIENTCERT_FILE  Client certificate file. This enables mTLS.\n");
 
 
 }

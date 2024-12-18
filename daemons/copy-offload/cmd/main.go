@@ -91,12 +91,13 @@ func main() {
 	mock := false
 	skip_tls := false
 	var tlsConfig *tls.Config
+	using_mtls := false
 
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
 	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
 	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
-	clientCertFile := flag.String("clientcert", "clientcert.pem", "client certificate PEM file")
-	flag.BoolVar(&skip_tls, "skip-tls", skip_tls, "Skip setting up TLS.")
+	clientCertFile := flag.String("clientcert", "", "Client certificate PEM file. This enables mTLS.")
+	flag.BoolVar(&skip_tls, "skip-tls", skip_tls, "Skip setting up TLS/mTLS.")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
 
@@ -118,20 +119,26 @@ func main() {
 		}
 
 		// Trusted client certificate.
-		clientCert, err := os.ReadFile(*clientCertFile)
-		if err != nil {
-			slog.Error("Error reading the client certificate file", "error", err.Error())
-			os.Exit(1)
+		var clientCertPool *x509.CertPool
+		if *clientCertFile != "" {
+			clientCert, err := os.ReadFile(*clientCertFile)
+			if err != nil {
+				slog.Error("Error reading the client certificate file", "error", err.Error())
+				os.Exit(1)
+			}
+			clientCertPool = x509.NewCertPool()
+			clientCertPool.AppendCertsFromPEM(clientCert)
+			using_mtls = true
 		}
-		clientCertPool := x509.NewCertPool()
-		clientCertPool.AppendCertsFromPEM(clientCert)
 
 		tlsConfig = &tls.Config{
 			MinVersion:               tls.VersionTLS13,
 			PreferServerCipherSuites: true,
 			Certificates:             []tls.Certificate{serverTLSCert},
-			ClientCAs:                clientCertPool,
-			ClientAuth:               tls.RequireAndVerifyClientCert,
+		}
+		if using_mtls {
+			tlsConfig.ClientCAs = clientCertPool
+			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		}
 	}
 
@@ -141,7 +148,7 @@ func main() {
 		drvr.Client = clnt
 	}
 
-	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "skip-tls", skip_tls)
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "skip-tls", skip_tls, "mTLS", using_mtls)
 
 	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, Mock: mock}
 
