@@ -13,6 +13,7 @@ KEY=$CERTDIR/ca/private/ca_key.pem
 SERVER_SECRET=nnf-dm-copy-offload-server
 kubectl create secret tls $SERVER_SECRET --cert $SERVER_CERT --key $KEY
 
-CLIENT_SECRET=nnf-dm-copy-offload-client
-kubectl create secret tls $CLIENT_SECRET --cert $CLIENT_CERT --key $KEY
-
+if [[ -n $MTLS ]]; then
+    CLIENT_SECRET=nnf-dm-copy-offload-client
+    kubectl create secret tls $CLIENT_SECRET --cert $CLIENT_CERT --key $KEY
+fi

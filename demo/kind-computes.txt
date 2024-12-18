@@ -1,0 +1,2 @@
+kind-worker2
+kind-worker3
