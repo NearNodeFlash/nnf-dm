@@ -271,6 +271,7 @@ jobs:
 
     - name: "Build lib-copy-offload"
       run: |
+        sudo apt-get update
         sudo apt-get install libcurl4-openssl-dev
         make -C ./daemons/lib-copy-offload libcopyoffload.a
 
