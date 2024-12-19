@@ -68,6 +68,8 @@ COPY_OFFLOAD *copy_offload_init() {
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
+ * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
+ * If @skip_tls is set, then TLS/mTLS will not be enabled.
  */
 void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert) {
     CURL *curl = offload->curl;
@@ -102,8 +104,11 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
         curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
         curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
 
-        curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
-        curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
+        // Are we doing mTLS?
+        if (clientcert != NULL) {
+            curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
+            curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
+        }
     }
 }
 

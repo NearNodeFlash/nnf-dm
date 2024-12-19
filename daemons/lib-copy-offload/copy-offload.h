@@ -51,6 +51,8 @@ COPY_OFFLOAD *copy_offload_init();
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
+ * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
+ * If @skip_tls is set, then TLS/mTLS will not be enabled.
  */
 void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert);
 

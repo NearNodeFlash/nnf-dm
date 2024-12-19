@@ -271,13 +271,17 @@ jobs:
 
     - name: "Build lib-copy-offload"
       run: |
+        sudo apt-get update
         sudo apt-get install libcurl4-openssl-dev
         make -C ./daemons/lib-copy-offload libcopyoffload.a
 
     - name: "E2E mock test, without TLS"
       run: SKIP_TLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
+      
+    - name: "E2E mock test, with TLS (no mTLS)"
+      run: SKIP_MTLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
 
-    - name: "E2E mock test, with TLS"
+    - name: "E2E mock test, with mTLS"
       run: ./daemons/copy-offload-testing/e2e-mocked.sh
 
     - name: "Build the copy-offload Docker image"

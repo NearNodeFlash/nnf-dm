@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
 set -o pipefail
 
 make build-copy-offload-local
@@ -28,8 +27,7 @@ SRVR="localhost:4000"
 PROTO="http"
 
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TLS:+-skip-tls}"
-unset CERTDIR
-unset CURLCERTS
+CURL_APIVER_HDR="Accepts-version: 1.0"
 if [[ -z $SKIP_TLS ]]; then
     PROTO="https"
     CERTDIR=daemons/copy-offload-testing/certs
@@ -38,12 +36,20 @@ if [[ -z $SKIP_TLS ]]; then
     cakey="$CERTDIR/ca/private/ca_key.pem"
     clientcert="$CERTDIR/client/client_cert.pem"
 
-    SRVR_CMD="$SRVR_CMD -cert $cacert -cakey $cakey -clientcert $clientcert"
-    CO="$CO -x $cacert -y $cakey -z $clientcert"
-    CURLCERTS="--cacert $cacert --key $cakey --cert $clientcert"
+    SRVR_CMD_TLS_ARGS="-cert $cacert -cakey $cakey"
+    CO_TLS_ARGS="-x $cacert -y $cakey"
+    CURL_TLS_ARGS="--cacert $cacert --key $cakey"
+
+    # Enable mTLS?
+    if [[ -z $SKIP_MTLS ]]; then
+        SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
+        CO_MTLS_ARGS="-z $clientcert"
+        CURL_MTLS_ARGS="--cert $clientcert"
+    fi
 fi
 
-NNF_NODE_NAME=rabbit01 $SRVR_CMD &
+# shellcheck disable=SC2086
+NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TLS_ARGS $SRVR_CMD_MTLS_ARGS &
 srvr_pid=$!
 echo "Server pid is $srvr_pid, my pid is $$"
 
@@ -61,61 +67,126 @@ cleanup() {
 }
 
 echo "Waiting for daemon to start"
-while : ; do
+cnt=10
+while (( cnt > 0 )) ; do
     sleep 1
     # shellcheck disable=SC2086
-    if curl -H "Accepts-version: 1.0" $CURLCERTS "$PROTO://$SRVR/hello"; then
+    if output=$(curl -H "$CURL_APIVER_HDR" $CURL_TLS_ARGS $CURL_MTLS_ARGS "$PROTO://$SRVR/hello"); then
         break
     fi
+    (( cnt = cnt - 1 ))
 done
+if [[ $output != "hello back at ya" ]]; then
+    echo "FAIL: curl did not get expected 'hello' response"
+    kill "$srvr_pid"
+    exit 1
+fi
 
-output=$($CO -l "$SRVR")
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    cleanup
+fi
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -c nnf-copy-offload-node-2 "$SRVR")
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
+    cleanup
+fi
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi
 
-job1=$($CO -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR")
+# shellcheck disable=SC2086
+if ! job1=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR"); then
+    cleanup
+fi
 if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
     echo "FAIL: Unexpected output from copy. Got ($job1)."
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -l "$SRVR")
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    cleanup
+fi
 if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
     echo "FAIL: Unexpected output from list. Got ($output)."
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -c "$job1" "$SRVR")
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c "$job1" "$SRVR"); then
+    cleanup
+fi
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from cancel $job1"
     kill "$srvr_pid"
     exit 1
 fi
 
-output=$($CO -l "$SRVR")
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    cleanup
+fi
 if [[ $output != "" ]]; then
     echo "FAIL: Expected empty output from list after all jobs have been removed"
     kill "$srvr_pid"
     exit 1
 fi
 
+if [[ -z $SKIP_TLS ]]; then
+    if [[ -z $SKIP_MTLS ]]; then
+        SAY_CURL="Verify that mTLS args are required for curl. Expect curl to fail here."
+        USE_CURL_ARGS="$CURL_TLS_ARGS"
+        SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the mTLS cert"
+
+        SAY_TESTER="Verify that mTLS args are required for test tool. Expect it to fail here."
+        USE_TESTER_ARGS="$CO_TLS_ARGS"
+        SAY_TESTER_ERR="FAIL: Expected test tool to get failure when not specifying the mTLS cert"
+   else
+        SAY_CURL="Verify that TLS args are required for curl. Expect curl to fail here."
+        SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the TLS cert/key"
+
+        SAY_TESTER_ERR="FAIL: Expected test tool to get failure when not specifying the TLS cert/key"
+        SAY_TESTER="Verify that TLS args are required for test tool. Expect it to fail here."
+    fi
+
+    echo
+    echo "$SAY_CURL"
+    echo
+    # shellcheck disable=SC2086
+    if output=$(curl -H "$CURL_APIVER_HDR" $USE_CURL_ARGS "$PROTO://$SRVR/hello" 2>&1); then
+        echo "$SAY_CURL_ERR"
+        kill "$srvr_pid"
+        exit 1
+    fi
+    echo "output($output)"
+    echo
+    echo "$SAY_TESTER"
+    echo
+    # shellcheck disable=SC2086
+    if output=$($CO $USE_TESTER_ARGS -l "$SRVR" 2>&1); then
+        echo "$SAY_TESTER_ERR"
+        kill "$srvr_pid"
+        exit 1
+    fi
+    echo "output($output)"
+fi
+
+echo
+echo "PASS: Success"
 echo "Kill server $srvr_pid"
 kill "$srvr_pid"
 if [[ -d $CERTDIR ]]; then
     rm -rf "$CERTDIR"
 fi
-echo "PASS: Success"
 exit 0
 
