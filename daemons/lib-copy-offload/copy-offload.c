@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,9 +17,11 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "copy-offload.h"
 
 #define COPY_OFFLOAD_URL_SIZE 1024
@@ -30,6 +32,50 @@ struct memory {
     char *response;
     size_t size;
 };
+
+/* Read a file into a buffer. The caller is responsible for calling free() on the
+ * returned buffer.
+ * Returns 0 on success.
+ * On failure, returns 1 and places the error message in @offload->err_message.
+ */
+static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
+    int ret = 0;
+    FILE *fp;
+    struct stat stat_blk;
+    int cnt;
+    *buffer = NULL;
+
+    if (stat(path, &stat_blk) == -1) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to stat %s: errno %d\n", path, errno);
+        return 1;
+    }
+    if ((*buffer = malloc(stat_blk.st_size + 1)) == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to allocation a buffer for the bearer token\n");
+        return 1;
+    }
+    fp = fopen(path, "r");
+    if (fp == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to open %s: errno %d\n", path, errno);
+        free(*buffer);
+        *buffer = NULL;
+        return 1;
+    }
+    cnt = fread(*buffer, 1, stat_blk.st_size, fp);
+    if (cnt == -1) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to read %s: errno %d\n", path, errno);
+        free(*buffer);
+        buffer = NULL;
+        ret = 1;
+    } else if (cnt != stat_blk.st_size) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Incomplete read of %s. Wanted %lld, got %d\n", path, (long long)stat_blk.st_size, cnt);
+        free(*buffer);
+        buffer = NULL;
+        ret = 1;
+    }
+    fclose(fp);
+
+    return ret;
+}
 
 /* See the example in CURLOPT_WRITEFUNCTION(3). */
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp) {
@@ -71,7 +117,9 @@ COPY_OFFLOAD *copy_offload_init() {
  * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
  */
-void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert) {
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path) {
+    int ret = 0;
+
     CURL *curl = offload->curl;
     if (host_and_port != NULL)
         offload->host_and_port = host_and_port;
@@ -80,6 +128,8 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
         offload->cacert = cacert;
     if (key != NULL)
         offload->key = key;
+    if (token_path != NULL)
+        offload->token_path = token_path;
     if (clientcert != NULL)
         offload->clientcert = clientcert;
     strncpy(offload->proto, "http", sizeof(offload->proto));
@@ -101,15 +151,26 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
         curl_easy_setopt(curl, CURLOPT_CAINFO, cacert);
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
 
-        curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
-        curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
-
         // Are we doing mTLS?
-        if (clientcert != NULL) {
+        if (key != NULL && clientcert != NULL) {
+            curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
+            curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
+ 
             curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
             curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
         }
     }
+    if (offload->token_path != NULL) {
+        char *bearer = NULL;
+        ret = read_contents(offload, offload->token_path, &bearer);
+        if (ret == 0) {
+            curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, bearer);
+            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+        }
+        if (bearer != NULL)
+            free(bearer);
+    }
+    return ret;
 }
 
 /* Reset the handle so it can be used for the next command.
@@ -118,7 +179,7 @@ void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int ski
  */
 void copy_offload_reset(COPY_OFFLOAD *offload) {
     curl_easy_reset(offload->curl);
-    copy_offload_configure(offload, NULL, offload->skip_tls, NULL, NULL, NULL);
+    copy_offload_configure(offload, NULL, offload->skip_tls, NULL, NULL, NULL, NULL);
 }
 
 /* Request verbose output from libcurl. */

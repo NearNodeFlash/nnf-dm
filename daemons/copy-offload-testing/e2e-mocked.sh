@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2024 Hewlett Packard Enterprise Development LP
+# Copyright 2024-2025 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -19,38 +19,51 @@
 
 set -o pipefail
 
-make build-copy-offload-local
+make build-copy-offload-local || exit 1
 
-make -C ./daemons/lib-copy-offload tester
+make -C ./daemons/lib-copy-offload tester || exit 1
 CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
 SRVR="localhost:4000"
 PROTO="http"
 
-SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TLS:+-skip-tls}"
+CERTDIR=daemons/copy-offload-testing/certs
+./daemons/copy-offload-testing/gen_certs.sh $CERTDIR || exit 1
+
+SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"
+CA_KEY="$CERTDIR/ca/private/ca_key.pem"
 if [[ -z $SKIP_TLS ]]; then
     PROTO="https"
-    CERTDIR=daemons/copy-offload-testing/certs
-    ./daemons/copy-offload-testing/gen_certs.sh $CERTDIR
     cacert="$CERTDIR/server/server_cert.pem"
-    cakey="$CERTDIR/ca/private/ca_key.pem"
     clientcert="$CERTDIR/client/client_cert.pem"
 
-    SRVR_CMD_TLS_ARGS="-cert $cacert -cakey $cakey"
-    CO_TLS_ARGS="-x $cacert -y $cakey"
-    CURL_TLS_ARGS="--cacert $cacert --key $cakey"
+    SRVR_WANTS_KEY=1
+    SRVR_CMD_TLS_ARGS="-cert $cacert"
+    CO_TLS_ARGS="-x $cacert"
+    CURL_TLS_ARGS="--cacert $cacert"
 
     # Enable mTLS?
     if [[ -z $SKIP_MTLS ]]; then
         SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
-        CO_MTLS_ARGS="-z $clientcert"
-        CURL_MTLS_ARGS="--cert $clientcert"
+        CO_MTLS_ARGS="-z $clientcert -y $CA_KEY"
+        CURL_MTLS_ARGS="--cert $clientcert --key $CA_KEY"
     fi
 fi
+if [[ -z $SKIP_TOKEN ]]; then
+    SRVR_WANTS_KEY=1
+    TOKEN=$(<"$CERTDIR/client/token")
+    CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
+    CO_TLS_ARGS="$CO_TLS_ARGS -t $CERTDIR/client/token"
+fi
+if [[ -n $SRVR_WANTS_KEY ]]; then
+    SRVR_CMD_TLS_ARGS="$SRVR_CMD_TLS_ARGS -cakey $CA_KEY"
+fi
 
+set -x
 # shellcheck disable=SC2086
 NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TLS_ARGS $SRVR_CMD_MTLS_ARGS &
 srvr_pid=$!
+set +x
 echo "Server pid is $srvr_pid, my pid is $$"
 
 trap cleanup SIGINT SIGQUIT SIGABRT SIGTERM
@@ -71,7 +84,7 @@ cnt=10
 while (( cnt > 0 )) ; do
     sleep 1
     # shellcheck disable=SC2086
-    if output=$(curl -H "$CURL_APIVER_HDR" $CURL_TLS_ARGS $CURL_MTLS_ARGS "$PROTO://$SRVR/hello"); then
+    if output=$(curl -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" $CURL_TLS_ARGS $CURL_MTLS_ARGS "$PROTO://$SRVR/hello"); then
         break
     fi
     (( cnt = cnt - 1 ))
@@ -84,6 +97,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    echo "line $LINENO output: $output"
     cleanup
 fi
 if [[ $output != "" ]]; then
@@ -94,6 +108,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
+    echo "line $LINENO output: $output"
     cleanup
 fi
 if [[ $output != "" ]]; then
@@ -104,6 +119,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! job1=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR"); then
+    echo "line $LINENO output: $job1"
     cleanup
 fi
 if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
@@ -114,6 +130,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    echo "line $LINENO output: $output"
     cleanup
 fi
 if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
@@ -124,6 +141,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c "$job1" "$SRVR"); then
+    echo "line $LINENO output: $output"
     cleanup
 fi
 if [[ $output != "" ]]; then
@@ -134,6 +152,7 @@ fi
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+    echo "line $LINENO output: $output"
     cleanup
 fi
 if [[ $output != "" ]]; then

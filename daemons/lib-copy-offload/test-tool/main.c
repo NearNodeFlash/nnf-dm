@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -51,9 +51,10 @@ void usage(const char **argv) {
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
     fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
+    fprintf(stderr, "    -t TOKEN_FILE       Bearer token file.\n");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
-    fprintf(stderr, "    -y KEY_FILE         CA/Server key file.\n");
-    fprintf(stderr, "    -z CLIENTCERT_FILE  Client certificate file. This enables mTLS.\n");
+    fprintf(stderr, "    -y KEY_FILE         CA/Server key file. Required for mTLS.\n");
+    fprintf(stderr, "    -z CLIENTCERT_FILE  Client certificate file. Required for mTLS.\n");
 
 
 }
@@ -79,11 +80,12 @@ int main(int argc, const char **argv) {
     char *dest_path = NULL;
     char *cacert_path = NULL; /* CA/server cert - a self-signed certficate */
     char *cakey_path = NULL;
+    char *token_path = NULL;
     char *clientcert_path = NULL;
     int skip_tls = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlsx:y:z:c:oC:W:S:D:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:y:z:c:oC:W:S:D:")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -116,6 +118,9 @@ int main(int argc, const char **argv) {
             case 'D':
                 dest_path = optarg;
                 break;
+            case 't':
+                token_path = optarg;
+                break;
             case 'x':
                 cacert_path = optarg;
                 break;
@@ -145,7 +150,11 @@ int main(int argc, const char **argv) {
     }
 
     offload = copy_offload_init();
-    copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path);
+    ret = copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path, token_path);
+    if (ret != 0) {
+        fprintf(stderr, "%s\n", offload->err_message);
+        exit(1);
+    }
     if (verbose_libcurl) {
         copy_offload_verbose(offload);
     }

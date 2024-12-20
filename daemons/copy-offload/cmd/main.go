@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -23,6 +23,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"flag"
 	"log/slog"
@@ -89,15 +91,19 @@ func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 
 func main() {
 	mock := false
-	skip_tls := false
+	skipTls := false
+	skipToken := false
 	var tlsConfig *tls.Config
-	using_mtls := false
+	usingMtls := false
+	var derStr string
+	var keyBlock *pem.Block
 
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
 	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
 	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
 	clientCertFile := flag.String("clientcert", "", "Client certificate PEM file. This enables mTLS.")
-	flag.BoolVar(&skip_tls, "skip-tls", skip_tls, "Skip setting up TLS/mTLS.")
+	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS/mTLS.")
+	flag.BoolVar(&skipToken, "skip-token", skipToken, "Skip the use of a bearer token.")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
 
@@ -111,7 +117,7 @@ func main() {
 	// Make one of these for this server, and use it in all requests.
 	drvr := &driver.Driver{Log: crLog, RabbitName: rabbitName, Mock: mock}
 
-	if !skip_tls {
+	if !skipTls {
 		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 		if err != nil {
 			slog.Error("Error loading certificate and key file", "error", err.Error())
@@ -128,7 +134,7 @@ func main() {
 			}
 			clientCertPool = x509.NewCertPool()
 			clientCertPool.AppendCertsFromPEM(clientCert)
-			using_mtls = true
+			usingMtls = true
 		}
 
 		tlsConfig = &tls.Config{
@@ -136,10 +142,27 @@ func main() {
 			PreferServerCipherSuites: true,
 			Certificates:             []tls.Certificate{serverTLSCert},
 		}
-		if using_mtls {
+		if usingMtls {
 			tlsConfig.ClientCAs = clientCertPool
 			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		}
+	}
+
+	if !skipToken {
+		// Read the key out of its PEM file and convert it to DER form. Then
+		// base64-encode it so we are using the same representation that was
+		// used when signing the token.
+		inKey, err := os.ReadFile(*keyFile)
+		if err != nil {
+			slog.Error("unable to read back the key file", "error", err.Error())
+			os.Exit(1)
+		}
+		keyBlock, _ = pem.Decode(inKey)
+		if keyBlock == nil {
+			slog.Error("unable to decode PEM key")
+			os.Exit(1)
+		}
+		derStr = base64.StdEncoding.EncodeToString(keyBlock.Bytes)
 	}
 
 	if !mock {
@@ -148,9 +171,16 @@ func main() {
 		drvr.Client = clnt
 	}
 
-	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "skip-tls", skip_tls, "mTLS", using_mtls)
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "mTLS", usingMtls, "token", !skipToken)
 
-	httpHandler := &userHttp.UserHttp{Log: crLog, Drvr: drvr, Mock: mock}
+	httpHandler := &userHttp.UserHttp{
+		Log:  crLog,
+		Drvr: drvr,
+		Mock: mock,
+	}
+	if !skipToken {
+		httpHandler.DerKey = derStr
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello", httpHandler.Hello)
@@ -165,7 +195,7 @@ func main() {
 	}
 
 	var err error
-	if !skip_tls {
+	if !skipTls {
 		err = srv.ListenAndServeTLS("", "")
 	} else {
 		err = srv.ListenAndServe()
