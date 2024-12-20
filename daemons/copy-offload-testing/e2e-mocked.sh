@@ -37,14 +37,14 @@ if [[ -z $SKIP_TLS ]]; then
     clientcert="$CERTDIR/client/client_cert.pem"
 
     SRVR_CMD_TLS_ARGS="-cert $cacert -cakey $cakey"
-    CO_TLS_ARGS="-x $cacert -y $cakey"
-    CURL_TLS_ARGS="--cacert $cacert --key $cakey"
+    CO_TLS_ARGS="-x $cacert"
+    CURL_TLS_ARGS="--cacert $cacert"
 
     # Enable mTLS?
     if [[ -z $SKIP_MTLS ]]; then
         SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
-        CO_MTLS_ARGS="-z $clientcert"
-        CURL_MTLS_ARGS="--cert $clientcert"
+        CO_MTLS_ARGS="-z $clientcert -y $cakey"
+        CURL_MTLS_ARGS="--cert $clientcert --key $cakey"
     fi
 fi
 
