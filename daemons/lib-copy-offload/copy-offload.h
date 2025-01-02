@@ -61,7 +61,7 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:
- *  copy_offload_list(), copy_offload_cancel(), copy_offload_docopy().
+ *  copy_offload_list(), copy_offload_cancel(), copy_offload_copy().
  */
 void copy_offload_reset(COPY_OFFLOAD *offload);
 

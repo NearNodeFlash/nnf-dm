@@ -67,12 +67,12 @@ func (user *UserHttp) validateMessage(w http.ResponseWriter, req *http.Request) 
 	if user.DerKey != "" {
 		authHeader := req.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "unauthorized XXX 1", http.StatusUnauthorized)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return ""
 		}
 		tokenString := strings.TrimSpace(strings.Replace(authHeader, "Bearer", "", 1))
 		if err := user.verifyToken(tokenString); err != nil {
-			http.Error(w, "DEAN: "+err.Error(), http.StatusUnauthorized)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return ""
 		}
 	}
