@@ -32,17 +32,22 @@ SRVR_HOST=${SRVR_HOST:=localhost}
 CLIENT_HOST="$3"
 CLIENT_HOST=${CLIENT_HOST:=localhost}
 
+if ! base64 -w0 < /dev/null 2> /dev/null; then
+    BASE64="base64"
+else
+    BASE64="base64 -w0"
+fi
+
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
-CA_HMAC_KEY=$CA_PDIR/ca_hmac_key.der
 
 echo "Generate a key using EC algorithm"
 mkdir -p "$CA_DIR" && chmod 700 "$CA_DIR"
 mkdir -p "$CA_PDIR" && chmod 700 "$CA_PDIR"
 
 openssl ecparam -name secp521r1 -genkey -noout -out "$CA_KEY"
-DER_KEY=$(openssl ec -in "$CA_KEY" -outform DER | base64)
+DER_KEY=$(openssl ec -in "$CA_KEY" -outform DER | $BASE64)
 
 SERVER_DIR="$CERTDIR"/server
 SERVER_CERT=$SERVER_DIR/server_cert.pem
@@ -72,8 +77,8 @@ echo "Generate a JWT for the bearer token"
 # certificate from a known certificate authority.
 IAT=$(date +%s)
 
-HEADER=$(echo -n '{"alg":"HS256","typ":"JWT"}' | base64 | sed s/\+/-/ | sed -E s/=+$//)
-PAYLOAD=$(echo -n '{"sub":"copy-offload-api", "iat":'"$IAT"'}' | base64 | sed s/\+/-/ | sed -E s/=+$//)
+HEADER=$(echo -n '{"alg":"HS256","typ":"JWT"}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
+PAYLOAD=$(echo -n '{"sub":"copy-offload-api", "iat":'"$IAT"'}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
 SIG=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -binary -hmac "$DER_KEY" | openssl enc -base64 -A | tr -d '=' | tr -- '+/' '-_')
 
 echo -n "$HEADER.$PAYLOAD.$SIG" > "$JWT"

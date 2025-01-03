@@ -188,21 +188,38 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
 
   copy_offload_production:
+    # Testing with nektos/act:
+    #   Comment the 'needs' line below so that nektos/act doesn't attempt to
+    #   execute the jobs in the 'needs' list.
+    #   $ make clean-bin
+    #   $ act --rm -j copy_offload_production --container-architecture linux/amd64 --pull=false --bind --action-offline-mode push
+    #   $ make clean-bin
+    #   Uncomment the 'needs' line below.
+    #
     needs: [production]
     runs-on: ubuntu-latest
 
     steps:
     - name: "Build context"
       run: |
+        echo "env.ACT is ${{ env.ACT }}"
         echo "ref is ${{ github.ref }}"
         echo "ref_type is ${{ github.ref_type }}"
+        echo "want go version: $(grep -E '^go ' go.mod)"
 
     - name: "Checkout repository"
+      if: ${{ !env.ACT }} # skip during local actions testing
       id: checkout_repo
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: setup go
+      if: ${{ env.ACT }} # use during local actions testing
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
 
     - name: "Lowercase repository name for docker build"
       id: lowercase-repository-name
@@ -219,6 +236,7 @@ jobs:
       shell: bash
 
     - name: "Verify auto-generated files"
+      if: ${{ !env.ACT }} # skip during local actions testing
       run: |
           make manifests generate
           git status
@@ -227,6 +245,7 @@ jobs:
           fi
 
     - name: "Docker metadata"
+      if: ${{ !env.ACT }} # skip during local actions testing
       id: meta
       uses: docker/metadata-action@v5
       with:
@@ -248,6 +267,7 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
 
     - name: "Docker login"
+      if: ${{ !env.ACT }} # skip during local actions testing
       id: docker_login
       uses: docker/login-action@v3
       with:
@@ -257,7 +277,7 @@ jobs:
 
     - name: "Build the test Docker image"
       id: docker_build_test_target
-      if: ${{ env.DO_TEST == 'true' }}
+      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
       uses: docker/build-push-action@v6
       with:
         push: false
@@ -266,14 +286,16 @@ jobs:
 
     - name: "Run the Docker image unit tests"
       id: docker_test
-      if: ${{ env.DO_TEST == 'true' }}
+      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
       run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
 
-    - name: "Build lib-copy-offload"
+    - name: "Install libcurl"
       run: |
-        sudo apt-get update
-        sudo apt-get install libcurl4-openssl-dev
-        make -C ./daemons/lib-copy-offload libcopyoffload.a
+        sudo apt-get update -y
+        sudo apt-get install -y libcurl4-openssl-dev
+ 
+    - name: "Build lib-copy-offload"
+      run: make -C ./daemons/lib-copy-offload libcopyoffload.a
 
     - name: "E2E mock test, without TLS or token"
       run: SKIP_TLS=1 SKIP_TOKEN=1 ./daemons/copy-offload-testing/e2e-mocked.sh
@@ -291,6 +313,7 @@ jobs:
       run: ./daemons/copy-offload-testing/e2e-mocked.sh
 
     - name: "Build the copy-offload Docker image"
+      if: ${{ !env.ACT }} # skip during local actions testing
       id: docker_build
       uses: docker/build-push-action@v6
       with:

@@ -289,7 +289,8 @@ $(LOCALBIN):
 clean-bin:
 	if [[ -d $(LOCALBIN) ]]; then \
 	  chmod -R u+w $(LOCALBIN) && rm -rf $(LOCALBIN); \
-	fi
+	fi; \
+	make -C daemons/lib-copy-offload clean
 
 ## Location to place rpms
 RPMBIN ?= $(shell pwd)/rpms

@@ -46,13 +46,10 @@ if [[ -z $SKIP_TLS ]]; then
     if [[ -z $SKIP_MTLS ]]; then
         SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
         CO_MTLS_ARGS="-z $clientcert -y $CA_KEY"
-
-        CURL_WANTS_KEY=1
-        CURL_MTLS_ARGS="--cert $clientcert"
+        CURL_MTLS_ARGS="--cert $clientcert --key $CA_KEY"
     fi
 fi
 if [[ -z $SKIP_TOKEN ]]; then
-    CURL_WANTS_KEY=1
     SRVR_WANTS_KEY=1
     TOKEN=$(<"$CERTDIR/client/token")
     CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
@@ -60,9 +57,6 @@ if [[ -z $SKIP_TOKEN ]]; then
 fi
 if [[ -n $SRVR_WANTS_KEY ]]; then
     SRVR_CMD_TLS_ARGS="$SRVR_CMD_TLS_ARGS -cakey $CA_KEY"
-fi
-if [[ -n $CURL_WANTS_KEY ]]; then
-    CURL_MTLS_ARGS="$CURL_MTLS_ARGS --key $CA_KEY"
 fi
 
 set -x
