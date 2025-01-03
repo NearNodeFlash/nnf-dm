@@ -216,7 +216,6 @@ jobs:
         ref: ${{ github.event.pull_request.head.sha }}
 
     - name: setup go
-      if: ${{ env.ACT }} # use during local actions testing
       uses: actions/setup-go@v5
       with:
         go-version-file: 'go.mod'
