@@ -67,7 +67,7 @@ static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
         buffer = NULL;
         ret = 1;
     } else if (cnt != stat_blk.st_size) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Incomplete read of %s. Wanted %lld, got %d\n", path, stat_blk.st_size, cnt);
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Incomplete read of %s. Wanted %lld, got %d\n", path, (long long)stat_blk.st_size, cnt);
         free(*buffer);
         buffer = NULL;
         ret = 1;
