@@ -81,7 +81,6 @@ cleanup() {
 
 echo "Waiting for daemon to start"
 cnt=10
-set -x
 while (( cnt > 0 )) ; do
     sleep 1
     # shellcheck disable=SC2086
@@ -95,7 +94,6 @@ if [[ $output != "hello back at ya" ]]; then
     kill "$srvr_pid"
     exit 1
 fi
-set +x
 
 # shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then

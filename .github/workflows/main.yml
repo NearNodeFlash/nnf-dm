@@ -194,7 +194,7 @@ jobs:
     #   $ make clean-bin
     #   $ act --rm -j copy_offload_production --container-architecture linux/amd64 --pull=false --bind --action-offline-mode push
     #   $ make clean-bin
-    #   Uncomment the 'needs' line below.
+    #   Restore the 'needs' line below.
     #
     needs: [production]
     runs-on: ubuntu-latest
