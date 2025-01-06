@@ -14,7 +14,7 @@ data:
   spec:
     containers:
       - name: copy-offload-srvr
-        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:0.0.0.288-9193-dirty
+        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:0.0.0.295-4b4d-dirty
         command:
           - /nnf-copy-offload
           - --cert
@@ -32,6 +32,9 @@ data:
           #- name: copy-offload-client
           #  mountPath: /etc/copy-offload-client
           #  readOnly: true
+          - name: tester
+            mountPath: /etc/tester
+            readOnly: true
     volumes:
       - name: copy-offload-server
         secret:
@@ -39,6 +42,9 @@ data:
       #- name: copy-offload-client
       #  secret:
       #    secretName: nnf-dm-copy-offload-client
+      - name: tester
+        secret:
+          secretName: tester
     serviceAccount: nnf-dm-copy-offload
     serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
