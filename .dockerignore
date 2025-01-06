@@ -14,6 +14,7 @@ daemons/compute/client-go/client-go
 daemons/lib-copy-offload/**/*.[ao]
 daemons/lib-copy-offload/**/tester
 daemons/copy-offload-testing/certs
+daemons/copy-offload/certs
 
 *.swp
 *.swo

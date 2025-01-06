@@ -30,5 +30,5 @@ TOKEN=$CERTDIR/client/token
 SERVER_SECRET=nnf-dm-copy-offload-server
 kubectl create secret tls $SERVER_SECRET --cert $SERVER_CERT --key $KEY
 
-TOKEN_SECRET=nnf-dm-copy-offload-token
-kubectl create secret generic $TOKEN_SECRET --from-file token="$TOKEN"
+TOKEN_SECRET=nnf-dm-copy-offload-client
+kubectl create secret generic $TOKEN_SECRET --from-file "tls.crt"="$SERVER_CERT" --from-file token="$TOKEN"
