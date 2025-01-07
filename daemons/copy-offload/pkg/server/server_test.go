@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -36,6 +36,18 @@ import (
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 )
+
+// A bearer token and the base64-encoded form of the DER key that was used to sign it.
+var bearerToken = []byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTY4NzA2OX0.h3WWp4JjQtPcmqv8TkiYBxUxuGA4XEZIeSCzd-7OtAI")
+var derKeyStr = "MHQCAQEEIM7qqNUyVyUUV9KHm+i3DIhOLWGme4jMeTb903kQcq+foAcGBSuBBAAKoUQDQgAEBIURA81sK1qqM7c3Gp5FSiSgxoHSCM4myX+A2jrGmcbY44BIgEGB756XkMJ5LF0l1i9i3qlOtOLotJYcXjqy7g=="
+
+// A different, but otherwise valid, bearer token and its DER key.
+var bearerTokenOther = []byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTgzNzc4NX0.WmXW-oS5AQPozF9beSJ7e92m-kQFs6tdeQQvAnDRGX8")
+var derKeyOther = "MHQCAQEEIMo1QDm9yBNsHUMM9dooGmRD7G2XIlH6q83yk57NEtQqoAcGBSuBBAAKoUQDQgAE1Ww2TNtNqxT9aA++RIs95meyZdxzcG4NTifwLqDuOSEF9uwwB9Wqkzo1CkMcXoPsBwGK1ZW+kEhukybwexQJ5g=="
+
+// A different bearer token and DER key using a different signing algorithm.
+var bearerTokenAlg2 = []byte("eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTgzODQ3MX0.y8u5ikScQG334ADOoSnG34-wLpFaXWPJtGA6jy2npIo")
+var derKeyAlg2 = "MHQCAQEEIM7a9SpGLOmjJ0fe7MBJDv9uTY4HAb/lmXxRmJv2MVbboAcGBSuBBAAKoUQDQgAEl5ypJc/4AUFYlXuNCn2uPg57YDgobXe8YQL/hAA/y/KCRqLzK9rgEcTKLyL2KRcbz5EUktMWhiSSlrikFfIQ1A=="
 
 func setupLog() logr.Logger {
 	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
@@ -465,6 +477,144 @@ func TestF_BadAPIVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestG_BearerToken(t *testing.T) {
+
+	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		want := "hello back at ya\n"
+		statusWant := http.StatusOK
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+}
+
+func TestH_BearerTokenNegatives(t *testing.T) {
+
+	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		request.Header.Set("Authorization", "Bearer "+string(bearerTokenOther))
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		statusWant := http.StatusUnauthorized
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if !strings.Contains(got, "signature is invalid") {
+			t.Errorf("got %s, wanted message about invalid signature", got)
+		}
+	})
+
+	t.Run("fails when key is invalid", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr + "="}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		statusWant := http.StatusUnauthorized
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if !strings.Contains(got, "signature is invalid") {
+			t.Errorf("got %s, wanted message about key being of invalid type", got)
+		}
+	})
+
+	t.Run("fails when key doesn't match", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyOther}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		statusWant := http.StatusUnauthorized
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if !strings.Contains(got, "signature is invalid") {
+			t.Errorf("got %s, wanted message about key being of invalid type", got)
+		}
+	})
+
+	t.Run("fails when bearer token is expected but is not specified", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		statusWant := http.StatusUnauthorized
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if !strings.Contains(got, "unauthorized") {
+			t.Errorf("got %s, wanted unauthorized", got)
+		}
+	})
+
+	t.Run("fails when bearer token is signed with a different algorithm", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		request.Header.Set("Authorization", "Bearer "+string(bearerTokenAlg2))
+		response := httptest.NewRecorder()
+
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyAlg2}
+
+		httpHandler.Hello(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		statusWant := http.StatusUnauthorized
+
+		if res.StatusCode != statusWant {
+			t.Errorf("got status %d, want status %d", res.StatusCode, statusWant)
+		}
+		if !strings.Contains(got, "unexpected signing method") {
+			t.Errorf("got %s, wanted a message about an unexpected signing method", got)
+		}
+	})
 }
 
 // Just touch ginkgo, so it's here to interpret any ginkgo args from

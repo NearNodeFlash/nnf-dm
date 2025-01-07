@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -33,6 +33,7 @@ struct copy_offload_s {
     char *cacert;
     char *key;
     char *clientcert;
+    char *token_path;
     char proto[6];
 
     /* The post-processed error message. If there was an error from libcurl, then
@@ -51,14 +52,16 @@ COPY_OFFLOAD *copy_offload_init();
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
- * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
+ * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
+ * Returns 0 on success.
+ * On failure, returns 1 and places the error message in @offload->err_message. 
  */
-void copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert);
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path);
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:
- *  copy_offload_list(), copy_offload_cancel(), copy_offload_docopy().
+ *  copy_offload_list(), copy_offload_cancel(), copy_offload_copy().
  */
 void copy_offload_reset(COPY_OFFLOAD *offload);
 
