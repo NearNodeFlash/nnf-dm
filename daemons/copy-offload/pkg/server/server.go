@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -22,6 +22,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -31,6 +32,7 @@ import (
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	nnfv1alpha4 "github.com/NearNodeFlash/nnf-sos/api/v1alpha4"
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type UserHttp struct {
@@ -38,9 +40,43 @@ type UserHttp struct {
 	Drvr   *driver.Driver
 	InTest bool
 	Mock   bool
+	DerKey string
 }
 
-func validateVersion(w http.ResponseWriter, req *http.Request) string {
+// The signing algorithm that we expect was used when signing the JWT.
+const jwtSigningAlgorithm = "HS256"
+
+func (user *UserHttp) verifyToken(tokenString string) error {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != jwtSigningAlgorithm {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(user.DerKey), nil
+	})
+	if err != nil {
+		return err
+	}
+	if !token.Valid {
+		return fmt.Errorf("invalid token")
+	}
+	return nil
+}
+
+func (user *UserHttp) validateMessage(w http.ResponseWriter, req *http.Request) string {
+	// Validate the bearer token, if the server is using one.
+	if user.DerKey != "" {
+		authHeader := req.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return ""
+		}
+		tokenString := strings.TrimSpace(strings.Replace(authHeader, "Bearer", "", 1))
+		if err := user.verifyToken(tokenString); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return ""
+		}
+	}
+
 	// See COPY_OFFLOAD_API_VERSION in copy-offload.h.
 	// This applies to the format of the request sent by the client as well
 	// as the format of our response.
@@ -59,7 +95,7 @@ func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	if apiVersion = validateVersion(w, req); apiVersion == "" {
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
 		return
 	}
 
@@ -73,7 +109,7 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	if apiVersion = validateVersion(w, req); apiVersion == "" {
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
 		return
 	}
 
@@ -94,7 +130,7 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	if apiVersion = validateVersion(w, req); apiVersion == "" {
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
 		return
 	}
 	user.Log.Info("In DELETE", "version", apiVersion, "url", req.URL)
@@ -119,7 +155,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	if apiVersion = validateVersion(w, req); apiVersion == "" {
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
 		return
 	}
 	user.Log.Info("In TrialRequest", "version", apiVersion, "url", req.URL)
