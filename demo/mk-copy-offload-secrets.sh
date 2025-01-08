@@ -20,8 +20,11 @@
 set -e
 set -o pipefail
 
+SRVR_HOST="$1"
+SRVR_HOST=${SRVR_HOST:=localhost}
+
 CERTDIR=daemons/copy-offload/certs
-./daemons/copy-offload/tools/gen_certs.sh $CERTDIR
+./daemons/copy-offload/tools/gen_certs.sh "$CERTDIR" "$SRVR_HOST"
 
 KEY=$CERTDIR/ca/private/ca_key.pem
 SERVER_CERT=$CERTDIR/server/server_cert.pem

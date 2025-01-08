@@ -37,7 +37,6 @@ SERVERS_PATCH="demo/allocation-servers$SUFFIX.yaml"
 
 set -x
 
-#bin/kustomize build config/copy-offload | kubectl apply -f-
 kubectl apply -f demo/demo-datamovementprofile.yaml
 
 kubectl apply -f "$demo"
