@@ -42,10 +42,25 @@ CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
 
-echo "Generate a key using EC algorithm"
+RABBIT_SAN_CONF="$CERTDIR/rabbit-san.conf"
+
 mkdir -p "$CA_DIR" && chmod 700 "$CA_DIR"
 mkdir -p "$CA_PDIR" && chmod 700 "$CA_PDIR"
 
+if [[ -z $SKIP_SAN ]]; then
+    ./tools/mk-rabbit-san.sh "$CERTDIR" "$RABBIT_SAN_CONF" || exit 1
+else
+    if ! echo "[v3_req]
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = $SRVR_HOST
+" > "$RABBIT_SAN_CONF"; then
+        echo "Unable to write the SAN conf file"
+        exit 1
+    fi
+fi
+
+echo "Generate a key using EC algorithm"
 openssl ecparam -name secp521r1 -genkey -noout -out "$CA_KEY"
 DER_KEY=$(openssl ec -in "$CA_KEY" -outform DER | $BASE64)
 
@@ -55,8 +70,8 @@ SERVER_CSR=$SERVER_DIR/server_cert.csr
 
 echo "Generate a self-signed server certificate signing request and certificate"
 mkdir -p "$SERVER_DIR" && chmod 700 "$SERVER_DIR"
-openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST"
-openssl x509 -req -days 1 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT"
+openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST" -config "$RABBIT_SAN_CONF" -extensions 'v3_req'
+openssl x509 -req -days 1 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
 
 CLIENT_DIR="$CERTDIR"/client
 CLIENT_CERT=$CLIENT_DIR/client_cert.pem
