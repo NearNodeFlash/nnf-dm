@@ -27,7 +27,7 @@ SRVR="localhost:4000"
 PROTO="http"
 
 CERTDIR=daemons/copy-offload-testing/certs
-./daemons/copy-offload-testing/gen_certs.sh $CERTDIR || exit 1
+./daemons/copy-offload/tools/gen_certs.sh $CERTDIR || exit 1
 
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"
@@ -35,7 +35,6 @@ CA_KEY="$CERTDIR/ca/private/ca_key.pem"
 if [[ -z $SKIP_TLS ]]; then
     PROTO="https"
     cacert="$CERTDIR/server/server_cert.pem"
-    clientcert="$CERTDIR/client/client_cert.pem"
 
     SRVR_WANTS_KEY=1
     SRVR_CMD_TLS_ARGS="-cert $cacert"
@@ -44,6 +43,7 @@ if [[ -z $SKIP_TLS ]]; then
 
     # Enable mTLS?
     if [[ -z $SKIP_MTLS ]]; then
+        clientcert="$CERTDIR/client/client_cert.pem"
         SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
         CO_MTLS_ARGS="-z $clientcert -y $CA_KEY"
         CURL_MTLS_ARGS="--cert $clientcert --key $CA_KEY"

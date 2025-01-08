@@ -21,7 +21,7 @@ set -e
 set -o pipefail
 
 CERTDIR=daemons/copy-offload/certs
-./daemons/copy-offload-testing/gen_certs.sh $CERTDIR
+./daemons/copy-offload/tools/gen_certs.sh $CERTDIR
 
 KEY=$CERTDIR/ca/private/ca_key.pem
 SERVER_CERT=$CERTDIR/server/server_cert.pem
