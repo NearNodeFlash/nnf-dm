@@ -37,8 +37,6 @@ SERVERS_PATCH="demo/allocation-servers$SUFFIX.yaml"
 
 set -x
 
-kubectl apply -f demo/demo-datamovementprofile.yaml
-
 kubectl apply -f "$demo"
 wfname=$(yq -M 'select(.kind=="Workflow")|.metadata.name' "$demo")
 
