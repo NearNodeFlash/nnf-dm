@@ -35,7 +35,7 @@ daemons/compute/server/server
 daemons/lib-copy-offload/**/*.[ao]
 daemons/lib-copy-offload/**/tester
 daemons/copy-offload-testing/certs
-daemons/copy-offload/certs
+certs/
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 

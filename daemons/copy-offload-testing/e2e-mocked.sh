@@ -27,7 +27,7 @@ SRVR="localhost:4000"
 PROTO="http"
 
 CERTDIR=daemons/copy-offload-testing/certs
-SKIP_SAN=1 ./daemons/copy-offload/tools/gen_certs.sh $CERTDIR || exit 1
+SKIP_SAN=1 ./tools/gen_certs.sh $CERTDIR || exit 1
 
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"

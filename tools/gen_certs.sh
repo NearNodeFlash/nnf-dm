@@ -48,7 +48,7 @@ mkdir -p "$CA_DIR" && chmod 700 "$CA_DIR"
 mkdir -p "$CA_PDIR" && chmod 700 "$CA_PDIR"
 
 if [[ -z $SKIP_SAN ]]; then
-    ./daemons/copy-offload/tools/mk-rabbit-san.sh "$CERTDIR" "$RABBIT_SAN_CONF" || exit 1
+    ./tools/mk-rabbit-san.sh "$CERTDIR" "$RABBIT_SAN_CONF" || exit 1
 else
     if ! echo "[v3_req]
 subjectAltName = @alt_names
