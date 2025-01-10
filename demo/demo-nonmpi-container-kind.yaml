@@ -14,31 +14,23 @@ data:
   spec:
     containers:
       - name: copy-offload-srvr
-        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:0.0.0.284-88236-dirty
+        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:0.0.0.312-7c7f18
         command:
           - /nnf-copy-offload
           - --cert
           - /etc/copy-offload-server/tls.crt
           - --cakey
           - /etc/copy-offload-server/tls.key
-          - --clientcert
-          - /etc/copy-offload-client/tls.crt
           - --addr
           - :$(NNF_CONTAINER_PORTS)
         volumeMounts:
           - name: copy-offload-server
             mountPath: /etc/copy-offload-server
             readOnly: true
-          - name: copy-offload-client
-            mountPath: /etc/copy-offload-client
-            readOnly: true
     volumes:
       - name: copy-offload-server
         secret:
           secretName: nnf-dm-copy-offload-server
-      - name: copy-offload-client
-        secret:
-          secretName: nnf-dm-copy-offload-client
     serviceAccount: nnf-dm-copy-offload
     serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
