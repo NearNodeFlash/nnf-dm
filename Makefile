@@ -1,4 +1,4 @@
-# Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -270,6 +270,7 @@ edit-image: .version
 
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
+	./tools/mk-copy-offload-secrets.sh
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	./deploy.sh undeploy $(KUSTOMIZE) config/$(OVERLAY)
