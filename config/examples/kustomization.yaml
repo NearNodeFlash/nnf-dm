@@ -1,8 +1,8 @@
 namespace: nnf-system
 
 resources:
-- copy-offload-container-profiles.yaml
-- copy-offload-datamovement-profiles.yaml
+- copyoffload-containerprofiles.yaml
+- copyoffload-datamovementprofiles.yaml
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
