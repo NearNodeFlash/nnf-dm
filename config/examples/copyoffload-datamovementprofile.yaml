@@ -13,5 +13,5 @@ data:
   storeStdout: true
 kind: NnfDataMovementProfile
 metadata:
-  name: copy-offload-nonmpi-template
+  name: copy-offload-template
   namespace: nnf-system
