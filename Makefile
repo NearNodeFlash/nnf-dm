@@ -74,6 +74,9 @@ ENVTEST_K8S_VERSION = 1.29.0
 #   make deploy OVERLAY=dp0
 OVERLAY ?= kind
 
+# Tell Kustomize to deploy the default examples config, or an overlay
+OVERLAY_EXAMPLES ?= examples
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -267,6 +270,7 @@ minikube-push: .version
 edit-image: VERSION ?= $(shell cat .version)
 edit-image: .version
 	$(KUSTOMIZE_IMAGE_TAG) config/begin $(OVERLAY) $(IMAGE_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
+	$(KUSTOMIZE_IMAGE_TAG) config/begin-examples $(OVERLAY_EXAMPLES) $(IMAGE_COPY_OFFLOAD_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
 
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
