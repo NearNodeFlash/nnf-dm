@@ -1,1 +1,0 @@
-{"computeName": "rabbit-compute-3", "workflowName": "copy-offload-nonmpi", "sourcePath": "/mnt/nnf/70e5b467-8412-413a-a778-6a495f1172e2-0", "destinationPath": "/tmp/dean", "dmProfile": "copy-offload-nonmpi", "dryrun": true, "dcpOptions": "", "logStdout": true, "storeStdout": false}

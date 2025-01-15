@@ -50,7 +50,7 @@ static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
         return 1;
     }
     if ((*buffer = malloc(stat_blk.st_size + 1)) == NULL) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to allocation a buffer for the bearer token\n");
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to allocate a buffer for the bearer token\n");
         return 1;
     }
     fp = fopen(path, "r");
