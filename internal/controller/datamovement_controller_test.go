@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1054,6 +1055,130 @@ var _ = Describe("Data Movement Test", func() {
 				Entry("root-dir", "$DW_JOB_workflow", "/lus/global/user/", "/lus/global/user", "/lus/global/user", "/lus/global/user/"),
 				Entry("root/-dir", "$DW_JOB_workflow/", "/lus/global/user/", "/lus/global/user", "/lus/global/user/rabbit-node-2-10", "/lus/global/user/rabbit-node-2-10/"),
 			)
+		})
+
+		Context("TrimDcpProgressFromOutput", func() {
+			It("should trim the output when progress is present", func() {
+				output := `
+Walking /mnt/nnf/7faea3df-0179-47ef-a95c-0d6eb89ac804-0/0/scr/martymcf/scr.defjobid/scr.dataset.10/rank_7.ckpt
+Walked 1 items in 0.001 secs (1769.958 items/sec) ...
+Walked 1 items in 0.001 seconds (1496.641 items/sec)
+Copying to /p/lustre2/martymcf/scr/ckpt.10/rank_7.ckpt
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10.000 GiB per file)
+Creating 1 files.
+Copying data.
+Copied 988.000 MiB (10%) in 1.061 secs (931.328 MiB/s) 10 secs left ...
+Copied 2.770 GiB (28%) in 2.095 secs (1.322 GiB/s) 5 secs left ...
+Copied 4.574 GiB (46%) in 3.095 secs (1.478 GiB/s) 4 secs left ...
+Copied 6.336 GiB (63%) in 4.090 secs (1.549 GiB/s) 2 secs left ...
+Copied 8.078 GiB (81%) in 5.128 secs (1.575 GiB/s) 1 secs left ...
+Copied 10.000 GiB (100%) in 8.164 secs (1.225 GiB/s) done
+Copy data: 10.000 GiB (10737418254 bytes)
+Copy rate: 1.225 GiB/s (10737418254 bytes in 8.164 seconds)
+Syncing data to disk.
+Sync completed in 0.002 seconds.
+Fixing permissions.
+Updated 1 items in 0.002 seconds (547.733 items/sec)
+Syncing directory updates to disk.
+Sync completed in 0.001 seconds.
+Started: Aug-07-2023,16:41:05
+Completed: Aug-07-2023,16:41:13
+Seconds: 8.171
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10737418254 bytes)
+Rate: 1.224 GiB/s (10737418254 bytes in 8.171 seconds)
+`
+				trimmedOutput := TrimDcpProgressFromOutput(output)
+
+				// verify there are only 2 progress lines (first and last)
+				reProgress := regexp.MustCompile(`Copied.+\(([[:digit:]]{1,3})%\)`)
+				progressMatches := reProgress.FindAllString(trimmedOutput, -1)
+				Expect(progressMatches).To(HaveLen(2))
+
+				// verify <snipped> appears in output
+				reSnipped := regexp.MustCompile(`<snipped dcp progress output>`)
+				snippedMatches := reSnipped.FindAllString(trimmedOutput, -1)
+				Expect(snippedMatches).To(HaveLen(1))
+			})
+
+			It("should not trim the output when no progress is present", func() {
+				output := `
+Walking /mnt/nnf/7faea3df-0179-47ef-a95c-0d6eb89ac804-0/0/scr/martymcf/scr.defjobid/scr.dataset.10/rank_7.ckpt
+Walked 1 items in 0.001 secs (1769.958 items/sec) ...
+Walked 1 items in 0.001 seconds (1496.641 items/sec)
+Copying to /p/lustre2/martymcf/scr/ckpt.10/rank_7.ckpt
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10.000 GiB per file)
+Creating 1 files.
+Copying data.
+Copy data: 10.000 GiB (10737418254 bytes)
+Copy rate: 1.225 GiB/s (10737418254 bytes in 8.164 seconds)
+Syncing data to disk.
+Sync completed in 0.002 seconds.
+Fixing permissions.
+Updated 1 items in 0.002 seconds (547.733 items/sec)
+Syncing directory updates to disk.
+Sync completed in 0.001 seconds.
+Started: Aug-07-2023,16:41:05
+Completed: Aug-07-2023,16:41:13
+Seconds: 8.171
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10737418254 bytes)
+Rate: 1.224 GiB/s (10737418254 bytes in 8.171 seconds)
+`
+				trimmedOutput := TrimDcpProgressFromOutput(output)
+				Expect(trimmedOutput).To(Equal(output))
+			})
+
+			It("should not trim the output when only 2 progress lines are present", func() {
+				output := `
+Walking /mnt/nnf/7faea3df-0179-47ef-a95c-0d6eb89ac804-0/0/scr/martymcf/scr.defjobid/scr.dataset.10/rank_7.ckpt
+Walked 1 items in 0.001 secs (1769.958 items/sec) ...
+Walked 1 items in 0.001 seconds (1496.641 items/sec)
+Copying to /p/lustre2/martymcf/scr/ckpt.10/rank_7.ckpt
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10.000 GiB per file)
+Creating 1 files.
+Copying data.
+Copied 988.000 MiB (10%) in 1.061 secs (931.328 MiB/s) 10 secs left ...
+Copied 10.000 GiB (100%) in 8.164 secs (1.225 GiB/s) done
+Copy data: 10.000 GiB (10737418254 bytes)
+Copy rate: 1.225 GiB/s (10737418254 bytes in 8.164 seconds)
+Syncing data to disk.
+Sync completed in 0.002 seconds.
+Fixing permissions.
+Updated 1 items in 0.002 seconds (547.733 items/sec)
+Syncing directory updates to disk.
+Sync completed in 0.001 seconds.
+Started: Aug-07-2023,16:41:05
+Completed: Aug-07-2023,16:41:13
+Seconds: 8.171
+Items: 1
+  Directories: 0
+  Files: 1
+  Links: 0
+Data: 10.000 GiB (10737418254 bytes)
+Rate: 1.224 GiB/s (10737418254 bytes in 8.171 seconds)
+`
+				trimmedOutput := TrimDcpProgressFromOutput(output)
+				Expect(trimmedOutput).To(Equal(output))
+			})
 		})
 	})
 })
