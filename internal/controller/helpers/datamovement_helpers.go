@@ -118,6 +118,55 @@ func ParseDcpProgress(line string, cmdStatus *nnfv1alpha4.NnfDataMovementCommand
 	return nil
 }
 
+// Walk through the output of the dcp command and remove all of the progress lines except for the
+// first and last occurrences. Insert a snippet <snipped dcp progress output> to indicate that the
+// output has been trimmed.
+func TrimDcpProgressFromOutput(output string) string {
+	threshold := 2
+	progressFound := false
+	firstProgressLine, lastProgressLine := -1, -1
+	var result []string
+
+	lines := strings.Split(output, "\n")
+
+	// find all of the progress lines and keep track of the first and last
+	for i, line := range lines {
+		if progressRe.MatchString(line) {
+			if !progressFound {
+				firstProgressLine = i
+				progressFound = true
+			}
+			lastProgressLine = i
+		}
+	}
+
+	// nothing to do if there are 0-threshold progress lines
+	if !progressFound || firstProgressLine == -1 || lastProgressLine == -1 || lastProgressLine-firstProgressLine <= threshold-1 {
+		return output
+	}
+
+	insertedSnip := false
+	for i, line := range lines {
+		// keep the first and last progress lines
+		if i == firstProgressLine || i == lastProgressLine {
+			result = append(result, line)
+			// remove all other progress lines
+		} else if i > firstProgressLine && i < lastProgressLine {
+			if !insertedSnip { // only insert the snip once
+				result = append(result, "...")
+				result = append(result, "<snipped dcp progress output>")
+				result = append(result, "...")
+				insertedSnip = true
+			}
+			// keep all other lines
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return strings.Join(result, "\n")
+}
+
 // Go through the list of dcp stat regexes, parse them, and put them in their appropriate place in cmdStatus
 func ParseDcpStats(line string, cmdStatus *nnfv1alpha4.NnfDataMovementCommandStatus) error {
 	for _, s := range dcpStatsRegexes {
