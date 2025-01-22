@@ -1,1 +1,0 @@
-{"computeName": "compute-01", "workflowName": "copy-offload-nonmpi", "sourcePath": "/mnt/nnf/9b59f6c2-ea0a-4e70-8922-66677182b6b3-0", "destinationPath": "/lus/foo", "dmProfile": "copy-offload-nonmpi", "dryrun": false, "dcpOptions": "", "logStdout": true, "storeStdout": false}
