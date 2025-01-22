@@ -274,6 +274,7 @@ edit-image: .version
 
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
+	./deploy.sh deploy $(KUSTOMIZE) config/begin-examples
 	./tools/mk-copy-offload-secrets.sh
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
