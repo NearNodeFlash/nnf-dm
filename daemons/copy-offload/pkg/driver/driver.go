@@ -444,30 +444,33 @@ func runit(ctxCancel context.Context, contextDelete func(), cmd *exec.Cmd, cmdSt
 		//dm.Status.State = nnfv1alpha4.DataMovementConditionTypeFinished
 		//dm.Status.Status = nnfv1alpha4.DataMovementConditionReasonSuccess
 
+		// Grab the output and trim it to remove the progress bloat
+		output := helpers.TrimDcpProgressFromOutput(combinedOutBuf.String())
+
 		// On cancellation or failure, log the output. On failure, also store the output in the
 		// Status.Message. When successful, check the profile/UserConfig config options to log
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
-			log.Info("Data movement operation cancelled", "output", combinedOutBuf.String())
+			log.Info("Data movement operation cancelled", "output", output)
 			//dm.Status.Status = nnfv1alpha4.DataMovementConditionReasonCancelled
 		} else if err != nil {
-			log.Error(err, "Data movement operation failed", "output", combinedOutBuf.String())
+			log.Error(err, "Data movement operation failed", "output", output)
 			//dm.Status.Status = nnfv1alpha4.DataMovementConditionReasonFailed
-			//dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), combinedOutBuf.String())
-			//resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", combinedOutBuf.String()).WithFatal()
+			//dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
+			//resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			//dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
 			// Profile or DM request has enabled stdout logging
 			//if profile.Data.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
-			//	log.Info("Data movement operation output", "output", combinedOutBuf.String())
+			//	log.Info("Data movement operation output", "output", output)
 			//}
-			log.Info("Data movement operation output", "output", combinedOutBuf.String())
+			log.Info("Data movement operation output", "output", output)
 
 			//// Profile or DM request has enabled storing stdout
 			//if profile.Data.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
-			//	dm.Status.Message = combinedOutBuf.String()
+			//	dm.Status.Message = output
 			//}
 		}
 
