@@ -74,6 +74,7 @@ require (
 
 require (
 	github.com/DataWorkflowServices/dws v0.0.1-0.20241029172011-d5898d0b8640
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	go.openly.dev/pointy v1.3.0
 )
 

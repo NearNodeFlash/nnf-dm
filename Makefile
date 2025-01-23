@@ -1,4 +1,4 @@
-# Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -73,6 +73,9 @@ ENVTEST_K8S_VERSION = 1.29.0
 #   export KUBECONFIG=/my/dp0/kubeconfig.file
 #   make deploy OVERLAY=dp0
 OVERLAY ?= kind
+
+# Tell Kustomize to deploy the default examples config, or an overlay
+OVERLAY_EXAMPLES ?= examples
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -181,6 +184,12 @@ build-copy-offload-with: $(LOCALBIN)
 build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
 
+CROSS_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-cross
+build-copy-offload-tester-cross: $(CROSSBIN)
+build-copy-offload-tester-cross: ## Build standalone tester binary for $CROSS_PLATFORM
+	${CONTAINER_TOOL} build --platform=$(CROSS_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.xplatform .
+
 .PHONY: build-copy-offload-docker-local
 build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
 build-copy-offload-docker-local: build-copy-offload-docker-with
@@ -261,9 +270,12 @@ minikube-push: .version
 edit-image: VERSION ?= $(shell cat .version)
 edit-image: .version
 	$(KUSTOMIZE_IMAGE_TAG) config/begin $(OVERLAY) $(IMAGE_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
+	$(KUSTOMIZE_IMAGE_TAG) config/begin-examples $(OVERLAY_EXAMPLES) $(IMAGE_COPY_OFFLOAD_TAG_BASE) $(VERSION) $(NNFMFU_TAG_BASE) $(NNFMFU_VERSION)
 
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
+	./deploy.sh deploy $(KUSTOMIZE) config/begin-examples
+	./tools/mk-copy-offload-secrets.sh
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	./deploy.sh undeploy $(KUSTOMIZE) config/$(OVERLAY)
@@ -283,7 +295,8 @@ $(LOCALBIN):
 clean-bin:
 	if [[ -d $(LOCALBIN) ]]; then \
 	  chmod -R u+w $(LOCALBIN) && rm -rf $(LOCALBIN); \
-	fi
+	fi; \
+	make -C daemons/lib-copy-offload clean
 
 ## Location to place rpms
 RPMBIN ?= $(shell pwd)/rpms
@@ -294,6 +307,17 @@ $(RPMBIN):
 clean-rpmbin:
 	if [[ -d $(RPMBIN) ]]; then \
 	  rm -rf $(RPMBIN); \
+	fi
+
+## Location to place cross-compiled tools
+CROSSBIN ?= $(shell pwd)/crossbin
+$(CROSSBIN):
+	mkdir $(CROSSBIN)
+
+.PHONY: clean-crossbin
+clean-crossbin:
+	if [[ -d $(CROSSBIN) ]]; then \
+	  rm -rf $(CROSSBIN); \
 	fi
 
 ## Tool Binaries
