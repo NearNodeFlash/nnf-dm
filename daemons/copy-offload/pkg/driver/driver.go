@@ -102,12 +102,12 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 
 	wf := types.NamespacedName{Name: dmreq.WorkflowName, Namespace: dmreq.WorkflowNamespace}
 	if err := drvr.Client.Get(ctx, wf, workflow); err != nil {
-		crLog.Error(err, "Unable to get workflow")
+		crLog.Info("Unable to get workflow: %v", err)
 		return nil, err
 	}
 	if workflow.Status.State != dwsv1alpha2.StatePreRun || workflow.Status.Status != "Completed" {
 		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha2.StatePreRun)
-		crLog.Error(err, "Invalid state")
+		crLog.Info("Workflow is in an nvalid state: %v", err)
 		return nil, err
 	}
 

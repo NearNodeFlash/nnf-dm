@@ -1,13 +1,13 @@
 apiVersion: dataworkflowservices.github.io/v1alpha2
 kind: Workflow
 metadata:
-  name: copy-offload-nonmpi
+  name: copy-offload-yellow
   namespace: default
 spec:
   desiredState: "Proposal"
   dwDirectives:
     - "#DW jobdw name=copyoff-gfs2 type=gfs2 capacity=50GB"
-    - "#DW container name=copyoff-container profile=copy-offload-nonmpi \
+    - "#DW container name=copyoff-container profile=copy-offload-default \
       DW_JOB_my_storage=copyoff-gfs2 DW_GLOBAL_lus=/lus/foo/copyoff"
   wlmID: "Bubbly WLM"
   jobID: "fDeansJob3"
