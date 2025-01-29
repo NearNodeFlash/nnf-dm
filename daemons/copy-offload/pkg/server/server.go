@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
-	nnfv1alpha4 "github.com/NearNodeFlash/nnf-sos/api/v1alpha4"
+	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
 	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -171,7 +171,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var dm *nnfv1alpha4.NnfDataMovement
+	var dm *nnfv1alpha5.NnfDataMovement
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {
