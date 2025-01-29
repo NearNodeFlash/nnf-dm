@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20241209183639-2d8fdbd63dec
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20241211170601-b6a1ac55c9e4
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250129201741-d53005cfce87
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
@@ -22,7 +22,7 @@ require (
 )
 
 require (
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20241205165035-51a536434b0d // indirect
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250113163425-2fd0825bc67c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

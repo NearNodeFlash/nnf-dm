@@ -1,4 +1,4 @@
-apiVersion: nnf.cray.hpe.com/v1alpha4
+apiVersion: nnf.cray.hpe.com/v1alpha5
 data:
   command: ulimit -n 2048 && mpirun --hostfile $HOSTFILE dcp --progress 1 $SRC $DEST
   createDestDir: true
