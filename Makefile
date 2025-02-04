@@ -129,12 +129,15 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 FAILFAST ?= no
+TESTDIRS ?= internal daemons/copy-offload/pkg/server
 test: manifests generate fmt vet envtest ## Run tests.
 	if [[ "${FAILFAST}" == yes ]]; then \
 		failfast="-ginkgo.fail-fast"; \
 	fi; \
 	set -o errexit; \
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./... -coverprofile cover.out -ginkgo.v $$failfast
+	for subdir in ${TESTDIRS}; do \
+		KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./$$subdir/... -coverprofile cover-$$(basename $$subdir.out) -ginkgo.v $$failfast; \
+	done
 
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image

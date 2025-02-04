@@ -21,13 +21,21 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt/v5"
 	. "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -38,16 +46,92 @@ import (
 )
 
 // A bearer token and the base64-encoded form of the DER key that was used to sign it.
-var bearerToken = []byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTY4NzA2OX0.h3WWp4JjQtPcmqv8TkiYBxUxuGA4XEZIeSCzd-7OtAI")
-var derKeyStr = "MHQCAQEEIM7qqNUyVyUUV9KHm+i3DIhOLWGme4jMeTb903kQcq+foAcGBSuBBAAKoUQDQgAEBIURA81sK1qqM7c3Gp5FSiSgxoHSCM4myX+A2jrGmcbY44BIgEGB756XkMJ5LF0l1i9i3qlOtOLotJYcXjqy7g=="
+var bearerToken1 = ""
+var derKey1 = ""
 
 // A different, but otherwise valid, bearer token and its DER key.
-var bearerTokenOther = []byte("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTgzNzc4NX0.WmXW-oS5AQPozF9beSJ7e92m-kQFs6tdeQQvAnDRGX8")
-var derKeyOther = "MHQCAQEEIMo1QDm9yBNsHUMM9dooGmRD7G2XIlH6q83yk57NEtQqoAcGBSuBBAAKoUQDQgAE1Ww2TNtNqxT9aA++RIs95meyZdxzcG4NTifwLqDuOSEF9uwwB9Wqkzo1CkMcXoPsBwGK1ZW+kEhukybwexQJ5g=="
+var bearerToken2 = ""
+var derKey2 = ""
 
 // A different bearer token and DER key using a different signing algorithm.
-var bearerTokenAlg2 = []byte("eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3B5LW9mZmxvYWQtYXBpIiwgImlhdCI6MTczNTgzODQ3MX0.y8u5ikScQG334ADOoSnG34-wLpFaXWPJtGA6jy2npIo")
-var derKeyAlg2 = "MHQCAQEEIM7a9SpGLOmjJ0fe7MBJDv9uTY4HAb/lmXxRmJv2MVbboAcGBSuBBAAKoUQDQgAEl5ypJc/4AUFYlXuNCn2uPg57YDgobXe8YQL/hAA/y/KCRqLzK9rgEcTKLyL2KRcbz5EUktMWhiSSlrikFfIQ1A=="
+var bearerTokenAlg2 = ""
+var derKeyAlg2 = ""
+
+// Fill in the tokens/keys prior to running the tests.
+func TestMain(m *testing.M) {
+	err := createTokensAndKeys()
+	if err != nil {
+		fmt.Printf("%s\n", err.Error())
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
+func createTokensAndKeys() error {
+	var err error
+
+	createTokenAndKey := func(signingMethod *jwt.SigningMethodHMAC, verifiesOK bool) (string, string, error) {
+		createToken := func(key []byte, method jwt.SigningMethod) (string, error) {
+			token := jwt.NewWithClaims(method,
+				jwt.MapClaims{
+					"sub": "copy-offload-api",
+					"iat": time.Now().Unix(),
+				})
+
+			tokenString, err := token.SignedString(key)
+			if err != nil {
+				return "", fmt.Errorf("Failure from SignedString: %w", err)
+			}
+			return tokenString, nil
+		}
+
+		createKey := func() ([]byte, error) {
+			privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+			if err != nil {
+				return []byte{}, fmt.Errorf("Failure from GenerateKey: %w", err)
+			}
+			privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+			if err != nil {
+				return []byte{}, fmt.Errorf("Failure from MarshalPKCS8PrivateKey: %w", err)
+			}
+			return privBytes, nil
+		}
+
+		privKey, err := createKey()
+		if err != nil {
+			return "", "", err
+		}
+		tokenString, err := createToken(privKey, signingMethod)
+		if err != nil {
+			return "", "", err
+		}
+		if verifiesOK {
+			httpHandler := &UserHttp{DerKey: string(privKey)}
+			if err := httpHandler.verifyToken(tokenString); err != nil {
+				return "", "", fmt.Errorf("Failure in real verifyToken: %w", err)
+			}
+		}
+		return tokenString, string(privKey), nil
+	}
+
+	// First valid key/token.
+	bearerToken1, derKey1, err = createTokenAndKey(jwt.SigningMethodHS256, true)
+	if err != nil {
+		return fmt.Errorf("Failure creating token/key #1: %w", err)
+	}
+	// Second valid key/token, signed the same way.
+	bearerToken2, derKey2, err = createTokenAndKey(jwt.SigningMethodHS256, true)
+	if err != nil {
+		return fmt.Errorf("Failure creating token/key #2: %w", err)
+	}
+	// Use a different signing method for this key/token. Though still valid,
+	// the token is not signed the way the server expects.
+	bearerTokenAlg2, derKeyAlg2, err = createTokenAndKey(jwt.SigningMethodHS512, false)
+	if err != nil {
+		return fmt.Errorf("Failure creating token/key #3: %w", err)
+	}
+	return nil
+}
 
 func setupLog() logr.Logger {
 	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
@@ -484,10 +568,10 @@ func TestG_BearerToken(t *testing.T) {
 	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
-		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -510,10 +594,10 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
-		request.Header.Set("Authorization", "Bearer "+string(bearerTokenOther))
+		request.Header.Set("Authorization", "Bearer "+bearerToken2)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -532,10 +616,10 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 	t.Run("fails when key is invalid", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
-		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr + "="}
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1 + "="}
 
 		httpHandler.Hello(response, request)
 
@@ -554,10 +638,10 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 	t.Run("fails when key doesn't match", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
-		request.Header.Set("Authorization", "Bearer "+string(bearerToken))
+		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyOther}
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey2}
 
 		httpHandler.Hello(response, request)
 
@@ -578,7 +662,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyStr}
+		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
 
 		httpHandler.Hello(response, request)
 
