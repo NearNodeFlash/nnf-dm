@@ -30,7 +30,7 @@ func createKey() ([]byte, error) {
 }
 
 func createToken(key []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512,
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"service": "copy-offload-api",
 			"uid":     uuid.New().String(),
@@ -46,7 +46,7 @@ func createToken(key []byte) (string, error) {
 
 func verifyToken(tokenString string, key []byte) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if token.Method.Alg() != "HS512" {
+		if token.Method.Alg() != "HS256" {
 			return nil, errors.New("unexpected signing method")
 		}
 		return key, nil
@@ -106,7 +106,7 @@ func main() {
 		os.Exit(1)
 	}
 	keyBlock, _ := pem.Decode(inKey)
-	fmt.Printf("keybytes: %s\n", string(keyBlock.Bytes))
+	//fmt.Printf("keybytes: %s\n", string(keyBlock.Bytes))
 	if !bytes.Equal(privKey, keyBlock.Bytes) {
 		fmt.Printf("key block does not match private key\n")
 		os.Exit(1)
