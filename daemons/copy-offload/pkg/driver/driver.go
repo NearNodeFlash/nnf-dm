@@ -107,7 +107,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	}
 	if workflow.Status.State != dwsv1alpha2.StatePreRun || workflow.Status.Status != "Completed" {
 		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha2.StatePreRun)
-		crLog.Info("Workflow is in an nvalid state: %v", err)
+		crLog.Info("Workflow is in an invalid state: %v", err)
 		return nil, err
 	}
 
