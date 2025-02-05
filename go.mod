@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250205180945-2d1cc3da204e
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250205162314-eed33f89e1fa
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250205182542-4881472d2c44
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
