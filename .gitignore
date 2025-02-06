@@ -10,7 +10,9 @@ testbin/*
 nnf-dm
 .version
 config/begin/*
+config/begin-examples/*
 rpms/
+crossbin/
 
 # Test binary, build with `go test -c`
 *.test
@@ -31,6 +33,10 @@ daemons/compute/lib-cpp/cmake
 daemons/compute/lib-cpp/example/cmake
 daemons/compute/server/nnf-dm
 daemons/compute/server/server
+daemons/lib-copy-offload/**/*.[ao]
+daemons/lib-copy-offload/**/tester
+daemons/copy-offload-testing/certs
+certs/
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 
