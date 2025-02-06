@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -22,6 +22,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,8 +30,9 @@ import (
 	"strings"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
-	nnfv1alpha4 "github.com/NearNodeFlash/nnf-sos/api/v1alpha4"
+	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type UserHttp struct {
@@ -38,17 +40,76 @@ type UserHttp struct {
 	Drvr   *driver.Driver
 	InTest bool
 	Mock   bool
+	DerKey string
+}
+
+// The signing algorithm that we expect was used when signing the JWT.
+const jwtSigningAlgorithm = "HS256"
+
+func (user *UserHttp) verifyToken(tokenString string) error {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != jwtSigningAlgorithm {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(user.DerKey), nil
+	})
+	if err != nil {
+		return err
+	}
+	if !token.Valid {
+		return fmt.Errorf("invalid token")
+	}
+	return nil
+}
+
+func (user *UserHttp) validateMessage(w http.ResponseWriter, req *http.Request) string {
+	// Validate the bearer token, if the server is using one.
+	if user.DerKey != "" {
+		authHeader := req.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return ""
+		}
+		tokenString := strings.TrimSpace(strings.Replace(authHeader, "Bearer", "", 1))
+		if err := user.verifyToken(tokenString); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return ""
+		}
+	}
+
+	// See COPY_OFFLOAD_API_VERSION in copy-offload.h.
+	// This applies to the format of the request sent by the client as well
+	// as the format of our response.
+	apiVersion := req.Header.Get("Accepts-version")
+	if apiVersion != "1.0" {
+		// The RFC says Not Accceptable should return a list of valid versions.
+		http.Error(w, "Valid versions: 1.0", http.StatusNotAcceptable)
+		return ""
+	}
+	return apiVersion
 }
 
 func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
+	var apiVersion string
+	if req.Method != "GET" {
+		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+
 	user.Log.Info("Hello")
 	fmt.Fprintf(w, "hello back at ya\n")
 }
 
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "GET" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
 		return
 	}
 
@@ -64,12 +125,15 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 }
 
 func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "DELETE" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	user.Log.Info("In DELETE", "url", req.URL)
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+	user.Log.Info("In DELETE", "version", apiVersion, "url", req.URL)
 	urlParts, err := url.Parse(req.URL.String())
 	if err != nil {
 		http.Error(w, "unable to parse URL", http.StatusBadRequest)
@@ -86,12 +150,15 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
-
+	var apiVersion string
 	if req.Method != "POST" {
 		http.Error(w, "method not supported", http.StatusNotImplemented)
 		return
 	}
-	user.Log.Info("In TrialRequest", "url", req.URL)
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+	user.Log.Info("In TrialRequest", "version", apiVersion, "url", req.URL)
 
 	var dmreq driver.DMRequest
 	if err := json.NewDecoder(req.Body).Decode(&dmreq); err != nil {
@@ -104,7 +171,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var dm *nnfv1alpha4.NnfDataMovement
+	var dm *nnfv1alpha5.NnfDataMovement
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {

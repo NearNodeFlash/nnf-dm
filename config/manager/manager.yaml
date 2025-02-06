@@ -44,10 +44,24 @@ spec:
               port: 8081
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+            - name: tzdata
+              mountPath: /usr/share/zoneinfo
+              readOnly: true
+      volumes:
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+        - name: tzdata
+          hostPath:
+            path: /usr/share/zoneinfo
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
 ---
-apiVersion: nnf.cray.hpe.com/v1alpha4
+apiVersion: nnf.cray.hpe.com/v1alpha5
 kind: NnfDataMovementManager
 metadata:
   name: manager-controller-manager
@@ -86,6 +100,12 @@ spec:
             - name:  worker-config
               mountPath: /etc/ssh/sshd_config
               subPath: sshd_config
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+            - name: tzdata
+              mountPath: /usr/share/zoneinfo
+              readOnly: true
         - name: manager
           command:
             - /manager
@@ -98,7 +118,20 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+            - name: tzdata
+              mountPath: /usr/share/zoneinfo
+              readOnly: true
       volumes:
         - name: worker-config
           configMap:
             name: nnf-dm-worker-config
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+        - name: tzdata
+          hostPath:
+            path: /usr/share/zoneinfo
