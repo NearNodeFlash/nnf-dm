@@ -5,6 +5,11 @@ metadata:
   namespace: default
 spec:
   desiredState: "Proposal"
+
+# The container profile is specified here.
+# The datamovement profile is specified in the copy-offload request from
+# the client. This is the 'dmProfile' argument.
+
   dwDirectives:
     - "#DW jobdw name=copyoff-gfs2 type=gfs2 capacity=50GB"
     - "#DW container name=copyoff-container profile=copy-offload-default \
