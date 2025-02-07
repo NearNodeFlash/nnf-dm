@@ -101,6 +101,7 @@ func main() {
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
 	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
 	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
+	tokenKeyFile := flag.String("tokenkey", "token_key.pem", "File with PEM key used to sign the token.")
 	clientCertFile := flag.String("clientcert", "", "Client certificate PEM file. This enables mTLS.")
 	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS/mTLS.")
 	flag.BoolVar(&skipToken, "skip-token", skipToken, "Skip the use of a bearer token.")
@@ -149,10 +150,10 @@ func main() {
 	}
 
 	if !skipToken {
-		// Read the key out of its PEM file and convert it to DER form. Then
-		// base64-encode it so we are using the same representation that was
-		// used when signing the token.
-		inKey, err := os.ReadFile(*keyFile)
+		// Read the token's key out of its PEM file and convert it to DER form.
+		// Then base64-encode it so we are using the same representation that
+		// was used when signing the token.
+		inKey, err := os.ReadFile(*tokenKeyFile)
 		if err != nil {
 			slog.Error("unable to read back the key file", "error", err.Error())
 			os.Exit(1)
