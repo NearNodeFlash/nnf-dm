@@ -54,6 +54,9 @@ if [[ -z $SKIP_TOKEN ]]; then
     TOKEN=$(<"$CERTDIR/client/token")
     CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
     CO_TLS_ARGS="$CO_TLS_ARGS -t $CERTDIR/client/token"
+
+    token_key_file="$CERTDIR/ca/private/token_key.pem"
+    SRVR_CMD_TOKEN_ARGS="-tokenkey $token_key_file"
 fi
 if [[ -n $SRVR_WANTS_KEY ]]; then
     SRVR_CMD_TLS_ARGS="$SRVR_CMD_TLS_ARGS -cakey $CA_KEY"
@@ -61,7 +64,7 @@ fi
 
 set -x
 # shellcheck disable=SC2086
-NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TLS_ARGS $SRVR_CMD_MTLS_ARGS &
+NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS $SRVR_CMD_MTLS_ARGS &
 srvr_pid=$!
 set +x
 echo "Server pid is $srvr_pid, my pid is $$"

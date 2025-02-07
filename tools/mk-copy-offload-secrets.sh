@@ -23,9 +23,11 @@ set -o pipefail
 SRVR_HOST="$1"
 SRVR_HOST=${SRVR_HOST:=localhost}
 
-SERVER_SECRET=nnf-dm-copy-offload-server
-TOKEN_SECRET=nnf-dm-copy-offload-client
-if kubectl get secret $TOKEN_SECRET $SERVER_SECRET 2> /dev/null; then
+SERVER_SECRET_TLS=nnf-dm-copy-offload-server-tls
+SERVER_SECRET_TOKEN=nnf-dm-copy-offload-server-token
+CLIENT_SECRET_TLS=nnf-dm-copy-offload-client-tls
+CLIENT_SECRET_TOKEN=nnf-dm-copy-offload-client-token
+if kubectl get secret "$SERVER_SECRET_TLS" "$SERVER_SECRET_TOKEN" "$CLIENT_SECRET_TLS" "$CLIENT_SECRET_TOKEN" 2> /dev/null; then
     echo "The copy-offload secrets already exist in the cluster."
     exit 0
 fi
@@ -35,8 +37,14 @@ CERTDIR=certs
 
 KEY=$CERTDIR/ca/private/ca_key.pem
 SERVER_CERT=$CERTDIR/server/server_cert.pem
+
+TOKEN_KEY=$CERTDIR/ca/private/token_key.pem
 TOKEN=$CERTDIR/client/token
 
-kubectl create secret tls $SERVER_SECRET --cert $SERVER_CERT --key $KEY
+kubectl create secret tls $SERVER_SECRET_TLS --cert $SERVER_CERT --key $KEY
+# Use an opaque secret for the client's TLS cert because we don't want to
+# give the key to the client.
+kubectl create secret generic $CLIENT_SECRET_TLS --from-file "tls.crt=$SERVER_CERT"
 
-kubectl create secret generic $TOKEN_SECRET --from-file "tls.crt"="$SERVER_CERT" --from-file token="$TOKEN"
+kubectl create secret generic $CLIENT_SECRET_TOKEN --from-file "token=$TOKEN"
+kubectl create secret generic $SERVER_SECRET_TOKEN --from-file "token.key=$TOKEN_KEY"
