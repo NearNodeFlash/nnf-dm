@@ -41,6 +41,7 @@ fi
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
+TOKEN_KEY=$CA_PDIR/token_key.pem
 
 RABBIT_SAN_CONF="$CERTDIR/rabbit-san.conf"
 
@@ -60,9 +61,10 @@ DNS.1 = $SRVR_HOST
     fi
 fi
 
-echo "Generate a key using EC algorithm"
+echo "Generate keys using EC algorithm"
 openssl ecparam -name secp521r1 -genkey -noout -out "$CA_KEY"
-DER_KEY=$(openssl ec -in "$CA_KEY" -outform DER | $BASE64)
+openssl ecparam -name secp521r1 -genkey -noout -out "$TOKEN_KEY"
+DER_KEY=$(openssl ec -in "$TOKEN_KEY" -outform DER | $BASE64)
 
 SERVER_DIR="$CERTDIR"/server
 SERVER_CERT=$SERVER_DIR/server_cert.pem
