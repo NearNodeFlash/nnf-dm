@@ -36,7 +36,7 @@ data:
       - name: copy-offload-tls
         secret:
           secretName: nnf-dm-copy-offload-server-tls
-      - name: copy-offload-token-token
+      - name: copy-offload-token
         secret:
           secretName: nnf-dm-copy-offload-server-token
     serviceAccount: nnf-dm-copy-offload

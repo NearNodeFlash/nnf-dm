@@ -1,9 +1,45 @@
 #!/bin/bash
 
 
-# This is kind-worker3 sub'ing as a compute, sending a hello to kind-worker2:
+
+# Talking to the copy-offload server while it's running in a pod in KIND.
 #
-# root@kind-worker3:/# curl 172.18.0.2:8080/hello
+# Begin by storing the client's token and TLS cert in your Mac's /tmp/nnf dir
+# so it can be found from inside a kind-worker container:
+#
+# $ kubectl get secrets nnf-dm-copy-offload-client-token -o yaml  | yq -rM .'data.token' | base64 -d > /tmp/nnf/token
+# $ kubectl get secrets nnf-dm-copy-offload-client-tls -o yaml | yq -rM '.data."tls.crt"' | base64 -d > /tmp/nnf/tls.crt
+#
+# Get the copy-offload server's pod IP and port:
+#
+# $ kubectl get pods -o wide
+#    (find the copy-offload pod and its IP)
+#
+# Get the port:
+#
+# $ kubectl logs <podname> | grep Ready
+#    (it's in the INFO Ready message, on the "addr" parameter)
+#
+# Then go to a kind-worker container and load the token into an env var and
+# the copy-offload's IP and port:
+#
+# $ docker exec -it kind-worker3 bash
+# root@kind-worker3:/# TOKEN=$(</mnt/nnf/token)
+# root@kind-worker3:/# IP=10.244.3.14
+# root@kind-worker3:/# PORT=5000
+#
+# Now you're ready to use curl to send a "hello" message to the server.
+#
+# From your Mac, tail the server's log:
+#
+# $ kubectl logs -f <podname>
+#
+# From the kind-worker container, send the hello:
+#
+# root@kind-worker3:/# curl -k -H 'Accepts-version: 1.0' -H "Authorization: Bearer $TOKEN" --cacert /mnt/nnf/tls.crt  https://$IP:$PORT/hello
+#
+
+
 
 
 # This is kind-worker3 sub'ing as a compute, sending a copy-offload request
