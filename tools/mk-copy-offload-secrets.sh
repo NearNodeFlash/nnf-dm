@@ -23,9 +23,10 @@ set -o pipefail
 SRVR_HOST="$1"
 SRVR_HOST=${SRVR_HOST:=localhost}
 
-SERVER_SECRET=nnf-dm-copy-offload-server
-TOKEN_SECRET=nnf-dm-copy-offload-client
-if kubectl get secret $TOKEN_SECRET $SERVER_SECRET 2> /dev/null; then
+SERVER_TLS_SECRET=nnf-dm-copy-offload-server-tls
+SERVER_TOKEN_SECRET=nnf-dm-copy-offload-server-token
+CLIENT_SECRET=nnf-dm-copy-offload-client
+if kubectl get secret "$SERVER_TLS_SECRET" "$SERVER_TOKEN_SECRET" "$CLIENT_SECRET" 2> /dev/null; then
     echo "The copy-offload secrets already exist in the cluster."
     exit 0
 fi
@@ -35,8 +36,11 @@ CERTDIR=certs
 
 KEY=$CERTDIR/ca/private/ca_key.pem
 SERVER_CERT=$CERTDIR/server/server_cert.pem
+
+TOKEN_KEY=$CERTDIR/ca/private/token_key.pem
 TOKEN=$CERTDIR/client/token
 
-kubectl create secret tls $SERVER_SECRET --cert $SERVER_CERT --key $KEY
+kubectl create secret tls $SERVER_TLS_SECRET --cert $SERVER_CERT --key $KEY
 
-kubectl create secret generic $TOKEN_SECRET --from-file "tls.crt"="$SERVER_CERT" --from-file token="$TOKEN"
+kubectl create secret generic $CLIENT_SECRET --from-file "tls.crt"="$SERVER_CERT" --from-file token="$TOKEN"
+kubectl create secret generic $SERVER_TOKEN_SECRET --from-file "token.key"="$TOKEN_KEY"
