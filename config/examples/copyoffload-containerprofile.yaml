@@ -18,19 +18,27 @@ data:
         command:
           - /nnf-copy-offload
           - --cert
-          - /etc/copy-offload-server/tls.crt
+          - /etc/copy-offload-tls/tls.crt
           - --cakey
-          - /etc/copy-offload-server/tls.key
+          - /etc/copy-offload-tls/tls.key
+          - --tokenkey
+          - /etc/copy-offload-token/token.key
           - --addr
           - :$(NNF_CONTAINER_PORTS)
         volumeMounts:
-          - name: copy-offload-server
-            mountPath: /etc/copy-offload-server
+          - name: copy-offload-tls
+            mountPath: /etc/copy-offload-tls
+            readOnly: true
+          - name: copy-offload-token
+            mountPath: /etc/copy-offload-token
             readOnly: true
     volumes:
-      - name: copy-offload-server
+      - name: copy-offload-tls
         secret:
-          secretName: nnf-dm-copy-offload-server
+          secretName: nnf-dm-copy-offload-server-tls
+      - name: copy-offload-token
+        secret:
+          secretName: nnf-dm-copy-offload-server-token
     serviceAccount: nnf-dm-copy-offload
     serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
