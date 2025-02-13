@@ -1,6 +1,6 @@
 module github.com/NearNodeFlash/nnf-dm
 
-go 1.21
+go 1.22
 
 require (
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250205180945-2d1cc3da204e
