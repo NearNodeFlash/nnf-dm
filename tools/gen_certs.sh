@@ -32,16 +32,9 @@ SRVR_HOST=${SRVR_HOST:=localhost}
 CLIENT_HOST="$3"
 CLIENT_HOST=${CLIENT_HOST:=localhost}
 
-if ! base64 -w0 < /dev/null 2> /dev/null; then
-    BASE64="base64"
-else
-    BASE64="base64 -w0"
-fi
-
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
-TOKEN_KEY=$CA_PDIR/token_key.pem
 
 RABBIT_SAN_CONF="$CERTDIR/rabbit-san.conf"
 
@@ -63,8 +56,6 @@ fi
 
 echo "Generate keys using EC algorithm"
 openssl ecparam -name secp521r1 -genkey -noout -out "$CA_KEY"
-openssl ecparam -name secp521r1 -genkey -noout -out "$TOKEN_KEY"
-DER_KEY=$(openssl ec -in "$TOKEN_KEY" -outform DER | $BASE64)
 
 SERVER_DIR="$CERTDIR"/server
 SERVER_CERT=$SERVER_DIR/server_cert.pem
@@ -83,21 +74,5 @@ echo "Generate a client certificate signing request and certificate"
 mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
 openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
 openssl x509 -req -days 1 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
-
-JWT="$CLIENT_DIR"/token
-
-echo "Generate a JWT for the bearer token"
-# In a JWT-style token, only the signature is encrypted. Note that a public
-# validation service, such as jwt.io, will be able to verify everything except
-# the signature. This is because we are signing with the key we made above for
-# our self-signed certificate, rather than with a key that goes with a
-# certificate from a known certificate authority.
-IAT=$(date +%s)
-
-HEADER=$(echo -n '{"alg":"HS256","typ":"JWT"}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
-PAYLOAD=$(echo -n '{"sub":"copy-offload-api", "iat":'"$IAT"'}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
-SIG=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -binary -hmac "$DER_KEY" | openssl enc -base64 -A | tr -d '=' | tr -- '+/' '-_')
-
-echo -n "$HEADER.$PAYLOAD.$SIG" > "$JWT"
 
 exit 0

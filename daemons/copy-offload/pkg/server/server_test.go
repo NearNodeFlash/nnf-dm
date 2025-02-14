@@ -45,17 +45,17 @@ import (
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 )
 
-// A bearer token and the base64-encoded form of the DER key that was used to sign it.
+// A bearer token and the DER form of the key that was used to sign it.
 var bearerToken1 = ""
-var derKey1 = ""
+var derKey1 = []byte("")
 
 // A different, but otherwise valid, bearer token and its DER key.
 var bearerToken2 = ""
-var derKey2 = ""
+var derKey2 = []byte("")
 
 // A different bearer token and DER key using a different signing algorithm.
 var bearerTokenAlg2 = ""
-var derKeyAlg2 = ""
+var derKeyAlg2 = []byte("")
 
 // Fill in the tokens/keys prior to running the tests.
 func TestMain(m *testing.M) {
@@ -70,11 +70,11 @@ func TestMain(m *testing.M) {
 func createTokensAndKeys() error {
 	var err error
 
-	createTokenAndKey := func(signingMethod *jwt.SigningMethodHMAC, verifiesOK bool) (string, string, error) {
+	createTokenAndKey := func(signingMethod *jwt.SigningMethodHMAC, verifiesOK bool) (string, []byte, error) {
 		createToken := func(key []byte, method jwt.SigningMethod) (string, error) {
 			token := jwt.NewWithClaims(method,
 				jwt.MapClaims{
-					"sub": "copy-offload-api",
+					"sub": "user-container",
 					"iat": time.Now().Unix(),
 				})
 
@@ -99,19 +99,19 @@ func createTokensAndKeys() error {
 
 		privKey, err := createKey()
 		if err != nil {
-			return "", "", err
+			return "", []byte(""), err
 		}
 		tokenString, err := createToken(privKey, signingMethod)
 		if err != nil {
-			return "", "", err
+			return "", []byte(""), err
 		}
 		if verifiesOK {
-			httpHandler := &UserHttp{DerKey: string(privKey)}
+			httpHandler := &UserHttp{KeyBytes: privKey}
 			if err := httpHandler.verifyToken(tokenString); err != nil {
-				return "", "", fmt.Errorf("Failure in real verifyToken: %w", err)
+				return "", []byte(""), fmt.Errorf("Failure in real verifyToken: %w", err)
 			}
 		}
-		return tokenString, string(privKey), nil
+		return tokenString, privKey, nil
 	}
 
 	// First valid key/token.
@@ -571,7 +571,7 @@ func TestG_BearerToken(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -597,7 +597,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken2)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -619,7 +619,9 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1 + "="}
+		invalidKey := derKey1
+		invalidKey = append(invalidKey, byte('='))
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: invalidKey}
 
 		httpHandler.Hello(response, request)
 
@@ -641,7 +643,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey2}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey2}
 
 		httpHandler.Hello(response, request)
 
@@ -662,7 +664,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -684,7 +686,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+string(bearerTokenAlg2))
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyAlg2}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKeyAlg2}
 
 		httpHandler.Hello(response, request)
 

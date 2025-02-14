@@ -26,6 +26,9 @@
 
 #define COPY_OFFLOAD_MSG_SIZE CURL_ERROR_SIZE * 2
 
+// The name of the environment variable that will contain the workflow's token.
+#define WORKFLOW_TOKEN_ENV "DW_WORKFLOW_TOKEN"
+
 struct copy_offload_s {
     CURL *curl;
     int skip_tls;
@@ -54,6 +57,9 @@ COPY_OFFLOAD *copy_offload_init();
  * for the handle.
  * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
+ * The token is normally taken from the DW_WORKFLOW_TOKEN environment variable,
+ * if it exists. If @token_path is supplied then it overrides the DW_WORKFLOW_TOKEN
+ * variable. If neither is found then no token is used.
  * Returns 0 on success.
  * On failure, returns 1 and places the error message in @offload->err_message. 
  */

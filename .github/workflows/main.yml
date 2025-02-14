@@ -288,11 +288,14 @@ jobs:
       if: ${{ env.DO_TEST == 'true' && !env.ACT }}
       run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
 
-    - name: "Install libcurl"
+    - name: "Install libcurl and shellcheck"
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y libcurl4-openssl-dev
+        sudo apt-get install -y libcurl4-openssl-dev shellcheck
  
+    - name: "Do shellcheck"
+      run: shellcheck tools/*.sh daemons/copy-offload-testing/e2e-mocked.sh
+
     - name: "Build lib-copy-offload"
       run: make -C ./daemons/lib-copy-offload libcopyoffload.a
 
