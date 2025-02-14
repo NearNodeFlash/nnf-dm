@@ -53,11 +53,11 @@ func verifyToken(tokenString string, key []byte) error {
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("token parse failed: %w", err)
 	}
 
 	if !token.Valid {
-		return fmt.Errorf("invalid token")
+		return errors.New("invalid token")
 	}
 
 	return nil
@@ -94,7 +94,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	tokFname := "copy-offload-token.txt"
+	tokFname := "copy-offload-token"
 	if err := os.WriteFile(tokFname, []byte(tokenString), 0600); err != nil {
 		fmt.Printf("unable to write file %s: %s\n", tokFname, err.Error())
 		os.Exit(1)

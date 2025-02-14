@@ -33,13 +33,13 @@ func verifyToken(tokenString string, key []byte) error {
 func main() {
 
 	fmt.Println("t1")
-	inKey, err := os.ReadFile("certs/ca/private/ca_key.pem")
+	inKey, err := os.ReadFile("/tmp/key.pem")
 	if err != nil {
 		fmt.Printf("unable to read back the key file: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	inToken, err := os.ReadFile("certs/client/token")
+	inToken, err := os.ReadFile("/tmp/token")
 	if err != nil {
 		fmt.Printf("unable to read back the token file: %s\n", err.Error())
 		os.Exit(1)
@@ -62,11 +62,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = verifyToken(tokenString, []byte(derStr))
+	fail := false
+	err = verifyToken(tokenString, keyBlock.Bytes)
 	if err != nil {
-		fmt.Printf("verify failed: %s\n", err.Error())
-		os.Exit(1)
+		fmt.Printf("verify failed with keyBlock.Bytes: %s\n", err.Error())
+		fail = true
 	}
 
+	// This should never work--the base64-encoded bytes cannot just be cast
+	// to []byte.
+	err = verifyToken(tokenString, []byte(derStr))
+	if err == nil {
+		fmt.Println("FAIL: []byte(derStr) should not have succeeded.")
+		fail = true
+	}
+
+	if fail {
+		os.Exit(1)
+	}
 	fmt.Printf("good\n")
 }
