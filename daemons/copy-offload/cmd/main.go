@@ -23,7 +23,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -95,7 +94,6 @@ func main() {
 	skipToken := false
 	var tlsConfig *tls.Config
 	usingMtls := false
-	var derStr string
 	var keyBlock *pem.Block
 
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
@@ -150,9 +148,7 @@ func main() {
 	}
 
 	if !skipToken {
-		// Read the token's key out of its PEM file and convert it to DER form.
-		// Then base64-encode it so we are using the same representation that
-		// was used when signing the token.
+		// Read the token's key out of its PEM file and decode it to DER form.
 		inKey, err := os.ReadFile(*tokenKeyFile)
 		if err != nil {
 			slog.Error("unable to read back the key file", "error", err.Error())
@@ -160,10 +156,9 @@ func main() {
 		}
 		keyBlock, _ = pem.Decode(inKey)
 		if keyBlock == nil {
-			slog.Error("unable to decode PEM key")
+			slog.Error("unable to decode PEM key for token")
 			os.Exit(1)
 		}
-		derStr = base64.StdEncoding.EncodeToString(keyBlock.Bytes)
 	}
 
 	if !mock {
@@ -180,7 +175,7 @@ func main() {
 		Mock: mock,
 	}
 	if !skipToken {
-		httpHandler.DerKey = derStr
+		httpHandler.KeyBytes = keyBlock.Bytes
 	}
 
 	mux := http.NewServeMux()

@@ -36,11 +36,11 @@ import (
 )
 
 type UserHttp struct {
-	Log    logr.Logger
-	Drvr   *driver.Driver
-	InTest bool
-	Mock   bool
-	DerKey string
+	Log      logr.Logger
+	Drvr     *driver.Driver
+	InTest   bool
+	Mock     bool
+	KeyBytes []byte
 }
 
 // The signing algorithm that we expect was used when signing the JWT.
@@ -51,10 +51,10 @@ func (user *UserHttp) verifyToken(tokenString string) error {
 		if token.Method.Alg() != jwtSigningAlgorithm {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(user.DerKey), nil
+		return user.KeyBytes, nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("token parse failed: %w", err)
 	}
 	if !token.Valid {
 		return fmt.Errorf("invalid token")
@@ -64,7 +64,7 @@ func (user *UserHttp) verifyToken(tokenString string) error {
 
 func (user *UserHttp) validateMessage(w http.ResponseWriter, req *http.Request) string {
 	// Validate the bearer token, if the server is using one.
-	if user.DerKey != "" {
+	if len(user.KeyBytes) > 0 {
 		authHeader := req.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)

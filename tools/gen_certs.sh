@@ -63,8 +63,6 @@ fi
 
 echo "Generate keys using EC algorithm"
 openssl ecparam -name secp521r1 -genkey -noout -out "$CA_KEY"
-openssl ecparam -name secp521r1 -genkey -noout -out "$TOKEN_KEY"
-DER_KEY=$(openssl ec -in "$TOKEN_KEY" -outform DER | $BASE64)
 
 SERVER_DIR="$CERTDIR"/server
 SERVER_CERT=$SERVER_DIR/server_cert.pem
@@ -84,20 +82,10 @@ mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
 openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
 openssl x509 -req -days 1 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
 
-JWT="$CLIENT_DIR"/token
 
 echo "Generate a JWT for the bearer token"
-# In a JWT-style token, only the signature is encrypted. Note that a public
-# validation service, such as jwt.io, will be able to verify everything except
-# the signature. This is because we are signing with the key we made above for
-# our self-signed certificate, rather than with a key that goes with a
-# certificate from a known certificate authority.
-IAT=$(date +%s)
+JWT="$CLIENT_DIR"/token
+go run ./tools/make-jwt/make-jwt.go -tokenkey "$TOKEN_KEY" -token "$JWT"
 
-HEADER=$(echo -n '{"alg":"HS256","typ":"JWT"}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
-PAYLOAD=$(echo -n '{"sub":"copy-offload-api", "iat":'"$IAT"'}' | $BASE64 | sed s/\+/-/ | sed -E s/=+$//)
-SIG=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -binary -hmac "$DER_KEY" | openssl enc -base64 -A | tr -d '=' | tr -- '+/' '-_')
-
-echo -n "$HEADER.$PAYLOAD.$SIG" > "$JWT"
 
 exit 0
