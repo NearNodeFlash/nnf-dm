@@ -44,11 +44,11 @@ type UserHttp struct {
 }
 
 // The signing algorithm that we expect was used when signing the JWT.
-const jwtSigningAlgorithm = "HS256"
+var jwtSigningAlgorithm = jwt.SigningMethodHS256
 
 func (user *UserHttp) verifyToken(tokenString string) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if token.Method.Alg() != jwtSigningAlgorithm {
+		if token.Method.Alg() != jwtSigningAlgorithm.Name {
 			return nil, errors.New("unexpected signing method")
 		}
 		return user.KeyBytes, nil
