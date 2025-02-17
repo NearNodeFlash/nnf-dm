@@ -7,8 +7,6 @@
 # Begin by storing the client's token and TLS cert in your Mac's /tmp/nnf dir
 # so it can be found from inside a kind-worker container:
 #
-# #CLIENT_TOKEN_SECRET=nnf-dm-copy-offload-client-token
-# #CLIENT_TLS_SECRET=nnf-dm-copy-offload-client-tls
 # CLIENT_TOKEN_SECRET=nnf-dm-usercontainer-client-token
 # CLIENT_TLS_SECRET=nnf-dm-usercontainer-client-tls
 #
@@ -30,7 +28,7 @@
 #
 # $ docker exec -it kind-worker3 bash
 # root@kind-worker3:/# TOKEN=$(</mnt/nnf/token)
-# root@kind-worker3:/# IP=10.244.1.13
+# root@kind-worker3:/# IP=10.244.4.10
 # root@kind-worker3:/# PORT=5000
 #
 # Now you're ready to use curl to send a "hello" message to the server.
