@@ -29,6 +29,10 @@ PROTO="http"
 CERTDIR=daemons/copy-offload-testing/certs
 SKIP_SAN=1 ./tools/gen_certs.sh $CERTDIR || exit 1
 
+TOKEN_KEY=$CERTDIR/token_key.pem
+JWT=$CERTDIR/token
+go run ./daemons/copy-offload-testing/make-jwt/make-jwt.go -tokenkey "$TOKEN_KEY" -token "$JWT"
+
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"
 CA_KEY="$CERTDIR/ca/private/ca_key.pem"
@@ -51,11 +55,11 @@ if [[ -z $SKIP_TLS ]]; then
 fi
 if [[ -z $SKIP_TOKEN ]]; then
     SRVR_WANTS_KEY=1
-    TOKEN=$(<"$CERTDIR/client/token")
+    TOKEN=$(<"$JWT")
     CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
-    CO_TLS_ARGS="$CO_TLS_ARGS -t $CERTDIR/client/token"
+    CO_TLS_ARGS="$CO_TLS_ARGS -t $JWT"
 
-    token_key_file="$CERTDIR/ca/private/token_key.pem"
+    token_key_file="$TOKEN_KEY"
     SRVR_CMD_TOKEN_ARGS="-tokenkey $token_key_file"
 fi
 if [[ -n $SRVR_WANTS_KEY ]]; then

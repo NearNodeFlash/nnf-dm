@@ -41,7 +41,6 @@ fi
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
-TOKEN_KEY=$CA_PDIR/token_key.pem
 
 RABBIT_SAN_CONF="$CERTDIR/rabbit-san.conf"
 
@@ -81,11 +80,5 @@ echo "Generate a client certificate signing request and certificate"
 mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
 openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
 openssl x509 -req -days 1 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
-
-
-echo "Generate a JWT for the bearer token"
-JWT="$CLIENT_DIR"/token
-go run ./tools/make-jwt/make-jwt.go -tokenkey "$TOKEN_KEY" -token "$JWT"
-
 
 exit 0
