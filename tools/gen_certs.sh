@@ -32,12 +32,6 @@ SRVR_HOST=${SRVR_HOST:=localhost}
 CLIENT_HOST="$3"
 CLIENT_HOST=${CLIENT_HOST:=localhost}
 
-if ! base64 -w0 < /dev/null 2> /dev/null; then
-    BASE64="base64"
-else
-    BASE64="base64 -w0"
-fi
-
 CA_DIR="$CERTDIR"/ca
 CA_PDIR=$CA_DIR/private
 CA_KEY=$CA_PDIR/ca_key.pem
