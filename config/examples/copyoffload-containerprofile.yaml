@@ -18,27 +18,16 @@ data:
         command:
           - /nnf-copy-offload
           - --cert
-          - /etc/usercontainer-tls/tls.crt
+          - $(TLS_CERT_PATH)
           - --cakey
-          - /etc/usercontainer-tls/tls.key
+          - $(TLS_KEY_PATH)
           - --tokenkey
-          - /etc/usercontainer-token/token.key
+          - $(TOKEN_KEY_PATH)
           - --addr
           - :$(NNF_CONTAINER_PORTS)
-        volumeMounts:
-          - name: usercontainer-tls
-            mountPath: /etc/usercontainer-tls
-            readOnly: true
-          - name: usercontainer-token
-            mountPath: /etc/usercontainer-token
-            readOnly: true
-    volumes:
-      - name: usercontainer-tls
-        secret:
-          secretName: nnf-dm-usercontainer-server-tls
-      - name: usercontainer-token
-        secret:
-          secretName: nnf-dm-usercontainer-server-token
-    serviceAccount: nnf-dm-copy-offload
+    # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
+    # the Kubernetes API server.
+    # Normal user containers should not require Kubernetes API server privilege
+    # and should not have a service account.
     serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
