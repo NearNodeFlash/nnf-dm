@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha5
+package v1alpha6
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,10 +25,10 @@ import (
 )
 
 // log is for logging in this package.
-var nnfportmanagerlog = logf.Log.WithName("nnfportmanager-resource")
+var nnfnodeecdatalog = logf.Log.WithName("nnfnodeecdata-resource")
 
 // SetupWebhookWithManager will setup the manager to manage the webhooks
-func (r *NnfPortManager) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *NnfNodeECData) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()

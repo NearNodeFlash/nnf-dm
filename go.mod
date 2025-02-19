@@ -4,19 +4,11 @@ go 1.22.0
 
 toolchain go1.22.5
 
-replace github.com/NearNodeFlash/lustre-fs-operator => ../lustre-fs-operator
-
-replace github.com/NearNodeFlash/nnf-sos => ../nnf-sos
-
-replace github.com/NearNodeFlash/nnf-ec => ../../nnf-ec-1.git
-
-replace github.com/DataWorkflowServices/dws => ../dws
-
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20250123184816-8c112709f939
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250205180945-2d1cc3da204e
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250130195025-8ce00255cc9e // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250205182542-4881472d2c44
+	github.com/DataWorkflowServices/dws v0.0.1-0.20250219193729-7e8e8fb274cc
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250219194350-45aad5cbbe17
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250219193635-3e6c6b39d0e0 // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250219195921-c95d3e1f4847
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
