@@ -26,6 +26,9 @@
 
 #define COPY_OFFLOAD_MSG_SIZE CURL_ERROR_SIZE * 2
 
+// The name of the environment variable that will contain the workflow's token.
+#define WORKFLOW_TOKEN_ENV "DW_WORKFLOW_TOKEN"
+
 struct copy_offload_s {
     CURL *curl;
     int skip_tls;
@@ -33,7 +36,7 @@ struct copy_offload_s {
     char *cacert;
     char *key;
     char *clientcert;
-    char *token_path;
+    char *token;
     char proto[6];
 
     /* The post-processed error message. If there was an error from libcurl, then
@@ -54,10 +57,13 @@ COPY_OFFLOAD *copy_offload_init();
  * for the handle.
  * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
+ * The token is normally taken from the DW_WORKFLOW_TOKEN environment variable,
+ * if it exists. If @token is supplied then it overrides the DW_WORKFLOW_TOKEN
+ * variable. If neither is found then no token is used.
  * Returns 0 on success.
  * On failure, returns 1 and places the error message in @offload->err_message. 
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path);
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token);
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:

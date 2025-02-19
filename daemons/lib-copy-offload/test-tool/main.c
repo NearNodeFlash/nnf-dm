@@ -51,7 +51,8 @@ void usage(const char **argv) {
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
     fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
-    fprintf(stderr, "    -t TOKEN_FILE       Bearer token file.\n");
+    fprintf(stderr, "    -t TOKEN            Bearer token. Default is to get the token from.\n");
+    fprintf(stderr, "                        the DW_WORKFLOW_TOKEN environment variable.");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
     fprintf(stderr, "    -y KEY_FILE         CA/Server key file. Required for mTLS.\n");
     fprintf(stderr, "    -z CLIENTCERT_FILE  Client certificate file. Required for mTLS.\n");
@@ -80,7 +81,7 @@ int main(int argc, const char **argv) {
     char *dest_path = NULL;
     char *cacert_path = NULL; /* CA/server cert - a self-signed certficate */
     char *cakey_path = NULL;
-    char *token_path = NULL;
+    char *token = NULL;
     char *clientcert_path = NULL;
     int skip_tls = 0;
     int ret;
@@ -119,7 +120,7 @@ int main(int argc, const char **argv) {
                 dest_path = optarg;
                 break;
             case 't':
-                token_path = optarg;
+                token = optarg;
                 break;
             case 'x':
                 cacert_path = optarg;
@@ -150,7 +151,7 @@ int main(int argc, const char **argv) {
     }
 
     offload = copy_offload_init();
-    ret = copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path, token_path);
+    ret = copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path, token);
     if (ret != 0) {
         fprintf(stderr, "%s\n", offload->err_message);
         exit(1);

@@ -33,50 +33,6 @@ struct memory {
     size_t size;
 };
 
-/* Read a file into a buffer. The caller is responsible for calling free() on the
- * returned buffer.
- * Returns 0 on success.
- * On failure, returns 1 and places the error message in @offload->err_message.
- */
-static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
-    int ret = 0;
-    FILE *fp;
-    struct stat stat_blk;
-    int cnt;
-    *buffer = NULL;
-
-    if (stat(path, &stat_blk) == -1) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to stat %s: errno %d\n", path, errno);
-        return 1;
-    }
-    if ((*buffer = malloc(stat_blk.st_size + 1)) == NULL) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to allocate a buffer for the bearer token\n");
-        return 1;
-    }
-    fp = fopen(path, "r");
-    if (fp == NULL) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to open %s: errno %d\n", path, errno);
-        free(*buffer);
-        *buffer = NULL;
-        return 1;
-    }
-    cnt = fread(*buffer, 1, stat_blk.st_size, fp);
-    if (cnt == -1) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to read %s: errno %d\n", path, errno);
-        free(*buffer);
-        buffer = NULL;
-        ret = 1;
-    } else if (cnt != stat_blk.st_size) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Incomplete read of %s. Wanted %lld, got %d\n", path, (long long)stat_blk.st_size, cnt);
-        free(*buffer);
-        buffer = NULL;
-        ret = 1;
-    }
-    fclose(fp);
-
-    return ret;
-}
-
 /* See the example in CURLOPT_WRITEFUNCTION(3). */
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp) {
     size_t realsize = size * nmemb;
@@ -117,7 +73,7 @@ COPY_OFFLOAD *copy_offload_init() {
  * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path) {
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token) {
     int ret = 0;
 
     CURL *curl = offload->curl;
@@ -128,8 +84,12 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         offload->cacert = cacert;
     if (key != NULL)
         offload->key = key;
-    if (token_path != NULL)
-        offload->token_path = token_path;
+
+    if (token != NULL)
+        offload->token = token;
+    else
+        offload->token = getenv(WORKFLOW_TOKEN_ENV);
+
     if (clientcert != NULL)
         offload->clientcert = clientcert;
     strncpy(offload->proto, "http", sizeof(offload->proto));
@@ -160,15 +120,9 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
             curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
         }
     }
-    if (offload->token_path != NULL) {
-        char *bearer = NULL;
-        ret = read_contents(offload, offload->token_path, &bearer);
-        if (ret == 0) {
-            curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, bearer);
-            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
-        }
-        if (bearer != NULL)
-            free(bearer);
+    if (offload->token != NULL) {
+        curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, offload->token);
+        curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
     }
     return ret;
 }

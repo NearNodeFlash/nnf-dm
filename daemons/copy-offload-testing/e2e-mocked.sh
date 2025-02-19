@@ -55,9 +55,9 @@ if [[ -z $SKIP_TLS ]]; then
 fi
 if [[ -z $SKIP_TOKEN ]]; then
     SRVR_WANTS_KEY=1
-    TOKEN=$(<"$JWT")
-    CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
-    CO_TLS_ARGS="$CO_TLS_ARGS -t $JWT"
+    DW_WORKFLOW_TOKEN=$(<"$JWT")
+    export DW_WORKFLOW_TOKEN
+    CURL_BEARER_TOKEN_HDR="Authorization: Bearer $DW_WORKFLOW_TOKEN"
 
     token_key_file="$TOKEN_KEY"
     SRVR_CMD_TOKEN_ARGS="-tokenkey $token_key_file"
