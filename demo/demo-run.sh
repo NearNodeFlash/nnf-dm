@@ -27,7 +27,7 @@
 # the copy-offload's IP and port:
 #
 # $ docker exec -it kind-worker3 bash
-# root@kind-worker3:/# TOKEN=$(</mnt/nnf/token)
+# root@kind-worker3:/# DW_WORKFLOW_TOKEN=$(</mnt/nnf/token)
 # root@kind-worker3:/# IP=10.244.1.11
 # root@kind-worker3:/# PORT=5000
 #
@@ -39,7 +39,7 @@
 #
 # From the kind-worker container, send the hello:
 #
-# root@kind-worker3:/# curl -k -H 'Accepts-version: 1.0' -H "Authorization: Bearer $TOKEN" --cacert /mnt/nnf/tls.crt  https://$IP:$PORT/hello
+# root@kind-worker3:/# curl -k -H 'Accepts-version: 1.0' -H "Authorization: Bearer $DW_WORKFLOW_TOKEN" --cacert /mnt/nnf/tls.crt  https://$IP:$PORT/hello
 #
 
 
