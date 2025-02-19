@@ -5,30 +5,6 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   resources:
   - configmaps
@@ -40,14 +16,6 @@ rules:
   - ""
   resources:
   - pods
-  verbs:
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - pods/status
   verbs:
   - get
@@ -58,6 +26,7 @@ rules:
   - ""
   resources:
   - secrets
+  - services
   verbs:
   - create
   - delete
@@ -67,9 +36,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
+  - apps
   resources:
-  - services
+  - daemonsets
+  - deployments
   verbs:
   - create
   - delete
@@ -82,12 +52,6 @@ rules:
   - dataworkflowservices.github.io
   resources:
   - clientmounts
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - dataworkflowservices.github.io
-  resources:
   - clientmounts/status
   verbs:
   - get
@@ -114,39 +78,6 @@ rules:
   - nnf.cray.hpe.com
   resources:
   - nnfdatamovementmanagers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
-  - nnfdatamovementmanagers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
-  - nnfdatamovementmanagers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
-  - nnfdatamovementprofiles
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
   - nnfdatamovements
   verbs:
   - create
@@ -159,12 +90,14 @@ rules:
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
+  - nnfdatamovementmanagers/finalizers
   - nnfdatamovements/finalizers
   verbs:
   - update
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
+  - nnfdatamovementmanagers/status
   - nnfdatamovements/status
   verbs:
   - get
@@ -173,14 +106,8 @@ rules:
 - apiGroups:
   - nnf.cray.hpe.com
   resources:
+  - nnfdatamovementprofiles
   - nnfnodestorages
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - nnf.cray.hpe.com
-  resources:
   - nnfstorages
   verbs:
   - get
