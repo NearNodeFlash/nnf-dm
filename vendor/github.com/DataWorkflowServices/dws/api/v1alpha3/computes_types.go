@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha2
+package v1alpha3
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +31,7 @@ type ComputesData struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 
 // Computes is the Schema for the computes API
 type Computes struct {
