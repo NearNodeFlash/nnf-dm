@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM --platform=$BUILDPLATFORM gcc:12.4.0-bookworm AS builder
+FROM gcc:12.4.0-bookworm AS builder
 
 WORKDIR /workspace
 
