@@ -36,7 +36,7 @@ struct copy_offload_s {
     char *cacert;
     char *key;
     char *clientcert;
-    char *token;
+    char *token_path;
     char proto[6];
 
     /* The post-processed error message. If there was an error from libcurl, then
@@ -58,12 +58,12 @@ COPY_OFFLOAD *copy_offload_init();
  * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
  * The token is normally taken from the DW_WORKFLOW_TOKEN environment variable,
- * if it exists. If @token is supplied then it overrides the DW_WORKFLOW_TOKEN
+ * if it exists. If @token_path is supplied then it overrides the DW_WORKFLOW_TOKEN
  * variable. If neither is found then no token is used.
  * Returns 0 on success.
  * On failure, returns 1 and places the error message in @offload->err_message. 
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token);
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path);
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:
