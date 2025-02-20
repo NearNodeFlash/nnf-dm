@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2023-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha2
+package v1alpha3
 
 // ResourceState is the enumeration of the state of a DWS resource
 // +kubebuilder:validation:Enum:=Enabled;Disabled

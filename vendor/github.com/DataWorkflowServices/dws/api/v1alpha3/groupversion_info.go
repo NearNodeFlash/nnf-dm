@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Hewlett Packard Enterprise Development LP
+ * Copyright 2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,10 +17,10 @@
  * limitations under the License.
  */
 
-// Package v1alpha2 contains API Schema definitions for the dws v1alpha2 API group
+// Package v1alpha3 contains API Schema definitions for the dataworkflowservices v1alpha3 API group.
 // +kubebuilder:object:generate=true
 // +groupName=dataworkflowservices.github.io
-package v1alpha2
+package v1alpha3
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,10 +28,10 @@ import (
 )
 
 var (
-	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "dataworkflowservices.github.io", Version: "v1alpha2"}
+	// GroupVersion is group version used to register these objects.
+	GroupVersion = schema.GroupVersion{Group: "dataworkflowservices.github.io", Version: "v1alpha3"}
 
-	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
