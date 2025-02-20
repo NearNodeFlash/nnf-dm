@@ -17,8 +17,8 @@
 
 CC ?= /usr/bin/gcc
 AR ?= /usr/bin/ar
-CFLAGS = -Wall -Werror -g -I/opt/homebrew/include -I/opt/homebrew/opt/curl/include
-LDFLAGS = -lcurl -L/opt/homebrew/lib -L/opt/homebrew/opt/curl/lib
+CFLAGS = -Wall -Werror -g `pkg-config --cflags libcurl`
+LDFLAGS = `pkg-config --libs libcurl`
 ARFLAGS = rcs
 
 all: libcopyoffload.a tester
