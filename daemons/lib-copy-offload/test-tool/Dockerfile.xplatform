@@ -15,9 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcc:12.4.0-bookworm AS builder
+# Use rocky 8.10 to get a similar environment as TOSS 4.8.
+FROM rockylinux/rockylinux:8.10 AS builder
 
 WORKDIR /workspace
+
+RUN dnf install -y \
+    make gcc libcurl-devel
 
 COPY daemons/lib-copy-offload daemons/lib-copy-offload/
 COPY Makefile Makefile
