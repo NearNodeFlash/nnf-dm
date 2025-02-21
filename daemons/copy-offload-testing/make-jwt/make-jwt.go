@@ -85,7 +85,7 @@ func verifyToken(tokenString string, key []byte, method jwt.SigningMethod) error
 
 func main() {
 
-	tokenKeyFile := flag.String("tokenkey", "token_key.pem", "Output filel for the token key in PEM form.")
+	tokenKeyFile := flag.String("tokenkey", "token_key.pem", "Output file for the token key in PEM form.")
 	tokenFile := flag.String("token", "token", "Output file for the token.")
 	flag.Parse()
 
