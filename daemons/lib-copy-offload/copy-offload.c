@@ -130,6 +130,7 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         offload->key = key;
     if (token_path != NULL)
         offload->token_path = token_path;
+
     if (clientcert != NULL)
         offload->clientcert = clientcert;
     strncpy(offload->proto, "http", sizeof(offload->proto));
@@ -160,16 +161,27 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
             curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
         }
     }
+
+    // If we've been told to read the token from a file, then do that.
+    // Otherwise, find it in the WORKFLOW_TOKEN_ENV environment variable.
+    // If neither of those is available, then don't specify a bearer token.
+    char *token = NULL;
+    char *bearer_from_file = NULL;
     if (offload->token_path != NULL) {
-        char *bearer = NULL;
-        ret = read_contents(offload, offload->token_path, &bearer);
+        ret = read_contents(offload, offload->token_path, &bearer_from_file);
         if (ret == 0) {
-            curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, bearer);
-            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+            token = bearer_from_file;
         }
-        if (bearer != NULL)
-            free(bearer);
+    } else {
+        token = getenv(WORKFLOW_TOKEN_ENV);
     }
+    if (token != NULL) {
+        curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, token);
+        curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+    }
+    if (bearer_from_file != NULL)
+        free(bearer_from_file);
+
     return ret;
 }
 
