@@ -26,7 +26,8 @@ data:
           - --addr
           - :$(NNF_CONTAINER_PORTS)
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
-    # the Kubernetes API server.
+    # the Kubernetes API server. This is ServiceAccount and its Role are
+    # defined in config/copy-offload.
     # Normal user containers should not require Kubernetes API server privilege
     # and should not have a service account.
     serviceAccountName: nnf-dm-copy-offload
