@@ -71,6 +71,11 @@ static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
         free(*buffer);
         buffer = NULL;
         ret = 1;
+    } else {
+        (*buffer)[cnt] = '\0';
+        if (cnt > 0 && ((*buffer)[cnt - 1] == '\n' || (*buffer)[cnt - 1] == '\r')) {
+            (*buffer)[cnt - 1] = '\0';
+        }
     }
     fclose(fp);
 
