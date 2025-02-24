@@ -64,7 +64,7 @@ SERVER_CSR=$SERVER_DIR/server_cert.csr
 echo "Generate a self-signed server certificate signing request and certificate"
 mkdir -p "$SERVER_DIR" && chmod 700 "$SERVER_DIR"
 openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST" -config "$RABBIT_SAN_CONF" -extensions 'v3_req'
-openssl x509 -req -days 1 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
+openssl x509 -req -days 365 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
 
 CLIENT_DIR="$CERTDIR"/client
 CLIENT_CERT=$CLIENT_DIR/client_cert.pem
@@ -73,6 +73,6 @@ CLIENT_CSR=$CLIENT_DIR/client_cert.csr
 echo "Generate a client certificate signing request and certificate"
 mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
 openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
-openssl x509 -req -days 1 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
+openssl x509 -req -days 356 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
 
 exit 0
