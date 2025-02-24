@@ -54,7 +54,6 @@ if [[ -z $SKIP_TLS ]]; then
     fi
 fi
 if [[ -z $SKIP_TOKEN ]]; then
-    SRVR_WANTS_KEY=1
     DW_WORKFLOW_TOKEN=$(<"$JWT")
     export DW_WORKFLOW_TOKEN
     CURL_BEARER_TOKEN_HDR="Authorization: Bearer $DW_WORKFLOW_TOKEN"
