@@ -96,7 +96,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output);
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, char *source_path, char *dest_path, char **output);
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int dry_run, char *source_path, char *dest_path, char **output);
 
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload);
