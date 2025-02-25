@@ -297,13 +297,14 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
 /* Submit a new copy-offload request.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, char *source_path, char *dest_path, char **output) {
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int dry_run, char *source_path, char *dest_path, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
     int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
     char postbuf[COPY_OFFLOAD_POST_SIZE];
+    char dry_run_str[8];
 
     snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/trial", offload->proto, *offload->host_and_port);
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
@@ -316,17 +317,23 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         profile_name = "copy-offload-default";
     }
 
+    if (dry_run) {
+        strcpy(dry_run_str, "true");
+    } else {
+        strcpy(dry_run_str, "false");
+    }
+
     char *offload_req =
         "{\"computeName\": \"%s\", "
         "\"workflowName\": \"%s\", "
         "\"sourcePath\": \"%s\", "
         "\"destinationPath\": \"%s\", "
         "\"dmProfile\": \"%s\", "
-        "\"dryrun\": false, "
+        "\"dryrun\": %s, "
         "\"dcpOptions\": \"\", "
         "\"logStdout\": true, "
         "\"storeStdout\": false}";
-    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name);
+    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name, dry_run_str);
     if (n >= sizeof(postbuf)) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
         return ret;
