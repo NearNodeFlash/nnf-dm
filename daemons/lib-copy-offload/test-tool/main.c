@@ -188,7 +188,7 @@ int main(int argc, const char **argv) {
         printf("ret %d, http_code %ld\n", ret, offload->http_code);
     }
     if (ret) {
-        fprintf(stderr, "%s", offload->err_message);
+        fprintf(stderr, "%s\n", offload->err_message);
     }
 
     copy_offload_cleanup(offload);

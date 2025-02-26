@@ -301,6 +301,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
     char postbuf[COPY_OFFLOAD_POST_SIZE];
 
@@ -325,7 +326,14 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         "\"dcpOptions\": \"\", "
         "\"logStdout\": true, "
         "\"storeStdout\": false}";
-    snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name);
+    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name);
+    if (n >= sizeof(postbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_POSTFIELDS, postbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
