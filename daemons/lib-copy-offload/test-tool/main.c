@@ -44,6 +44,7 @@ void usage(const char **argv) {
     fprintf(stderr, "    -o            Perform a copy-offload request, using the following args:\n");
     fprintf(stderr, "       -C COMPUTE_NAME    Name of the local compute node.\n");
     fprintf(stderr, "       -W WORKFLOW_NAME   Name of the associated Workflow.\n");
+    fprintf(stderr, "       -P DM_PROFILE_NAME Name of the DM profile to use (optional).\n");
     fprintf(stderr, "       -S SOURCE_PATH     Local path to source file to be copied.\n");
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
     fprintf(stderr, "\n");
@@ -76,6 +77,7 @@ int main(int argc, const char **argv) {
     char *job_name = NULL;
     char *compute_name = NULL;
     char *workflow_name = NULL;
+    char *profile_name = NULL;
     char *source_path = NULL;
     char *dest_path = NULL;
     char *cacert_path = NULL; /* CA/server cert - a self-signed certficate */
@@ -85,7 +87,7 @@ int main(int argc, const char **argv) {
     int skip_tls = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:y:z:c:oC:W:S:D:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:y:z:c:oC:W:P:S:D:")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -111,6 +113,9 @@ int main(int argc, const char **argv) {
                 break;
             case 'W':
                 workflow_name = optarg;
+                break;
+            case 'P':
+                profile_name = optarg;
                 break;
             case 'S':
                 source_path = optarg;
@@ -166,7 +171,7 @@ int main(int argc, const char **argv) {
     } else if (c_opt) {
         ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
-        ret = copy_offload_copy(offload, compute_name, workflow_name, source_path, dest_path, &output);
+        ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, source_path, dest_path, &output);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
@@ -183,7 +188,7 @@ int main(int argc, const char **argv) {
         printf("ret %d, http_code %ld\n", ret, offload->http_code);
     }
     if (ret) {
-        fprintf(stderr, "%s", offload->err_message);
+        fprintf(stderr, "%s\n", offload->err_message);
     }
 
     copy_offload_cleanup(offload);

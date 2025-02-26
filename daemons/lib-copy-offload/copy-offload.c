@@ -161,7 +161,7 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         if (key != NULL && clientcert != NULL) {
             curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
             curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
- 
+
             curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
             curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
         }
@@ -297,18 +297,43 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
 /* Submit a new copy-offload request.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **output) {
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, char *source_path, char *dest_path, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
     char postbuf[COPY_OFFLOAD_POST_SIZE];
 
     snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/trial", offload->proto, *offload->host_and_port);
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
-    char *offload_req = "{\"computeName\": \"%s\", \"workflowName\": \"%s\", \"sourcePath\": \"%s\", \"destinationPath\": \"%s\", \"dmProfile\": \"copy-offload-nonmpi\", \"dryrun\": true, \"dcpOptions\": \"\", \"logStdout\": true, \"storeStdout\": false}";
-    snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path);
+    if (profile_name == NULL) {
+        // We cannot use the default DM profile in k8s because it has setpriv commands to change
+        // from root to a non-root user. Those setpriv commands will fail in the copyoffload
+        // container since it is running as non-root. Therefore, we need to use the
+        // copy-offload-default profile and not the k8s default.
+        profile_name = "copy-offload-default";
+    }
+
+    char *offload_req =
+        "{\"computeName\": \"%s\", "
+        "\"workflowName\": \"%s\", "
+        "\"sourcePath\": \"%s\", "
+        "\"destinationPath\": \"%s\", "
+        "\"dmProfile\": \"%s\", "
+        "\"dryrun\": false, "
+        "\"dcpOptions\": \"\", "
+        "\"logStdout\": true, "
+        "\"storeStdout\": false}";
+    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name);
+    if (n >= sizeof(postbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_POSTFIELDS, postbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
