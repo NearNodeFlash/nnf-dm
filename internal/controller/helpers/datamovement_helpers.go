@@ -256,6 +256,14 @@ func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string
 	}
 
 	cmd := profile.Data.Command
+
+	// If running as non-root (i.e. in a copy offload container), remove the --uid and --gid options
+	// from dcp.
+	if os.Getuid() != 0 {
+		cmd = strings.ReplaceAll(cmd, "--uid $UID", "")
+		cmd = strings.ReplaceAll(cmd, "--gid $GID", "")
+	}
+
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", dm.Spec.UserId))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", dm.Spec.GroupId))
@@ -302,13 +310,10 @@ func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path st
 
 	// For DataIn/DataOut, dm is ran as root, so setpriv is needed to become the specified user. For
 	// copy offload, the user container is ran as the user, so setpriv is not needed.
-	log.Info("Building stat/dir command", "current uid", os.Getuid(), "uid", uid, "gid", gid, "setprivCmd", setprivCmd)
 	if os.Getuid() != 0 {
 		setprivCmd = ""
 	}
-	log.Info("Building stat/dir command", "cmd before", cmd)
 	cmd = strings.ReplaceAll(cmd, "$SETPRIV", setprivCmd)
-	log.Info("Building stat/dir command", "cmd after", cmd)
 
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", uid))
