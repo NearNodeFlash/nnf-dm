@@ -147,7 +147,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		Name:      r.dmProfile.Name,
 		Namespace: r.dmProfile.Namespace,
 	}
-	crLog.Info("Using NnfDataMovmentProfile", "name", r.dmProfile)
+	crLog.Info("Using NnfDataMovmentProfile", "name", r.dmProfile.Name)
 
 	dm.Spec.UserId = workflow.Spec.UserID
 	dm.Spec.GroupId = workflow.Spec.GroupID
