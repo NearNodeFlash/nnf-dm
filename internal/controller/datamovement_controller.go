@@ -212,6 +212,24 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
+	var cmdArgs2 []string
+	for i, arg := range cmdArgs {
+		if strings.Contains(arg, "dcp") {
+			cmdArgs2 = cmdArgs[:i]
+			break
+		}
+	}
+
+	log.Info("BLAKE debug start")
+	cmdArgs2 = append(cmdArgs2, "ls")
+	cmdArgs2 = append(cmdArgs2, "-al")
+	cmdArgs2 = append(cmdArgs2, dm.Spec.Destination.Path)
+	dbg := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs2, " "))
+	log.Info("ls command", "cmd", dbg.String())
+	b, _ := dbg.Output()
+	log.Info("ls output", "output", string(b))
+	log.Info("BLAKE debug end")
+
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
