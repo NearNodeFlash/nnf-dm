@@ -1,7 +1,17 @@
 spec:
   allocationSets:
+#    - allocationSize: 50000000000
+#      label: gfs2
+#      storage:
+#        - allocationCount: 1
+#          name: rabbit-node-1
     - allocationSize: 50000000000
-      label: gfs2
+      label: ost
       storage:
-        - allocationCount: 1
+        - allocationCount: 2
+          name: rabbit-node-1
+    - allocationSize: 50000000000
+      label: mdt
+      storage:
+        - allocationCount: 2
           name: rabbit-node-1
