@@ -310,11 +310,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     if (profile_name == NULL) {
-        // We cannot use the default DM profile in k8s because it has setpriv commands to change
-        // from root to a non-root user. Those setpriv commands will fail in the copyoffload
-        // container since it is running as non-root. Therefore, we need to use the
-        // copy-offload-default profile and not the k8s default.
-        profile_name = "copy-offload-default";
+        profile_name = "";
     }
 
     if (dry_run) {

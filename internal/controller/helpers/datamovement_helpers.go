@@ -256,6 +256,14 @@ func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string
 	}
 
 	cmd := profile.Data.Command
+
+	// If running as non-root (i.e. in a copy offload container), remove the --uid and --gid options
+	// from dcp.
+	if os.Getuid() != 0 {
+		cmd = strings.ReplaceAll(cmd, "--uid $UID", "")
+		cmd = strings.ReplaceAll(cmd, "--gid $GID", "")
+	}
+
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", dm.Spec.UserId))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", dm.Spec.GroupId))
@@ -298,7 +306,15 @@ func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string
 	return strings.Split(cmd, " "), nil
 }
 
-func buildStatOrMkdirCommand(uid, gid uint32, cmd, hostfile, path string) string {
+func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path string, log logr.Logger) string {
+
+	// For DataIn/DataOut, dm is ran as root, so setpriv is needed to become the specified user. For
+	// copy offload, the user container is ran as the user, so setpriv is not needed.
+	if os.Getuid() != 0 {
+		setprivCmd = ""
+	}
+	cmd = strings.ReplaceAll(cmd, "$SETPRIV", setprivCmd)
+
 	cmd = strings.ReplaceAll(cmd, "$HOSTFILE", hostfile)
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", uid))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", gid))
@@ -483,7 +499,7 @@ func GetDestinationDir(profile *nnfv1alpha6.NnfDataMovementProfile, dm *nnfv1alp
 
 // Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
 func mpiStat(profile *nnfv1alpha6.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
-	cmd := buildStatOrMkdirCommand(uid, gid, profile.Data.StatCommand, mpiHostfile, path)
+	cmd := buildStatOrMkdirCommand(uid, gid, profile.Data.StatCommand, profile.Data.SetprivCommand, mpiHostfile, path, log)
 
 	output, err := command.Run(cmd, log)
 	if err != nil {
@@ -595,7 +611,7 @@ func createDestinationDir(profile *nnfv1alpha6.NnfDataMovementProfile, dm *nnfv1
 		return nil
 	}
 
-	cmd := buildStatOrMkdirCommand(dm.Spec.UserId, dm.Spec.GroupId, profile.Data.MkdirCommand, mpiHostfile, dest)
+	cmd := buildStatOrMkdirCommand(dm.Spec.UserId, dm.Spec.GroupId, profile.Data.MkdirCommand, profile.Data.SetprivCommand, mpiHostfile, dest, log)
 	output, err := command.Run(cmd, log)
 	if err != nil {
 		return fmt.Errorf("data movement mkdir failed ('%s'): %w output: %s", cmd, err, output)
