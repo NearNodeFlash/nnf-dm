@@ -308,7 +308,7 @@ func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string
 
 func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path string, log logr.Logger) string {
 
-	// For DataIn/DataOut, dm is ran as root, so setpriv is needed to become the specified user. For
+	// For DataIn/DataOut, dm runs as root, so setpriv is needed to become the specified user. For
 	// copy offload, the user container is ran as the user, so setpriv is not needed.
 	if os.Getuid() != 0 {
 		setprivCmd = ""
