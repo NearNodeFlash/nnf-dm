@@ -151,7 +151,6 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
 
-        fprintf(stderr, "Setting CAINFO to (%s)\n", offload->cacert);
         curl_easy_setopt(curl, CURLOPT_CAINFO, offload->cacert);
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
 
