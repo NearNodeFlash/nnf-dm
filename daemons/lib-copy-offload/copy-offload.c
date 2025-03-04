@@ -126,18 +126,15 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
     int ret = 0;
 
     CURL *curl = offload->curl;
-    if (host_and_port != NULL)
-        offload->host_and_port = host_and_port;
+    offload->host_and_port = host_and_port;
     offload->skip_tls = skip_tls;
     if (cacert != NULL)
         offload->cacert = cacert;
-    if (key != NULL)
-        offload->key = key;
-    if (token_path != NULL)
-        offload->token_path = token_path;
-
-    if (clientcert != NULL)
-        offload->clientcert = clientcert;
+    else
+        offload->cacert = CERT_PATH;
+    offload->key = key;
+    offload->token_path = token_path;
+    offload->clientcert = clientcert;
     strncpy(offload->proto, "http", sizeof(offload->proto));
 
     struct curl_slist *chunk = NULL;
@@ -154,15 +151,15 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
 
-        curl_easy_setopt(curl, CURLOPT_CAINFO, cacert);
+        curl_easy_setopt(curl, CURLOPT_CAINFO, offload->cacert);
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
 
         // Are we doing mTLS?
         if (key != NULL && clientcert != NULL) {
-            curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
+            curl_easy_setopt(curl, CURLOPT_SSLKEY, offload->key);
             curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
 
-            curl_easy_setopt(curl, CURLOPT_SSLCERT, clientcert);
+            curl_easy_setopt(curl, CURLOPT_SSLCERT, offload->clientcert);
             curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
         }
     }

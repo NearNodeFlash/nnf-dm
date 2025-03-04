@@ -29,6 +29,10 @@
 // The name of the environment variable that will contain the workflow's token.
 #define WORKFLOW_TOKEN_ENV "DW_WORKFLOW_TOKEN"
 
+// Default path of the TLS certificate. This should be a text file holding the
+// PEM form of the certificate.
+#define CERT_PATH "/etc/nnf-dm-usercontainer/cert.pem"
+
 struct copy_offload_s {
     CURL *curl;
     int skip_tls;
@@ -55,6 +59,8 @@ COPY_OFFLOAD *copy_offload_init();
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
+ * The @cacert path may be NULL, indicating that the default path of CERT_PATH
+ * should be used.
  * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
  * If @skip_tls is set, then TLS/mTLS will not be enabled.
  * The token is normally taken from the DW_WORKFLOW_TOKEN environment variable,
