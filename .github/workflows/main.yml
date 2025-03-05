@@ -271,7 +271,7 @@ jobs:
 
     - name: "Build the test Docker image"
       id: docker_build_test_target
-      if: ${{ env.DO_TEST == 'true' }}
+      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
       uses: docker/build-push-action@v6
       with:
         push: false
@@ -280,8 +280,12 @@ jobs:
 
     - name: "Run the Docker image unit tests"
       id: docker_test
-      if: ${{ env.DO_TEST == 'true' }}
+      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
       run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
+
+    - name: "Build and run the Docker image unit tests in nektos/act"
+      if: ${{ env.DO_TEST == 'true' && env.ACT }}
+      run: make container-unit-test
 
     - name: "Build the copy-offload Docker image"
       if: ${{ !env.ACT }} # skip during local actions testing
