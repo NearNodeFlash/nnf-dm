@@ -19,9 +19,10 @@
 
 set -o pipefail
 
-make build-copy-offload-local || exit 1
-
-make -C ./daemons/lib-copy-offload tester || exit 1
+if [[ -z $SKIP_BUILD ]]; then
+    make build-copy-offload-local || exit 1
+    make -C ./daemons/lib-copy-offload tester || exit 1
+fi
 CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
 SRVR="localhost:4000"
 PROTO="http"
