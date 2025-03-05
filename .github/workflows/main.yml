@@ -215,11 +215,6 @@ jobs:
         fetch-depth: 0
         ref: ${{ github.event.pull_request.head.sha }}
 
-    - name: setup go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
-
     - name: "Lowercase repository name for docker build"
       id: lowercase-repository-name
       run: echo "REPO_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
@@ -276,7 +271,7 @@ jobs:
 
     - name: "Build the test Docker image"
       id: docker_build_test_target
-      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
+      if: ${{ env.DO_TEST == 'true' }}
       uses: docker/build-push-action@v6
       with:
         push: false
@@ -285,34 +280,8 @@ jobs:
 
     - name: "Run the Docker image unit tests"
       id: docker_test
-      if: ${{ env.DO_TEST == 'true' && !env.ACT }}
+      if: ${{ env.DO_TEST == 'true' }}
       run: docker run ${{ env.REPO_NAME }}:${{ env.TEST_TAG }}
-
-    - name: "Install libcurl and shellcheck"
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install -y libcurl4-openssl-dev shellcheck
- 
-    - name: "Do shellcheck"
-      run: shellcheck tools/*.sh daemons/copy-offload-testing/e2e-mocked.sh
-
-    - name: "Build lib-copy-offload"
-      run: make -C ./daemons/lib-copy-offload libcopyoffload.a
-
-    - name: "E2E mock test, without TLS or token"
-      run: SKIP_TLS=1 SKIP_TOKEN=1 ./daemons/copy-offload-testing/e2e-mocked.sh
-
-    - name: "E2E mock test, with TLS, without token"
-      run: SKIP_MTLS=1 SKIP_TOKEN=1 ./daemons/copy-offload-testing/e2e-mocked.sh
-
-    - name: "E2E mock test, with token, without TLS"
-      run: SKIP_TLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
-      
-    - name: "E2E mock test, with token and TLS (no mTLS)"
-      run: SKIP_MTLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
-
-    - name: "E2E mock test, with token and mTLS"
-      run: ./daemons/copy-offload-testing/e2e-mocked.sh
 
     - name: "Build the copy-offload Docker image"
       if: ${{ !env.ACT }} # skip during local actions testing

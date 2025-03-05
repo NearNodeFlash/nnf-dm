@@ -36,6 +36,20 @@ COPY vendor/ vendor/
 COPY cmd/ cmd/
 COPY api/ api/
 COPY internal/ internal/
+COPY daemons/copy-offload/ daemons/copy-offload/
+COPY daemons/copy-offload-testing/ daemons/copy-offload-testing/
+COPY daemons/lib-copy-offload/ daemons/lib-copy-offload/
+COPY tools/ tools/
+COPY Makefile Makefile
+
+RUN apk add make bash && make clean-bin
+
+###############################################################################
+FROM builder_setup AS shellchecker
+
+COPY hack/ hack/
+
+RUN apk add shellcheck && rm -f shellcheck_okay && shellcheck tools/*.sh hack/*.sh daemons/copy-offload-testing/e2e-mocked.sh && touch shellcheck_okay
 
 ###############################################################################
 FROM builder_setup AS builder
@@ -56,8 +70,6 @@ FROM builder_setup AS copy_offload_builder
 ARG TARGETARCH
 ARG TARGETOS
 
-COPY daemons/copy-offload/ daemons/copy-offload/
-
 # Build
 # the GOARCH has a default value to allow the binary be built according to the host where the command
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
@@ -66,21 +78,31 @@ COPY daemons/copy-offload/ daemons/copy-offload/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nnf-copy-offload daemons/copy-offload/cmd/main.go
 
 ###############################################################################
+FROM builder_setup AS copy_offload_tester_builder
+
+RUN apk add curl-dev gcc libc-dev && \
+    make -C ./daemons/lib-copy-offload tester
+
+###############################################################################
 FROM builder AS testing
 
-COPY daemons/copy-offload/ daemons/copy-offload/
-
 WORKDIR /workspace
+RUN mkdir bin
 
 COPY config/ config/
 COPY hack/ hack/
-COPY Makefile Makefile
+COPY --from=copy_offload_builder /workspace/nnf-copy-offload bin/
+COPY --from=copy_offload_tester_builder /workspace/daemons/lib-copy-offload/tester daemons/lib-copy-offload/tester
 
-RUN apk add make bash
+# Force docker build to run the shellcheck stage.
+COPY --from=shellchecker /workspace/shellcheck_okay shellcheck_okay
 
 ENV CGO_ENABLED=0
 
-ENTRYPOINT [ "make", "test" ]
+# These are used by the e2e-mocked test for the copy-offload server.
+RUN apk add curl openssl
+
+ENTRYPOINT [ "make", "within-container-unit-test" ]
 
 ###############################################################################
 FROM $NNFMFU_TAG_BASE:$NNFMFU_VERSION AS production
