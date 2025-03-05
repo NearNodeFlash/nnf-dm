@@ -812,7 +812,11 @@ func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string)
 
 	nodeNameToHostnameMap := map[string]string{}
 	for _, pod := range pods.Items {
-		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + nnfv1alpha6.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
+		// <pod-ipv4-address>.<service-name>.<my-namespace>.svc.<cluster-domain.example>
+		nodeNameToHostnameMap[pod.Spec.NodeName] = fmt.Sprintf(
+			"%s.dm.%s.svc.cluster.local",
+			strings.ReplaceAll(pod.Status.PodIP, ".", "-"),
+			nnfv1alpha6.DataMovementNamespace)
 	}
 
 	hostnames := make([]string, len(nodes))
