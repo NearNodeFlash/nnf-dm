@@ -139,6 +139,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 		KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./$$subdir/... -coverprofile cover-$$(basename $$subdir.out) -ginkgo.v $$failfast; \
 	done
 
+within-container-unit-test: test
+	make -f daemons/copy-offload-testing/Makefile $@
+
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
 	${CONTAINER_TOOL} build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(CONTAINER_BUILDARGS) .
