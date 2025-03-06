@@ -14,7 +14,7 @@ data:
   spec:
     containers:
       - name: copy-offload-srvr
-        image: nnf-dm-copy-offload:latest
+        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
         command:
           - /nnf-copy-offload
           - --cert
@@ -33,7 +33,8 @@ data:
             value: 'true'
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
-        image: nnf-mfu:latest
+        image: ghcr.io/nearnodeflash/nnf-mfu:latest
+
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
     # defined in config/copy-offload.
