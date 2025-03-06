@@ -25,6 +25,14 @@ data:
           - $(TOKEN_KEY_PATH)
           - --addr
           - :$(NNF_CONTAINER_PORTS)
+        env:
+          # OMPI_MCA_orte_keep_fqdn_hostnames is required for mpirun to be able to communicate with
+          # the nnf-dm-worker pods. Normal user containers should not require this environment
+          # variable.
+          - name: OMPI_MCA_orte_keep_fqdn_hostnames
+            value: 'true'
+      - name: copy-offload-worker
+        image: nnf-dm-copy-offload:latest
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
     # defined in config/copy-offload.
