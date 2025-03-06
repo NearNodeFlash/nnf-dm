@@ -22,7 +22,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -93,15 +92,13 @@ func main() {
 	skipTls := false
 	skipToken := false
 	var tlsConfig *tls.Config
-	usingMtls := false
 	var keyBlock *pem.Block
 
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
 	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
 	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
 	tokenKeyFile := flag.String("tokenkey", "token_key.pem", "File with PEM key used to sign the token.")
-	clientCertFile := flag.String("clientcert", "", "Client certificate PEM file. This enables mTLS.")
-	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS/mTLS.")
+	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS.")
 	flag.BoolVar(&skipToken, "skip-token", skipToken, "Skip the use of a bearer token.")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
@@ -123,27 +120,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Trusted client certificate.
-		var clientCertPool *x509.CertPool
-		if *clientCertFile != "" {
-			clientCert, err := os.ReadFile(*clientCertFile)
-			if err != nil {
-				slog.Error("Error reading the client certificate file", "error", err.Error())
-				os.Exit(1)
-			}
-			clientCertPool = x509.NewCertPool()
-			clientCertPool.AppendCertsFromPEM(clientCert)
-			usingMtls = true
-		}
-
 		tlsConfig = &tls.Config{
 			MinVersion:               tls.VersionTLS13,
 			PreferServerCipherSuites: true,
 			Certificates:             []tls.Certificate{serverTLSCert},
-		}
-		if usingMtls {
-			tlsConfig.ClientCAs = clientCertPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		}
 	}
 
@@ -167,7 +147,7 @@ func main() {
 		drvr.Client = clnt
 	}
 
-	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "mTLS", usingMtls, "token", !skipToken)
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "token", !skipToken)
 
 	httpHandler := &userHttp.UserHttp{
 		Log:  crLog,

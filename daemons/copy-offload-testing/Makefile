@@ -32,9 +32,6 @@ e2e-mock:
 	# E2E mock test, with TLS, without token
 	SKIP_MTLS=1 SKIP_TOKEN=1 ./daemons/copy-offload-testing/e2e-mocked.sh
 
-	# E2E mock test, with token and TLS (no mTLS)
-	SKIP_MTLS=1 ./daemons/copy-offload-testing/e2e-mocked.sh
-
-	# E2E mock test, with token and mTLS
+	# E2E mock test, with token and TLS
 	./daemons/copy-offload-testing/e2e-mocked.sh
 
