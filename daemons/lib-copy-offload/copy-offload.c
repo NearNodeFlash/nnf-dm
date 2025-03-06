@@ -119,22 +119,16 @@ COPY_OFFLOAD *copy_offload_init() {
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
- * This will enable mTLS when @clientcert is non-NULL, otherwise it will enable TLS.
- * If @skip_tls is set, then TLS/mTLS will not be enabled.
+ * If @skip_tls is set, then TLS will not be enabled.
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path) {
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls) {
     int ret = 0;
 
     CURL *curl = offload->curl;
+    offload->cert_and_token_done = 0;
     offload->host_and_port = host_and_port;
     offload->skip_tls = skip_tls;
-    if (cacert != NULL)
-        offload->cacert = cacert;
-    else
-        offload->cacert = CERT_PATH;
-    offload->key = key;
-    offload->token_path = token_path;
-    offload->clientcert = clientcert;
+    offload->cacert = CERT_PATH;
     strncpy(offload->proto, "http", sizeof(offload->proto));
 
     struct curl_slist *chunk = NULL;
@@ -151,40 +145,64 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
 
-        curl_easy_setopt(curl, CURLOPT_CAINFO, offload->cacert);
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
-
-        // Are we doing mTLS?
-        if (key != NULL && clientcert != NULL) {
-            curl_easy_setopt(curl, CURLOPT_SSLKEY, offload->key);
-            curl_easy_setopt(curl, CURLOPT_SSLKEYTYPE, "PEM");
-
-            curl_easy_setopt(curl, CURLOPT_SSLCERT, offload->clientcert);
-            curl_easy_setopt(curl, CURLOPT_SSLCERTTYPE, "PEM");
-        }
     }
 
-    // If we've been told to read the token from a file, then do that.
-    // Otherwise, find it in the WORKFLOW_TOKEN_ENV environment variable.
-    // If neither of those is available, then don't specify a bearer token.
-    char *token = NULL;
-    char *bearer_from_file = NULL;
-    if (offload->token_path != NULL) {
-        ret = read_contents(offload, offload->token_path, &bearer_from_file);
-        if (ret == 0) {
-            token = bearer_from_file;
-        }
-    } else {
-        token = getenv(WORKFLOW_TOKEN_ENV);
-    }
-    if (token != NULL) {
-        curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, token);
-        curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
-    }
-    if (bearer_from_file != NULL)
-        free(bearer_from_file);
+    offload->token = getenv(WORKFLOW_TOKEN_ENV);
 
     return ret;
+}
+
+/* Override the certificate file path. */
+int copy_offload_override_cert(COPY_OFFLOAD *offload, char *cert_path) {
+    if (offload->cert_and_token_done) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Too late to override certificate");
+        return 1;
+    }
+    if (cert_path == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "NULL certificate path");
+        return 1;
+    }
+
+    offload->cacert = cert_path;
+    return 0;
+}
+
+/* Override the token. */
+int copy_offload_override_token(COPY_OFFLOAD *offload, char *token_path) {
+    if (offload->cert_and_token_done) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Too late to override token");
+        return 1;
+    }
+    if (token_path == NULL) {
+        if (offload->token != NULL)
+            free(offload->token);
+        offload->token = NULL;
+        return 0;
+    }
+
+    char *token = NULL;
+    int ret;
+    ret = read_contents(offload, token_path, &token);
+    if (ret != 0)
+        return ret;
+    if (offload->token != NULL)
+        free(offload->token);
+    offload->token = token;
+    return 0;
+}
+
+static void copy_offload_setup_cert_and_token(COPY_OFFLOAD *offload) {
+    if (offload->cert_and_token_done)
+        return;
+    if (!offload->skip_tls) {
+        curl_easy_setopt(offload->curl, CURLOPT_CAINFO, offload->cacert);
+    }
+    if (offload->token != NULL) {
+        curl_easy_setopt(offload->curl, CURLOPT_XOAUTH2_BEARER, offload->token);
+        curl_easy_setopt(offload->curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
+    }
+    offload->cert_and_token_done = 1;
 }
 
 /* Reset the handle so it can be used for the next command.
@@ -193,7 +211,10 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
  */
 void copy_offload_reset(COPY_OFFLOAD *offload) {
     curl_easy_reset(offload->curl);
-    copy_offload_configure(offload, NULL, offload->skip_tls, NULL, NULL, NULL, NULL);
+    if (offload->token != NULL)
+        free(offload->token);
+    offload->cert_and_token_done = 0;
+    copy_offload_configure(offload, offload->host_and_port, offload->skip_tls);
 }
 
 /* Request verbose output from libcurl. */
@@ -211,6 +232,7 @@ static long copy_offload_perform(COPY_OFFLOAD *offload, struct memory *chunk) {
     long http_code = -1;
     char errbuf[CURL_ERROR_SIZE];
 
+    copy_offload_setup_cert_and_token(offload);
     /* Send all data to the cb() function.
      * See the example in CURLOPT_WRITEFUNCTION(3).
      */
