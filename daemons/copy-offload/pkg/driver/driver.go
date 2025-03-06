@@ -219,11 +219,14 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 
 	// Create the hostfile. This is needed for preparing the destination and the data movement
 	// command itself.
-	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
-	if err != nil {
-		crLog.Error(err, "could not create MPI hostfile")
-		return err
-	}
+	// r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
+	// if err != nil {
+	// 	crLog.Error(err, "could not create MPI hostfile")
+	// 	return err
+	// }
+	// #TODO: mpioperator creates the hostfile for us - but it only has 1 slot. Figure out a way to
+	// configure that or search and replace slots=1.
+	r.mpiHostfile = "/etc/mpi/hostfile"
 	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
 
 	ctxCancel := r.recordRequest(ctx, dm)
