@@ -31,8 +31,9 @@ data:
           # variable.
           - name: OMPI_MCA_orte_keep_fqdn_hostnames
             value: 'true'
+      # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
-        image: nnf-dm-copy-offload:latest
+        image: nnf-mfu:latest
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
     # defined in config/copy-offload.
