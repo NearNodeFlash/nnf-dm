@@ -33,7 +33,7 @@ data:
             value: 'true'
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
-        image: nnf-mfu:latest
+        image: ghcr.io/nearnodeflash/nnf-mfu:latest
         command:
           - /usr/sbin/sshd
         args:
