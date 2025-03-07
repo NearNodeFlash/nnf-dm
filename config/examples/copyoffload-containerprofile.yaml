@@ -33,7 +33,25 @@ data:
             value: 'true'
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
-        image: ghcr.io/nearnodeflash/nnf-mfu:latest
+        image: nnf-mfu:latest
+        command:
+          - /usr/sbin/sshd
+        args:
+          - -De
+        # securityContext:
+        #   privileged: true
+        #   capabilities:
+        #     add: ['SETUID', 'SETGID', 'MKNOD']
+        # volumeMounts:
+        #   - name:  worker-config
+        #     mountPath: /etc/ssh/sshd_config
+        #     subPath: sshd_config
+        #   - name: localtime
+        #     mountPath: /etc/localtime
+        #     readOnly: true
+        #   - name: tzdata
+        #     mountPath: /usr/share/zoneinfo
+        #     readOnly: true
 
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
