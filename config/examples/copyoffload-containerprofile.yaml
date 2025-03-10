@@ -34,6 +34,9 @@ data:
         volumeMounts:
           - name: ssh-auth
             mountPath: /home/mpiuser/.ssh
+          - mountPath: /etc/ssh/sshd_config
+            name: worker-config
+            subPath: sshd_config
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
         image: ghcr.io/nearnodeflash/nnf-mfu:latest
@@ -41,23 +44,13 @@ data:
           - /usr/sbin/sshd
         args:
           - -De
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ['SETUID', 'SETGID', 'MKNOD']
         volumeMounts:
           - name: ssh-auth
             mountPath: /home/mpiuser/.ssh
-        # securityContext:
-        #   privileged: true
-        #   capabilities:
-        #     add: ['SETUID', 'SETGID', 'MKNOD']
-        # volumeMounts:
-        #   - name:  worker-config
-        #     mountPath: /etc/ssh/sshd_config
-        #     subPath: sshd_config
-        #   - name: localtime
-        #     mountPath: /etc/localtime
-        #     readOnly: true
-        #   - name: tzdata
-        #     mountPath: /usr/share/zoneinfo
-        #     readOnly: true
     volumes:
       - name: ssh-auth
         secret:
@@ -70,6 +63,10 @@ data:
               path: id_rsa.pub
             - key: ssh-publickey
               path: authorized_keys
+      - configMap:
+          defaultMode: 420
+          name: blake-worker-config
+        name: worker-config
 
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
