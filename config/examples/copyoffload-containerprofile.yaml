@@ -61,7 +61,7 @@ data:
     volumes:
       - name: ssh-auth
         secret:
-          secretName: blake-ssh-keys
+          secretName: blake-ssh-key
           defaultMode: 384
           items:
             - key: ssh-privatekey
