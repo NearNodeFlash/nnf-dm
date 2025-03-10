@@ -31,6 +31,9 @@ data:
           # variable.
           - name: OMPI_MCA_orte_keep_fqdn_hostnames
             value: 'true'
+        volumeMounts:
+          - name: ssh-auth
+            mountPath: /home/mpiuser/.ssh
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
         image: ghcr.io/nearnodeflash/nnf-mfu:latest
@@ -38,6 +41,9 @@ data:
           - /usr/sbin/sshd
         args:
           - -De
+        volumeMounts:
+          - name: ssh-auth
+            mountPath: /home/mpiuser/.ssh
         # securityContext:
         #   privileged: true
         #   capabilities:
@@ -52,6 +58,18 @@ data:
         #   - name: tzdata
         #     mountPath: /usr/share/zoneinfo
         #     readOnly: true
+    volumes:
+      - name: ssh-auth
+        secret:
+          secretName: blake-ssh-keys
+          defaultMode: 384
+          items:
+            - key: ssh-privatekey
+              path: id_rsa
+            - key: ssh-publickey
+              path: id_rsa.pub
+            - key: ssh-publickey
+              path: authorized_keys
 
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
