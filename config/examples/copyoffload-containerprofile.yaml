@@ -33,7 +33,7 @@ data:
             value: 'true'
         volumeMounts:
           - name: ssh-auth
-            mountPath: /home/mpiuser/.ssh
+            mountPath: /home/user/.ssh
           - mountPath: /etc/ssh/sshd_config
             name: worker-config
             subPath: sshd_config
@@ -50,7 +50,7 @@ data:
             add: ['SETUID', 'SETGID', 'MKNOD']
         volumeMounts:
           - name: ssh-auth
-            mountPath: /home/mpiuser/.ssh
+            mountPath: /home/user/.ssh
     volumes:
       - name: ssh-auth
         secret:
