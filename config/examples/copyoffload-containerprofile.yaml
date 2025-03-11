@@ -34,9 +34,11 @@ data:
         volumeMounts:
           - name: ssh-auth
             mountPath: /home/user/.ssh
-          - mountPath: /etc/ssh/sshd_config
-            name: worker-config
+          - name: worker-config
+            mountPath: /etc/ssh/sshd_config
             subPath: sshd_config
+          - name: core-dumps
+            mountPath: /localdisk/dumps
       # TODO inject this from sos when we find the serviceAccount below
       - name: copy-offload-worker
         image: ghcr.io/nearnodeflash/nnf-mfu:latest
@@ -51,7 +53,16 @@ data:
         volumeMounts:
           - name: ssh-auth
             mountPath: /home/user/.ssh
+          - name: worker-config
+            mountPath: /etc/ssh/sshd_config
+            subPath: sshd_config
+          - name: core-dumps
+            mountPath: /localdisk/dumps
     volumes:
+      - name: core-dumps
+        hostPath:
+          path: /localdisk/dumps
+          type: DirectoryOrCreate
       - name: ssh-auth
         secret:
           secretName: blake-ssh-key
@@ -63,10 +74,10 @@ data:
               path: id_rsa.pub
             - key: ssh-publickey
               path: authorized_keys
-      - configMap:
+      - name: worker-config
+        configMap:
           defaultMode: 420
           name: blake-worker-config
-        name: worker-config
 
     # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
     # the Kubernetes API server. This ServiceAccount and its Role are
