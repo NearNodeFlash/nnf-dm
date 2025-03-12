@@ -13,6 +13,8 @@ data:
   numPorts: 1
   retryLimit: 2
   mpiSpec:
+    # TODO: slotsPerWorker needs to come from a DM profile
+    slotsPerWorker: 8
     runPolicy:
       cleanPodPolicy: Running
     mpiReplicaSpecs:
