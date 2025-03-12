@@ -92,6 +92,8 @@ type DriverRequest struct {
 	hosts []string
 	// MPI hosts file.
 	mpiHostfile string
+
+	RabbitName string
 }
 
 func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
@@ -116,6 +118,9 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		crLog.Error(err, "Failed to retrieve compute mountinfo")
 		return nil, err
 	}
+
+	// Given the compute node, grab the namespace of the rabbit node
+	r.RabbitName = computeMountInfo.Device.DeviceReference.ObjectReference.Namespace
 
 	crLog = crLog.WithValues("type", computeMountInfo.Type)
 	var dm *nnfv1alpha6.NnfDataMovement
@@ -631,7 +636,7 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	// to this value resulting in the full path on the Rabbit.
 
 	listOptions := []client.ListOption{
-		client.InNamespace(drvr.RabbitName),
+		client.InNamespace(r.RabbitName),
 		client.MatchingLabels(map[string]string{
 			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
 			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
