@@ -775,8 +775,87 @@ func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha
 	return nodeNames, nil
 }
 
+func GetCopyOffloadWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string, workflow, namespace string, dm *nnfv1alpha6.NnfDataMovement) ([]string, error) {
+
+	// Node-local data movement with GFS2
+	if nodes[0] == "localhost" {
+		// TODO: we need to map this from the requested client
+		// nnfNodeName := os.Getenv("NNF_NODE_NAME")
+		// The source's storage reference should point to the namespace of the nnf node
+		nnfNodeName := dm.Spec.Source.StorageReference.Namespace
+
+		// Get the pods running on node nnfNodeName and that are labeled as workers for this workflow
+		listOptions := []client.ListOption{
+			client.InNamespace(namespace),
+			client.MatchingLabels(map[string]string{
+				"training.kubeflow.org/job-name": workflow,
+				"training.kubeflow.org/job-role": "worker",
+			}),
+			client.MatchingFields{"spec.nodeName": nnfNodeName},
+		}
+
+		pods := &corev1.PodList{}
+		if err := clnt.List(ctx, pods, listOptions...); err != nil {
+			return nil, err
+		}
+
+		// We should only have one worker pod per nnf node
+		if len(pods.Items) == 0 {
+			return nil, newInvalidError("could not find a single worker pod for node %s", nnfNodeName)
+		} else if len(pods.Items) != 1 {
+			return nil, newInvalidError("found more than one worker pod for node %s", nnfNodeName)
+		}
+
+		// <worker-pod-name>.<service-name>.<namespace>.svc.<cluster-domain.example>
+		// e.g. my-workflow-worker-0.my-workflow.default.svc.cluster.local
+		nodes[0] = fmt.Sprintf(
+			"%s.%s.%s.svc.cluster.local",
+			pods.Items[0].Name,
+			workflow,
+			namespace)
+
+		return nodes, nil
+	}
+
+	// Lustre Data Movement - use all the workers
+
+	// MPI-Operator builds the hostfile for us, but we want to override the slots and use the other
+	// existing DM functionality. Crack open the prebuilt hostfile and take out the hostnames.
+	getPreBuiltHosts := func() ([]string, error) {
+		file, err := os.Open("/etc/mpi/hostfile")
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		var hosts []string
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				hosts = append(hosts, fields[0])
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+
+		return hosts, nil
+	}
+
+	hosts, err := getPreBuiltHosts()
+	if err != nil {
+		return nil, newInvalidError("could not get hosts from hostfile: %s", err.Error())
+	}
+
+	return hosts, nil
+}
+
 func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string) ([]string, error) {
 
+	// Node-local data movement (i.e. XFS or GFS2)
 	if nodes[0] == "localhost" {
 		return nodes, nil
 	}

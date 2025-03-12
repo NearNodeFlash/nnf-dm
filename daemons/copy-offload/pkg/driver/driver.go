@@ -212,11 +212,14 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 	}
 
 	// TODO: Implement GetOffloadWorkerHostnames()
-	r.hosts, err = helpers.GetWorkerHostnames(drvr.Client, ctx, r.nodes)
+	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
+	// r.hosts, err = helpers.GetWorkerHostnames(drvr.Client, ctx, r.nodes)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
 		return err
 	}
+
+	crLog.Info("BLAKE HOSTS", "hosts", r.hosts)
 
 	// Create the hostfile. This is needed for preparing the destination and the data movement
 	// command itself.
