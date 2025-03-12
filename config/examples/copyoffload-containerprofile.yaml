@@ -11,78 +11,110 @@ data:
     - name: DW_GLOBAL_lus
       optional: false
   numPorts: 1
-  spec:
-    containers:
-      - name: copy-offload-srvr
-        image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
-        command:
-          - /nnf-copy-offload
-          - --cert
-          - $(TLS_CERT_PATH)
-          - --cakey
-          - $(TLS_KEY_PATH)
-          - --tokenkey
-          - $(TOKEN_KEY_PATH)
-          - --addr
-          - :$(NNF_CONTAINER_PORTS)
-        env:
-          # OMPI_MCA_orte_keep_fqdn_hostnames is required for mpirun to be able to communicate with
-          # the nnf-dm-worker pods. Normal user containers should not require this environment
-          # variable.
-          - name: OMPI_MCA_orte_keep_fqdn_hostnames
-            value: 'true'
-        volumeMounts:
-          - name: ssh-auth
-            mountPath: /home/user/.ssh
-          - name: worker-config
-            mountPath: /etc/ssh/sshd_config
-            subPath: sshd_config
-          - name: core-dumps
-            mountPath: /localdisk/dumps
-      # TODO inject this from sos when we find the serviceAccount below
-      - name: copy-offload-worker
-        image: ghcr.io/nearnodeflash/nnf-mfu:latest
-        command:
-          - /usr/sbin/sshd
-        args:
-          - -De
-        securityContext:
-          privileged: true
-          capabilities:
-            add: ['SETUID', 'SETGID', 'MKNOD']
-        volumeMounts:
-          - name: ssh-auth
-            mountPath: /home/user/.ssh
-          - name: worker-config
-            mountPath: /etc/ssh/sshd_config
-            subPath: sshd_config
-          - name: core-dumps
-            mountPath: /localdisk/dumps
-    volumes:
-      - name: core-dumps
-        hostPath:
-          path: /localdisk/dumps
-          type: DirectoryOrCreate
-      - name: ssh-auth
-        secret:
-          secretName: blake-ssh-key
-          defaultMode: 384
-          items:
-            - key: ssh-privatekey
-              path: id_rsa
-            - key: ssh-publickey
-              path: id_rsa.pub
-            - key: ssh-publickey
-              path: authorized_keys
-      - name: worker-config
-        configMap:
-          defaultMode: 420
-          name: blake-worker-config
-
-    # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
-    # the Kubernetes API server. This ServiceAccount and its Role are
-    # defined in config/copy-offload.
-    # Normal user containers should not require Kubernetes API server privilege
-    # and should not have a service account.
-    serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
+  mpiSpec:
+    runPolicy:
+      cleanPodPolicy: Running
+    mpiReplicaSpecs:
+      Launcher:
+        template:
+          spec:
+            containers:
+              - name: copy-offload-srvr
+                image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
+                command:
+                  - /nnf-copy-offload
+                  - --cert
+                  - $(TLS_CERT_PATH)
+                  - --cakey
+                  - $(TLS_KEY_PATH)
+                  - --tokenkey
+                  - $(TOKEN_KEY_PATH)
+                  - --addr
+                  - :$(NNF_CONTAINER_PORTS)
+            # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
+            # the Kubernetes API server. This ServiceAccount and its Role are
+            # defined in config/copy-offload.
+            # Normal user containers should not require Kubernetes API server privilege
+            # and should not have a service account.
+            serviceAccountName: nnf-dm-copy-offload
+      Worker:
+        template:
+          spec:
+            containers:
+              - name: copy-offload-worker
+                image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
+  # spec:
+  #   containers:
+  #     - name: copy-offload-srvr
+  #       image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
+  #       command:
+  #         - /nnf-copy-offload
+  #         - --cert
+  #         - $(TLS_CERT_PATH)
+  #         - --cakey
+  #         - $(TLS_KEY_PATH)
+  #         - --tokenkey
+  #         - $(TOKEN_KEY_PATH)
+  #         - --addr
+  #         - :$(NNF_CONTAINER_PORTS)
+  #       env:
+  #         # OMPI_MCA_orte_keep_fqdn_hostnames is required for mpirun to be able to communicate with
+  #         # the nnf-dm-worker pods. Normal user containers should not require this environment
+  #         # variable.
+  #         - name: OMPI_MCA_orte_keep_fqdn_hostnames
+  #           value: 'true'
+  #       volumeMounts:
+  #         - name: ssh-auth
+  #           mountPath: /home/user/.ssh
+  #         - name: worker-config
+  #           mountPath: /etc/ssh/sshd_config
+  #           subPath: sshd_config
+  #         - name: core-dumps
+  #           mountPath: /localdisk/dumps
+  #     # TODO inject this from sos when we find the serviceAccount below
+  #     - name: copy-offload-worker
+  #       image: ghcr.io/nearnodeflash/nnf-mfu:latest
+  #       command:
+  #         - /usr/sbin/sshd
+  #       args:
+  #         - -De
+  #       securityContext:
+  #         privileged: true
+  #         capabilities:
+  #           add: ['SETUID', 'SETGID', 'MKNOD']
+  #       volumeMounts:
+  #         - name: ssh-auth
+  #           mountPath: /home/user/.ssh
+  #         - name: worker-config
+  #           mountPath: /etc/ssh/sshd_config
+  #           subPath: sshd_config
+  #         - name: core-dumps
+  #           mountPath: /localdisk/dumps
+  #   volumes:
+  #     - name: core-dumps
+  #       hostPath:
+  #         path: /localdisk/dumps
+  #         type: DirectoryOrCreate
+  #     - name: ssh-auth
+  #       secret:
+  #         secretName: blake-ssh-key
+  #         defaultMode: 384
+  #         items:
+  #           - key: ssh-privatekey
+  #             path: id_rsa
+  #           - key: ssh-publickey
+  #             path: id_rsa.pub
+  #           - key: ssh-publickey
+  #             path: authorized_keys
+  #     - name: worker-config
+  #       configMap:
+  #         defaultMode: 420
+  #         name: blake-worker-config
+
+  #   # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to
+  #   # the Kubernetes API server. This ServiceAccount and its Role are
+  #   # defined in config/copy-offload.
+  #   # Normal user containers should not require Kubernetes API server privilege
+  #   # and should not have a service account.
+  #   serviceAccountName: nnf-dm-copy-offload
