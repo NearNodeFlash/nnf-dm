@@ -119,8 +119,24 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		return nil, err
 	}
 
+	// For GFS2 we can get the rabbit node name from the ClientMount because the object reference
+	// (NnfNodeStorage) namespace is set to the rabbit node. For lustre, we are not so lucky. We need
+	// to trace the compute mount back to its local rabbit.
+
 	// Given the compute node, grab the namespace of the rabbit node
-	r.RabbitName = computeMountInfo.Device.DeviceReference.ObjectReference.Namespace
+	// if computeMountInfo.Device.DeviceReference.ObjectReference.Kind == reflect.TypeOf(nnfv1alpha6.NnfNodeStorage{}).Name() {
+	// 	r.RabbitName = computeMountInfo.Device.DeviceReference.ObjectReference.Namespace
+	// } else {
+	// 	// TODO: how to get rabbit
+	// 	r.RabbitName = ""
+	// }
+
+	rabbit, err := r.findRabbitNameFromCompute(dmreq.ComputeName)
+	if err != nil {
+		crLog.Error(err, "Failed to trace compute node to its rabbit node")
+		return nil, err
+	}
+	r.RabbitName = rabbit
 
 	crLog = crLog.WithValues("type", computeMountInfo.Type)
 	var dm *nnfv1alpha6.NnfDataMovement
@@ -137,7 +153,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	}
 
 	if err != nil {
-		crLog.Error(err, "Failed to copy files")
+		crLog.Error(err, "Failed to create DM request")
 		return nil, err
 	}
 
@@ -774,4 +790,24 @@ func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nn
 	}
 
 	return profile, nil
+}
+
+func (r *DriverRequest) findRabbitNameFromCompute(compute string) (string, error) {
+	drvr := r.Drvr
+	systemConfigName := "default"
+
+	systemConfig := &dwsv1alpha3.SystemConfiguration{}
+	if err := drvr.Client.Get(context.TODO(), types.NamespacedName{Name: systemConfigName, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
+		return "", fmt.Errorf("failed to retrieve system configuration: %w", err)
+	}
+
+	for _, storageNode := range systemConfig.Spec.StorageNodes {
+		for _, computeNode := range storageNode.ComputesAccess {
+			if computeNode.Name == compute {
+				return storageNode.Name, nil
+			}
+		}
+	}
+
+	return "", nil
 }
