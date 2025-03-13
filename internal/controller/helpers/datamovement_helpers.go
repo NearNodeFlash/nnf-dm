@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
 	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
@@ -731,8 +732,12 @@ func isTestEnv() bool {
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
 func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) ([]string, error) {
+	// TODO: remove
+	log := log.FromContext(ctx)
+	log.Info("BLAKE GetStorageNodeNames", "storage reference", dm.Spec.Source.StorageReference)
+
 	// If this is a node data movement request simply reference the localhost
-	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() {
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha6.NnfNodeStorage{}).Name() {
 		return []string{"localhost"}, nil
 	}
 
