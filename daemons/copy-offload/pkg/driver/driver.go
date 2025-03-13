@@ -189,12 +189,12 @@ func (r *DriverRequest) generateName(dm *nnfv1alpha6.NnfDataMovement) {
 }
 
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
-	drvr := r.Drvr
+	// drvr := r.Drvr
 
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
-			Namespace:    drvr.RabbitName, // Use the rabbit
+			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
@@ -599,7 +599,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, 
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with GFS2.
 func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (*nnfv1alpha6.NnfDataMovement, error) {
-	drvr := r.Drvr
+	// drvr := r.Drvr
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -610,7 +610,7 @@ func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMR
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
-			Namespace:    drvr.RabbitName, // Use the rabbit
+			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
@@ -649,7 +649,7 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return "", fmt.Errorf("no client mounts found for node '%s'", drvr.RabbitName)
+		return "", fmt.Errorf("no client mounts found for node '%s'", r.RabbitName)
 	}
 
 	for _, clientMount := range clientMounts.Items {
