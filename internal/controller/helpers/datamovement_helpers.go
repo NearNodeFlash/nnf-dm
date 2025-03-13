@@ -419,7 +419,9 @@ func ExtractIndexMountDir(path, namespace string) (string, error) {
 	pattern := regexp.MustCompile(fmt.Sprintf(`(%s-\d+)(/|$)`, namespace))
 	match := pattern.FindStringSubmatch(path)
 	if match == nil {
-		return "", fmt.Errorf("could not extract index mount directory from source path: %s", path)
+		return "", fmt.Errorf(
+			"could not extract index mount directory from source path: %s. Looking for pattern '%s'",
+			path, pattern)
 	}
 
 	idxMount := match[1]
