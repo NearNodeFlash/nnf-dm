@@ -33,7 +33,7 @@ fi
 CERTDIR=certs
 ./tools/gen_certs.sh "$CERTDIR" "$SRVR_HOST"
 
-KEY=$CERTDIR/ca/private/ca_key.pem
+KEY=$CERTDIR/ca/ca_key.pem
 SERVER_CERT=$CERTDIR/server/server_cert.pem
 
 kubectl create secret tls $SERVER_SECRET_TLS --cert $SERVER_CERT --key $KEY
