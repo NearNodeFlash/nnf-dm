@@ -36,7 +36,7 @@ go run ./daemons/copy-offload-testing/make-jwt/make-jwt.go -tokenkey "$TOKEN_KEY
 
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"
-CA_KEY="$CERTDIR/ca/private/ca_key.pem"
+CA_KEY="$CERTDIR/ca/ca_key.pem"
 if [[ -z $SKIP_TLS ]]; then
     PROTO="https"
     cacert="$CERTDIR/server/server_cert.pem"
