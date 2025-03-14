@@ -206,7 +206,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Build command
-	cmdArgs, err := BuildDMCommand(profile, mpiHostfile, dm, log)
+	cmdArgs, err := BuildDMCommand(profile, mpiHostfile, true, dm, log)
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}

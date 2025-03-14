@@ -805,7 +805,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
+					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", true, &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})
@@ -823,7 +823,7 @@ var _ = Describe("Data Movement Test", func() {
 						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --extra opts --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
-					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", &dm, log.FromContext(context.TODO()))
+					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", true, &dm, log.FromContext(context.TODO()))
 					Expect(err).ToNot(HaveOccurred())
 					Expect(strings.Join(cmd, " ")).Should(MatchRegexp(expectedCmdRegex))
 				})

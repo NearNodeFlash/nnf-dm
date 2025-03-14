@@ -119,18 +119,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		return nil, err
 	}
 
-	// For GFS2 we can get the rabbit node name from the ClientMount because the object reference
-	// (NnfNodeStorage) namespace is set to the rabbit node. For lustre, we are not so lucky. We need
-	// to trace the compute mount back to its local rabbit.
-
-	// Given the compute node, grab the namespace of the rabbit node
-	// if computeMountInfo.Device.DeviceReference.ObjectReference.Kind == reflect.TypeOf(nnfv1alpha6.NnfNodeStorage{}).Name() {
-	// 	r.RabbitName = computeMountInfo.Device.DeviceReference.ObjectReference.Namespace
-	// } else {
-	// 	// TODO: how to get rabbit
-	// 	r.RabbitName = ""
-	// }
-
+	// Determine which rabbit is local to the compute that made the request
 	rabbit, err := r.findRabbitNameFromCompute(dmreq.ComputeName)
 	if err != nil {
 		crLog.Error(err, "Failed to trace compute node to its rabbit node")
@@ -232,26 +221,20 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 		return err
 	}
 
-	// TODO: Implement GetOffloadWorkerHostnames()
+	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
 	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
-	// r.hosts, err = helpers.GetWorkerHostnames(drvr.Client, ctx, r.nodes)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
 		return err
 	}
 
-	crLog.Info("BLAKE HOSTS", "hosts", r.hosts)
-
-	// Create the hostfile. This is needed for preparing the destination and the data movement
-	// command itself.
+	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
+	// and the data movement command itself.
 	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
 	if err != nil {
 		crLog.Error(err, "could not create MPI hostfile")
 		return err
 	}
-	// #TODO: mpioperator creates the hostfile for us - but it only has 1 slot. Figure out a way to
-	// configure that or search and replace slots=1.
-	// r.mpiHostfile = "/etc/mpi/hostfile"
 	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
 
 	ctxCancel := r.recordRequest(ctx, dm)
@@ -334,7 +317,7 @@ func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.
 	}
 
 	// Build command
-	cmdArgs, err := helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, dm, crLog)
+	cmdArgs, err := helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
 		return err
@@ -792,6 +775,7 @@ func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nn
 	return profile, nil
 }
 
+// Use the systemconfiguration to find the compute node's local rabbit node
 func (r *DriverRequest) findRabbitNameFromCompute(compute string) (string, error) {
 	drvr := r.Drvr
 	systemConfigName := "default"
