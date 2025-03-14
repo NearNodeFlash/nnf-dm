@@ -29,17 +29,12 @@ fi
 SRVR_HOST="$2"
 SRVR_HOST=${SRVR_HOST:=localhost}
 
-CLIENT_HOST="$3"
-CLIENT_HOST=${CLIENT_HOST:=localhost}
-
 CA_DIR="$CERTDIR"/ca
-CA_PDIR=$CA_DIR/private
-CA_KEY=$CA_PDIR/ca_key.pem
+CA_KEY=$CA_DIR/ca_key.pem
 
 RABBIT_SAN_CONF="$CERTDIR/rabbit-san.conf"
 
 mkdir -p "$CA_DIR" && chmod 700 "$CA_DIR"
-mkdir -p "$CA_PDIR" && chmod 700 "$CA_PDIR"
 
 if [[ -z $SKIP_SAN ]]; then
     ./tools/mk-rabbit-san.sh "$CERTDIR" "$RABBIT_SAN_CONF" || exit 1
@@ -65,14 +60,5 @@ echo "Generate a self-signed server certificate signing request and certificate"
 mkdir -p "$SERVER_DIR" && chmod 700 "$SERVER_DIR"
 openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST" -config "$RABBIT_SAN_CONF" -extensions 'v3_req'
 openssl x509 -req -days 365 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
-
-CLIENT_DIR="$CERTDIR"/client
-CLIENT_CERT=$CLIENT_DIR/client_cert.pem
-CLIENT_CSR=$CLIENT_DIR/client_cert.csr
-
-echo "Generate a client certificate signing request and certificate"
-mkdir -p "$CLIENT_DIR" && chmod 700 "$CLIENT_DIR"
-openssl req -new -key "$CA_KEY" -out "$CLIENT_CSR" -subj "/CN=$CLIENT_HOST"
-openssl x509 -req -days 356 -in "$CLIENT_CSR" -key "$CA_KEY" -out "$CLIENT_CERT"
 
 exit 0
