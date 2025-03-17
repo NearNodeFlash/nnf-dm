@@ -83,8 +83,6 @@ type SrvrDataMovementRecord struct {
 type DriverRequest struct {
 	Drvr *Driver
 
-	// Cancel context for this request.
-	cancelContext context.Context
 	// Fresh copy of the chosen NnfDataMovementProfile.
 	dmProfile *nnfv1alpha6.NnfDataMovementProfile
 	// Storage nodes to use.
@@ -205,7 +203,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		return nil, err
 	}
 	crLog.Info("Created NnfDataMovement", "name", dm.Name)
-	r.cancelContext = r.recordRequest(ctx, dm)
+	r.recordRequest(ctx, dm)
 
 	return dm, nil
 }
@@ -241,7 +239,7 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 
 	r.cmdArgs = []string{"sleep", "300"}
 
-	r.cancelContext = r.recordRequest(ctx, dm)
+	r.recordRequest(ctx, dm)
 	return dm, nil
 }
 
@@ -249,7 +247,13 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 
-	if err := r.driveWithContext(r.cancelContext, dm, crLog); err != nil {
+	contextRecord, err := r.loadRequest(dm.Name)
+	if err != nil {
+		crLog.Error(err, "request not found")
+		return err
+	}
+	cancelContext := contextRecord.cancelContext
+	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
 		drvr.contexts.Delete(dm.Name)
@@ -263,7 +267,13 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 
-	if err := r.driveWithContext(r.cancelContext, dm, crLog); err != nil {
+	contextRecord, err := r.loadRequest(dm.Name)
+	if err != nil {
+		crLog.Error(err, "request not found")
+		return err
+	}
+	cancelContext := contextRecord.cancelContext
+	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		drvr.contexts.Delete(dm.Name)
 		return err
@@ -272,7 +282,7 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	return nil
 }
 
-func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) context.Context {
+func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) {
 	drvr := r.Drvr
 
 	// Expand the context with cancel and store it in the map so the cancel function can be
@@ -285,7 +295,6 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 			Cancel: cancel,
 		},
 	})
-	return ctxCancel
 }
 
 func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error) {
@@ -301,6 +310,7 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 
 	contextRecord, err := r.loadRequest(name)
 	if err != nil {
+		// Maybe the Go routine already finished and removed the record.
 		return err
 	}
 	cancelContext := contextRecord.cancelContext
