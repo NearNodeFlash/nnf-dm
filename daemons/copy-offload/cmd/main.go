@@ -108,6 +108,11 @@ func main() {
 		slog.Error("Did not find NNF_NODE_NAME")
 		os.Exit(1)
 	}
+	if os.Getenv("ENVIRONMENT") == "" {
+		// "production" or "kind" or "test"
+		slog.Error("Did not find ENVIRONMENT")
+		os.Exit(1)
+	}
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
