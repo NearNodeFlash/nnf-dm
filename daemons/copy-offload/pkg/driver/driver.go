@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"go.openly.dev/pointy"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,6 +93,8 @@ type DriverRequest struct {
 	// Rabbit node targeted for data movement. This is the local node attach to the requesting
 	// compute node.
 	RabbitName string
+	// Command arguments.
+	cmdArgs []string
 }
 
 func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
@@ -149,7 +150,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	// Dm Profile - no pinned profiles here since copy_offload could use any profile.
 	r.dmProfile, err = r.selectProfile(ctx, dmreq)
 	if err != nil {
-		crLog.Error(err, "Failed to get profile", "profile", dmreq.DMProfile)
+		crLog.Error(err, "Failed to get data movement profile", "wanted", dmreq.DMProfile)
 		return nil, err
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
@@ -173,27 +174,55 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	// Allow the user to override/supplement certain settings
 	setUserConfig(dmreq, dm)
 
-	// We name the NnfDataMovement ourselves, since we're not giving it to k8s.
-	// We'll use this name internally.
-	r.generateName(dm)
+	r.nodes, err = helpers.GetStorageNodeNames(drvr.Client, ctx, dm)
+	if err != nil {
+		crLog.Error(err, "could not get storage nodes for data movement")
+		return nil, err
+	}
+
+	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
+	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
+	if err != nil {
+		crLog.Error(err, "could not get worker nodes for data movement")
+		return nil, err
+	}
+
+	// Prepare Destination Directory
+	if err := helpers.PrepareDestination(drvr.Client, ctx, r.dmProfile, dm, r.mpiHostfile, crLog); err != nil {
+		crLog.Error(err, "could not prepare destination")
+		return nil, err
+	}
+
+	// Build command
+	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
+	if err != nil {
+		crLog.Error(err, "could not create data movement command")
+		return nil, err
+	}
+
+	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
+	// and the data movement command itself.
+	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
+	if err != nil {
+		crLog.Error(err, "could not create MPI hostfile")
+		return nil, err
+	}
+	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
+
+	if err := drvr.Client.Create(ctx, dm); err != nil {
+		crLog.Error(err, "Failed to create NnfDataMovement")
+		return nil, err
+	}
+	crLog.Info("Created NnfDataMovement", "name", dm.Name)
+	r.recordRequest(ctx, dm)
 
 	return dm, nil
 }
 
-func (r *DriverRequest) generateName(dm *nnfv1alpha6.NnfDataMovement) {
-	drvr := r.Drvr
-
-	var nameSuffix string
-	if drvr.Mock {
-		nameSuffix = fmt.Sprintf("%d", drvr.MockCount)
-		drvr.MockCount += 1
-	} else {
-		nameSuffix = string(uuid.NewString()[0:10])
-	}
-	dm.Name = fmt.Sprintf("%s%s", dm.GetObjectMeta().GetGenerateName(), nameSuffix)
-}
-
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
+	drvr := r.Drvr
+	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	var err error
 
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -203,42 +232,58 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
 		},
+		Spec: nnfv1alpha6.NnfDataMovementSpec{
+			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+				Path: dmreq.SourcePath,
+			},
+			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+				Path: dmreq.DestinationPath,
+			},
+		},
 	}
-	r.generateName(dm)
+
+	r.dmProfile = &nnfv1alpha6.NnfDataMovementProfile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mock",
+			Namespace: nnfv1alpha6.DataMovementNamespace,
+		},
+		Data: nnfv1alpha6.NnfDataMovementProfileData{
+			ProgressIntervalSeconds: 1,
+			Command:                 "sleep 300",
+		},
+	}
+
+	// Allow the user to override/supplement certain settings
+	setUserConfig(dmreq, dm)
+
+	// We name the NnfDataMovement ourselves, since we're not giving it to k8s.
+	// We'll use this name internally.
+	nameSuffix := fmt.Sprintf("%d", drvr.MockCount)
+	drvr.MockCount += 1
+	dm.Name = fmt.Sprintf("%s%s", dm.GetObjectMeta().GetGenerateName(), nameSuffix)
+
+	// Build command
+	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
+	if err != nil {
+		crLog.Error(err, "could not create data movement command")
+		return nil, err
+	}
+
+	r.recordRequest(ctx, dm)
 	return dm, nil
 }
 
 func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
-
-	var err error
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 
-	r.nodes, err = helpers.GetStorageNodeNames(drvr.Client, ctx, dm)
+	contextRecord, err := r.loadRequest(dm.Name)
 	if err != nil {
-		crLog.Error(err, "could not get storage nodes for data movement")
+		crLog.Error(err, "request not found")
 		return err
 	}
-
-	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
-	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
-	if err != nil {
-		crLog.Error(err, "could not get worker nodes for data movement")
-		return err
-	}
-
-	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
-	// and the data movement command itself.
-	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
-	if err != nil {
-		crLog.Error(err, "could not create MPI hostfile")
-		return err
-	}
-	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
-
-	ctxCancel := r.recordRequest(ctx, dm)
-
-	if err := r.driveWithContext(ctx, ctxCancel, dm, crLog); err != nil {
+	cancelContext := contextRecord.cancelContext
+	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
 		drvr.contexts.Delete(dm.Name)
@@ -249,12 +294,25 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 }
 
 func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
-	_ = r.recordRequest(ctx, dm)
+	drvr := r.Drvr
+	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+
+	contextRecord, err := r.loadRequest(dm.Name)
+	if err != nil {
+		crLog.Error(err, "request not found")
+		return err
+	}
+	cancelContext := contextRecord.cancelContext
+	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
+		crLog.Error(err, "failed copy")
+		drvr.contexts.Delete(dm.Name)
+		return err
+	}
 
 	return nil
 }
 
-func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) context.Context {
+func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) {
 	drvr := r.Drvr
 
 	// Expand the context with cancel and store it in the map so the cancel function can be
@@ -267,19 +325,24 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 			Cancel: cancel,
 		},
 	})
-	return ctxCancel
+}
+
+func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error) {
+	storedCancelContext, loaded := r.Drvr.contexts.Load(name)
+	if !loaded {
+		return SrvrDataMovementRecord{}, fmt.Errorf("request not found")
+	}
+	return storedCancelContext.(SrvrDataMovementRecord), nil
 }
 
 func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	drvr := r.Drvr
 
-	storedCancelContext, loaded := drvr.contexts.LoadAndDelete(name)
-	if !loaded {
-		// Maybe it already completed and removed itself?
-		return nil
+	contextRecord, err := r.loadRequest(name)
+	if err != nil {
+		// Maybe the Go routine already finished and removed the record.
+		return err
 	}
-
-	contextRecord := storedCancelContext.(SrvrDataMovementRecord)
 	cancelContext := contextRecord.cancelContext
 	drvr.Log.Info("cancelling request", "name", name)
 	cancelContext.Cancel()
@@ -307,24 +370,10 @@ func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.Context, dm *nnfv1alpha6.NnfDataMovement, crLog logr.Logger) error {
+func (r *DriverRequest) driveWithContext(ctxCancel context.Context, dm *nnfv1alpha6.NnfDataMovement, crLog logr.Logger) error {
 	drvr := r.Drvr
 
-	// Prepare Destination Directory
-	if err := helpers.PrepareDestination(drvr.Client, ctx, r.dmProfile, dm, r.mpiHostfile, crLog); err != nil {
-		return err
-	}
-
-	// Build command
-	cmdArgs, err := helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
-	if err != nil {
-		crLog.Error(err, "could not create data movement command")
-		return err
-	}
-	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
-
-	// XXX DEAN DEAN at some point we need a lock for the dm.Status,
-	// to coordinate with a 'cancel' message that comes into the server.
+	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(r.cmdArgs, " "))
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()

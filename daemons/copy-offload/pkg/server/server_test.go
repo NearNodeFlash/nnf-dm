@@ -21,6 +21,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -229,8 +230,8 @@ func TestC_CancelRequest(t *testing.T) {
 		{
 			name:       "returns status-no-content",
 			method:     http.MethodDelete,
-			wantText:   "\n",
-			wantStatus: http.StatusNoContent,
+			wantText:   "unable to cancel request: request not found\n",
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "returns status-not-implemented for GET",
@@ -443,23 +444,38 @@ func TestE_Lifecycle(t *testing.T) {
 		}
 	})
 
-	stringWanted = strings.Join(listWanted[1:], ",")
+	stringWanted = ""
 	t.Run("list remaining jobs", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodGet, "/list", nil)
-		request.Header.Set("Accepts-version", "1.0")
-		response := httptest.NewRecorder()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-		httpHandler.ListRequests(response, request)
+		for {
+			time.Sleep(1 * time.Second)
+			select {
+			case <-ctx.Done():
+				t.Errorf("timeout waiting for jobs to finish")
+				return
+			default:
+				request, _ := http.NewRequest(http.MethodGet, "/list", nil)
+				request.Header.Set("Accepts-version", "1.0")
+				response := httptest.NewRecorder()
 
-		res := response.Result()
-		got := response.Body.String()
-		chopGot := strings.TrimRight(got, "\n")
+				httpHandler.ListRequests(response, request)
 
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
-		}
-		if chopGot != stringWanted {
-			t.Errorf("got %q, want %q", chopGot, stringWanted)
+				res := response.Result()
+				got := response.Body.String()
+
+				chopGot := strings.TrimRight(got, "\n")
+				if res.StatusCode != http.StatusOK {
+					fmt.Printf("got status %d, want status %d\n", res.StatusCode, http.StatusOK)
+					continue
+				}
+				if chopGot != stringWanted {
+					fmt.Printf("got %q, want %q\n", chopGot, stringWanted)
+					continue
+				}
+				return
+			}
 		}
 	})
 }
