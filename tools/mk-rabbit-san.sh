@@ -55,7 +55,12 @@ make_rabbit_san_conf()
         exit 1
     fi
 
-    if ! echo "[v3_req]
+    if ! echo "[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+C = US
+[v3_req]
 subjectAltName = @alt_names
 [alt_names]" > "$SAN_CONF"; then
         echo "Unable to start the SAN conf file"
