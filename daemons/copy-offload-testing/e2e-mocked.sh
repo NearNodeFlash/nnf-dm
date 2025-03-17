@@ -28,7 +28,7 @@ SRVR="localhost:4000"
 PROTO="http"
 
 CERTDIR=daemons/copy-offload-testing/certs
-SKIP_SAN=1 ./tools/gen_certs.sh $CERTDIR || exit 1
+./tools/mk-usercontainer-secrets.sh -A -S $CERTDIR || exit 1
 
 TOKEN_KEY=$CERTDIR/token_key.pem
 JWT=$CERTDIR/token
