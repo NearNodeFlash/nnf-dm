@@ -34,6 +34,9 @@
  * Print the usage of the current command line tool
  */
 void usage(const char **argv) {
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -H <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "    -H            Send a hello message to the server.\n");
+    fprintf(stderr, "\n");
     fprintf(stderr, "Usage: %s [COMMON_ARGS] -l <server_ip>:<server_port>\n", argv[0]);
     fprintf(stderr, "    -l            List all active copy-offload requests.\n");
     fprintf(stderr, "\n");
@@ -81,9 +84,10 @@ int main(int argc, const char **argv) {
     char *token_path = NULL;
     int dry_run = 0;
     int skip_tls = 0;
+    int H_opt = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:d")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:dH")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -127,6 +131,9 @@ int main(int argc, const char **argv) {
                 break;
             case 'x':
                 cacert_path = optarg;
+                break;
+            case 'H':
+                H_opt = 1;
                 break;
             default:
                 usage(argv);
@@ -179,6 +186,8 @@ int main(int argc, const char **argv) {
         ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
         ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, dry_run, source_path, dest_path, &output);
+    } else if (H_opt) {
+        ret = copy_offload_hello(offload, &output);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
