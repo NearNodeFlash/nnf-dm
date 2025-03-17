@@ -39,7 +39,12 @@ mkdir -p "$CA_DIR" && chmod 700 "$CA_DIR"
 if [[ -z $SKIP_SAN ]]; then
     ./tools/mk-rabbit-san.sh "$CERTDIR" "$RABBIT_SAN_CONF" || exit 1
 else
-    if ! echo "[v3_req]
+    if ! echo "[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+C = US
+[v3_req]
 subjectAltName = @alt_names
 [alt_names]
 DNS.1 = $SRVR_HOST
