@@ -100,6 +100,14 @@ void copy_offload_verbose(COPY_OFFLOAD *offload);
  */
 int copy_offload_list(COPY_OFFLOAD *offload, char **output);
 
+/* Send a hello message to the server.
+ * The server's response will be placed in @output. The caller is responsible
+ * for calling free() on @output if *output is non-NULL.
+ * Returns 0 on success.
+ * On failure it returns 1 and places an error message in @offload->err_message.
+ */
+int copy_offload_hello(COPY_OFFLOAD *offload, char **output);
+
 /* Cancel a specific copy-offload request.
  * Any output from the server, if present, will be placed in @output. The caller
  * is responsible for calling free() on @output if *output is non-NULL.
