@@ -10,7 +10,7 @@
 # CLIENT_TOKEN_SECRET=${WORKFLOW_NAME}-token
 # CLIENT_TLS_SECRET=nnf-dm-usercontainer-client-tls
 #
-# $ kubectl get secrets $CLIENT_TOKEN_SECRET -o yaml  | yq -rM .'data.token' | base64 -d > /tmp/nnf/token
+# $ kubectl get secrets $CLIENT_TOKEN_SECRET -o yaml  | yq -rM '.data.token' | base64 -d > /tmp/nnf/token
 # $ kubectl get secrets $CLIENT_TLS_SECRET -o yaml | yq -rM '.data."tls.crt"' | base64 -d > /tmp/nnf/tls.crt
 #
 # Get the copy-offload server's pod IP and port:
