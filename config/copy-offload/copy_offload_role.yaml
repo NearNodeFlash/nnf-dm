@@ -60,3 +60,22 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements
+  verbs:
+  - create
+  - update
+  - patch
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nnf.cray.hpe.com
+  resources:
+  - nnfdatamovements/status
+  verbs:
+  - update
+  - patch
+  - get
