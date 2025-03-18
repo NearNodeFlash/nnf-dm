@@ -210,6 +210,8 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
 	drvr := r.Drvr
+	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	var err error
 
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -217,6 +219,14 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 			Namespace:    drvr.RabbitName, // Use the rabbit
 			Labels: map[string]string{
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
+			},
+		},
+		Spec: nnfv1alpha6.NnfDataMovementSpec{
+			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+				Path: dmreq.SourcePath,
+			},
+			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+				Path: dmreq.DestinationPath,
 			},
 		},
 	}
@@ -228,8 +238,12 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 		},
 		Data: nnfv1alpha6.NnfDataMovementProfileData{
 			ProgressIntervalSeconds: 1,
+			Command:                 "sleep 300",
 		},
 	}
+
+	// Allow the user to override/supplement certain settings
+	setUserConfig(dmreq, dm)
 
 	// We name the NnfDataMovement ourselves, since we're not giving it to k8s.
 	// We'll use this name internally.
@@ -237,7 +251,12 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 	drvr.MockCount += 1
 	dm.Name = fmt.Sprintf("%s%s", dm.GetObjectMeta().GetGenerateName(), nameSuffix)
 
-	r.cmdArgs = []string{"sleep", "300"}
+	// Build command
+	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, dm, crLog)
+	if err != nil {
+		crLog.Error(err, "could not create data movement command")
+		return nil, err
+	}
 
 	r.recordRequest(ctx, dm)
 	return dm, nil
