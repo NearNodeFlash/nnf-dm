@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
@@ -283,7 +284,7 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 		return err
 	}
 	cancelContext := contextRecord.cancelContext
-	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
+	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
 		drvr.contexts.Delete(dm.Name)
@@ -303,7 +304,7 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 		return err
 	}
 	cancelContext := contextRecord.cancelContext
-	if err := r.driveWithContext(cancelContext.Ctx, dm, crLog); err != nil {
+	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		drvr.contexts.Delete(dm.Name)
 		return err
@@ -370,27 +371,46 @@ func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-func (r *DriverRequest) driveWithContext(ctxCancel context.Context, dm *nnfv1alpha6.NnfDataMovement, crLog logr.Logger) error {
+func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.Context, dm *nnfv1alpha6.NnfDataMovement, crLog logr.Logger) error {
 	drvr := r.Drvr
+	dmReq := types.NamespacedName{Name: dm.Name, Namespace: dm.Namespace}
 
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(r.cmdArgs, " "))
-
-	// Record the start of the data movement operation
-	now := metav1.NowMicro()
-	dm.Status.StartTime = &now
-	dm.Status.State = nnfv1alpha6.DataMovementConditionTypeRunning
 	cmdStatus := nnfv1alpha6.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
-	dm.Status.CommandStatus = &cmdStatus
+
+	setStart := func() {
+		now := metav1.NowMicro()
+		dm.Status.StartTime = &now
+		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeRunning
+		dm.Status.CommandStatus = &cmdStatus
+	}
+
+	// Record the start of the data movement operation
+	if !drvr.Mock {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			setStart()
+			return drvr.Client.Status().Update(ctx, dm)
+		})
+		if err != nil {
+			crLog.Error(err, "failed to update CommandStatus with start time", "cmdStatus", cmdStatus)
+			return err
+		}
+	} else {
+		setStart()
+	}
+
 	crLog.Info("Running Command", "cmd", cmdStatus.Command)
-
 	contextDelete := func() { drvr.contexts.Delete(dm.Name) }
-
-	runit(ctxCancel, contextDelete, cmd, &cmdStatus, r.dmProfile, r.mpiHostfile, crLog)
+	r.runit(ctx, ctxCancel, contextDelete, dmReq, cmd, &cmdStatus, r.dmProfile, r.mpiHostfile, crLog)
 	return nil
 }
 
-func runit(ctxCancel context.Context, contextDelete func(), cmd *exec.Cmd, cmdStatus *nnfv1alpha6.NnfDataMovementCommandStatus, profile *nnfv1alpha6.NnfDataMovementProfile, mpiHostfile string, log logr.Logger) {
+func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, contextDelete func(), dmReq types.NamespacedName, cmd *exec.Cmd, cmdStatus *nnfv1alpha6.NnfDataMovementCommandStatus, profile *nnfv1alpha6.NnfDataMovementProfile, mpiHostfile string, log logr.Logger) {
+	drvr := r.Drvr
 
 	// Execute the go routine to perform the data movement
 	go func() {
@@ -451,24 +471,26 @@ func runit(ctxCancel context.Context, contextDelete func(), cmd *exec.Cmd, cmdSt
 						cmdStatus.ElapsedTime = elapsed
 					}
 
-					//// Update the CommandStatus in the DM resource after we parsed all the lines
-					//err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					//	dm := &nnfv1alpha6.NnfDataMovement{}
-					//	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-					//		return client.IgnoreNotFound(err)
-					//	}
-					//
-					//	if dm.Status.CommandStatus == nil {
-					//		dm.Status.CommandStatus = &nnfv1alpha6.NnfDataMovementCommandStatus{}
-					//	}
-					//	cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
-					//
-					//	return r.Status().Update(ctx, dm)
-					//})
+					// Update the CommandStatus in the DM resource after we parsed all the lines
+					if !drvr.Mock {
+						err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+							dm := &nnfv1alpha6.NnfDataMovement{}
+							if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+								return client.IgnoreNotFound(err)
+							}
 
-					//if err != nil {
-					//	log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
-					//}
+							if dm.Status.CommandStatus == nil {
+								dm.Status.CommandStatus = &nnfv1alpha6.NnfDataMovementCommandStatus{}
+							}
+							cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
+
+							return drvr.Client.Status().Update(ctx, dm)
+						})
+
+						if err != nil {
+							log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
+						}
+					}
 				}
 
 				// Main Progress Collection Loop
@@ -498,10 +520,17 @@ func runit(ctxCancel context.Context, contextDelete func(), cmd *exec.Cmd, cmdSt
 		}
 
 		// Command is finished, update status
-		//now := metav1.NowMicro()
-		//dm.Status.EndTime = &now
-		//dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
-		//dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonSuccess
+		dm := &nnfv1alpha6.NnfDataMovement{}
+		if !drvr.Mock {
+			if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+				log.Error(err, "failed to get NnfDataMovement resource for final status update")
+				return
+			}
+		}
+		now := metav1.NowMicro()
+		dm.Status.EndTime = &now
+		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonSuccess
 
 		// Grab the output and trim it to remove the progress bloat
 		output := helpers.TrimDcpProgressFromOutput(combinedOutBuf.String())
@@ -511,49 +540,50 @@ func runit(ctxCancel context.Context, contextDelete func(), cmd *exec.Cmd, cmdSt
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
-			//dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonCancelled
+			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", output)
-			//dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonFailed
-			//dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
-			//resourceErr := dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
-			//dm.Status.SetResourceErrorAndLog(resourceErr, log)
+			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonFailed
+			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
+			resourceErr := dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
+			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
 			// Profile or DM request has enabled stdout logging
-			//if profile.Data.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
-			//	log.Info("Data movement operation output", "output", output)
-			//}
-			log.Info("Data movement operation output", "output", output)
+			if profile.Data.LogStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.LogStdout) {
+				log.Info("Data movement operation output", "output", output)
+			}
 
-			//// Profile or DM request has enabled storing stdout
-			//if profile.Data.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
-			//	dm.Status.Message = output
-			//}
+			// Profile or DM request has enabled storing stdout
+			if profile.Data.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
+				dm.Status.Message = output
+			}
 		}
 
 		os.RemoveAll(filepath.Dir(mpiHostfile))
 
-		//status := dm.Status.DeepCopy()
+		status := dm.Status.DeepCopy()
 
-		//err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		//	dm := &nnfv1alpha6.NnfDataMovement{}
-		//	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-		//		return client.IgnoreNotFound(err)
-		//	}
-		//
-		//	// Ensure we have the latest CommandStatus from the progress goroutine
-		//	cmdStatus.DeepCopyInto(status.CommandStatus)
-		//	status.DeepCopyInto(&dm.Status)
-		//
-		//	return r.Status().Update(ctx, dm)
-		//})
-		//
-		//if err != nil {
-		//	log.Error(err, "failed to update dm status with completion")
-		//	// TODO Add prometheus counter to track occurrences
-		//}
+		if !drvr.Mock {
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				dm := &nnfv1alpha6.NnfDataMovement{}
+				if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+					return client.IgnoreNotFound(err)
+				}
+
+				// Ensure we have the latest CommandStatus from the progress goroutine
+				cmdStatus.DeepCopyInto(status.CommandStatus)
+				status.DeepCopyInto(&dm.Status)
+
+				return drvr.Client.Status().Update(ctx, dm)
+			})
+
+			if err != nil {
+				log.Error(err, "failed to update dm status with completion")
+				// TODO Add prometheus counter to track occurrences
+			}
+		}
 
 		contextDelete()
 	}()
