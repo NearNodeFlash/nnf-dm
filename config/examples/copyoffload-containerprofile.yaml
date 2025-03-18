@@ -24,7 +24,7 @@ data:
           spec:
             containers:
               - name: copy-offload-srvr
-                image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
+                image: nnf-dm-copy-offload:latest
                 command:
                   - /nnf-copy-offload
                   - --cert
@@ -45,4 +45,4 @@ data:
           spec:
             containers:
               - name: copy-offload-worker
-                image: ghcr.io/nearnodeflash/nnf-dm-copy-offload:latest
+                image: nnf-dm-copy-offload:latest
