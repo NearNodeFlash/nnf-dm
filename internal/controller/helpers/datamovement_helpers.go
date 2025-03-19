@@ -246,7 +246,7 @@ func GetDMProfile(clnt client.Client, ctx context.Context, dm *nnfv1alpha6.NnfDa
 	return profile, nil
 }
 
-func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string, dm *nnfv1alpha6.NnfDataMovement, log logr.Logger) ([]string, error) {
+func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string, usePermissions bool, dm *nnfv1alpha6.NnfDataMovement, log logr.Logger) ([]string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// If Dryrun is enabled, just use the "true" command
@@ -259,7 +259,7 @@ func BuildDMCommand(profile *nnfv1alpha6.NnfDataMovementProfile, hostfile string
 
 	// If running as non-root (i.e. in a copy offload container), remove the --uid and --gid options
 	// from dcp.
-	if os.Getuid() != 0 {
+	if !usePermissions {
 		cmd = strings.ReplaceAll(cmd, "--uid $UID", "")
 		cmd = strings.ReplaceAll(cmd, "--gid $GID", "")
 	}
@@ -419,7 +419,9 @@ func ExtractIndexMountDir(path, namespace string) (string, error) {
 	pattern := regexp.MustCompile(fmt.Sprintf(`(%s-\d+)(/|$)`, namespace))
 	match := pattern.FindStringSubmatch(path)
 	if match == nil {
-		return "", fmt.Errorf("could not extract index mount directory from source path: %s", path)
+		return "", fmt.Errorf(
+			"could not extract index mount directory from source path: %s. Looking for pattern '%s'",
+			path, pattern)
 	}
 
 	idxMount := match[1]
@@ -729,8 +731,9 @@ func isTestEnv() bool {
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
 func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) ([]string, error) {
+
 	// If this is a node data movement request simply reference the localhost
-	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() {
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha6.NnfNodeStorage{}).Name() {
 		return []string{"localhost"}, nil
 	}
 
@@ -775,27 +778,102 @@ func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha
 	return nodeNames, nil
 }
 
+// Copy Offload version of GetWorkerHostnames.
+// For GFS2, we only need to have 1 hostname for the worker pod that is running on the local rabbit
+// node. We can get the rabbit node from the namespace of the storage reference.
+// For lustre, we want all the rabbits for the workflow. mpi-operator builds a hostfile and we can
+// take that list of FQDNs and use them.
+func GetCopyOffloadWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string, workflow, namespace string, dm *nnfv1alpha6.NnfDataMovement) ([]string, error) {
+
+	// Node-local data movement with GFS2
+	if nodes[0] == "localhost" {
+
+		// The source's storage reference should point to the namespace of the nnf node
+		if dm.Spec.Source.StorageReference.Kind != reflect.TypeOf(nnfv1alpha6.NnfNodeStorage{}).Name() {
+			return nil, newInvalidError("copy offload source storage reference is not of type NnfNodeStorage")
+		}
+		nnfNodeName := dm.Spec.Source.StorageReference.Namespace
+
+		// Get the pods running on node nnfNodeName and that are labeled as workers for this workflow
+		listOptions := []client.ListOption{
+			client.InNamespace(namespace),
+			client.MatchingLabels(map[string]string{
+				"training.kubeflow.org/job-name": workflow,
+				"training.kubeflow.org/job-role": "worker",
+			}),
+			client.MatchingFields{"spec.nodeName": nnfNodeName},
+		}
+		pods := &corev1.PodList{}
+		if err := clnt.List(ctx, pods, listOptions...); err != nil {
+			return nil, err
+		}
+
+		// We should only have one worker pod per nnf node
+		if len(pods.Items) == 0 {
+			return nil, newInvalidError("could not find any worker pods for node %s", nnfNodeName)
+		} else if len(pods.Items) != 1 {
+			return nil, newInvalidError("found more than one worker pod for node %s - there should only be one", nnfNodeName)
+		}
+
+		// Build the FQDN for the worker pod
+		// e.g. my-workflow-worker-0.my-workflow.default.svc.cluster.local
+		nodes[0] = fmt.Sprintf(
+			"%s.%s.%s.svc.cluster.local",
+			pods.Items[0].Name,
+			workflow,
+			namespace)
+
+		return nodes, nil
+	}
+
+	// Lustre Data Movement - use all the workers
+
+	// MPI-Operator builds a hostfile for us at /etc/mpi/hostfile, but we want to override the slots
+	// and use the other existing DM functionality to build the host file in the expected location
+	// and also to honor the DM profile's slots and max_slots. Crack open the prebuilt hostfile and
+	// take out only the hostnames on each line.
+	getPreBuiltHosts := func() ([]string, error) {
+		file, err := os.Open("/etc/mpi/hostfile")
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		var hosts []string
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			// only take the hostname from the line e.g. host slots=8 max_slots=16
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				hosts = append(hosts, fields[0])
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, err
+		}
+
+		return hosts, nil
+	}
+
+	hosts, err := getPreBuiltHosts()
+	if err != nil {
+		return nil, newInvalidError("could not get pull hosts from mpi-operator created hostfile: %s", err.Error())
+	}
+
+	return hosts, nil
+}
+
+// Get the hostnames for the workers that are running on the rabbit nodes. For node-local data
+// movement (i.e. XFS or GFS2) that only uses the local rabbit node, we can use localhost. For
+// non-local data movement (i.e. Lustre), we need to look up the Pods associated with the MPI
+// workers on each individual rabbit, mapping the nodename to a worker IP address.
 func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string) ([]string, error) {
 
 	if nodes[0] == "localhost" {
 		return nodes, nil
 	}
-
-	// For this first iteration, we need to look up the Pods associated with the MPI workers on each
-	// individual rabbit, mapping the nodename to a worker IP address. Since we've set up a headless
-	// service matching the subdomain, the worker's IP is used as the DNS name (substituting '-' for '.')
-	// following the description here:
-	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-hostname-and-subdomain-fields
-	//
-	// Ideally this look-up would not be required if the MPI worker pods could have the same hostname
-	// as the nodename. There is no straightfoward way for this to happen although it has been raised
-	// several times in the k8s community.
-	//
-	// A couple of ideas on how to support this...
-	// 1. Using an initContainer which would get the parent pod and modify the hostname.
-	// 2. Not use a DaemonSet to create the MPI worker pods, but do so manually, assigning
-	//    the correct hostname to each pod. Right now the daemon set provides scheduling and
-	//    pod restarts, and we would lose this feature if we managed the pods individually.
 
 	// Get the Rabbit DM Worker Pods
 	listOptions := []client.ListOption{
@@ -804,17 +882,22 @@ func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string)
 			nnfv1alpha6.DataMovementWorkerLabel: "true",
 		}),
 	}
-
 	pods := &corev1.PodList{}
 	if err := clnt.List(ctx, pods, listOptions...); err != nil {
 		return nil, err
 	}
 
+	// Build the FQDN for each worker pod
 	nodeNameToHostnameMap := map[string]string{}
 	for _, pod := range pods.Items {
-		nodeNameToHostnameMap[pod.Spec.NodeName] = strings.ReplaceAll(pod.Status.PodIP, ".", "-") + ".dm." + nnfv1alpha6.DataMovementNamespace // TODO: make the subdomain const TODO: use nnf-dm-system const
+		// <pod-ipv4-address>.<service-name>.<my-namespace>.svc.<cluster-domain.example>
+		nodeNameToHostnameMap[pod.Spec.NodeName] = fmt.Sprintf(
+			"%s.dm.%s.svc.cluster.local",
+			strings.ReplaceAll(pod.Status.PodIP, ".", "-"),
+			nnfv1alpha6.DataMovementNamespace)
 	}
 
+	// Add them to the list, making sure there are no duplicates
 	hostnames := make([]string, len(nodes))
 	for idx := range nodes {
 

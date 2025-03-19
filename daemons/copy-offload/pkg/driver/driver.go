@@ -57,9 +57,8 @@ var (
 // Driver will have only one instance per process, shared by all threads
 // in the process.
 type Driver struct {
-	Client     client.Client
-	Log        logr.Logger
-	RabbitName string
+	Client client.Client
+	Log    logr.Logger
 
 	Mock      bool
 	MockCount int
@@ -92,6 +91,9 @@ type DriverRequest struct {
 	hosts []string
 	// MPI hosts file.
 	mpiHostfile string
+	// Rabbit node targeted for data movement. This is the local node attach to the requesting
+	// compute node.
+	RabbitName string
 }
 
 func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
@@ -107,7 +109,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	}
 	if workflow.Status.State != dwsv1alpha3.StatePreRun || workflow.Status.Status != "Completed" {
 		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha3.StatePreRun)
-		crLog.Info("Workflow is in an invalid state: %v", err)
+		crLog.Error(err, "Workflow is in an invalid state")
 		return nil, err
 	}
 
@@ -116,6 +118,14 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		crLog.Error(err, "Failed to retrieve compute mountinfo")
 		return nil, err
 	}
+
+	// Determine which rabbit is local to the compute that made the request
+	rabbit, err := r.findRabbitNameFromCompute(dmreq.ComputeName)
+	if err != nil {
+		crLog.Error(err, "Failed to trace compute node to its rabbit node")
+		return nil, err
+	}
+	r.RabbitName = rabbit
 
 	crLog = crLog.WithValues("type", computeMountInfo.Type)
 	var dm *nnfv1alpha6.NnfDataMovement
@@ -132,7 +142,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	}
 
 	if err != nil {
-		crLog.Error(err, "Failed to copy files")
+		crLog.Error(err, "Failed to create DM request")
 		return nil, err
 	}
 
@@ -184,12 +194,11 @@ func (r *DriverRequest) generateName(dm *nnfv1alpha6.NnfDataMovement) {
 }
 
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
-	drvr := r.Drvr
 
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
-			Namespace:    drvr.RabbitName, // Use the rabbit
+			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
@@ -211,14 +220,15 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 		return err
 	}
 
-	r.hosts, err = helpers.GetWorkerHostnames(drvr.Client, ctx, r.nodes)
+	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
+	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
 		return err
 	}
 
-	// Create the hostfile. This is needed for preparing the destination and the data movement
-	// command itself.
+	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
+	// and the data movement command itself.
 	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
 	if err != nil {
 		crLog.Error(err, "could not create MPI hostfile")
@@ -306,7 +316,7 @@ func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.
 	}
 
 	// Build command
-	cmdArgs, err := helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, dm, crLog)
+	cmdArgs, err := helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
 		return err
@@ -509,6 +519,10 @@ func setUserConfig(dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) {
 	dm.Spec.UserConfig.LogStdout = dmreq.LogStdout
 	dm.Spec.UserConfig.StoreStdout = dmreq.StoreStdout
 
+	// TODO: Even though these aren't set explicity by copy offload API, they are getting
+	// overwritten. Investigate this. The profile says 8, but we only get 1 slot. I did remove
+	// slotsPerWorker from the container profile, so perhaps mpi-operator is doing someting extra
+	// there too.
 	if dmreq.Slots >= 0 {
 		dm.Spec.UserConfig.Slots = pointy.Int(int(dmreq.Slots))
 	}
@@ -587,7 +601,6 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, 
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with GFS2.
 func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (*nnfv1alpha6.NnfDataMovement, error) {
-	drvr := r.Drvr
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -598,7 +611,7 @@ func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMR
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
-			Namespace:    drvr.RabbitName, // Use the rabbit
+			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
 				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
@@ -624,7 +637,7 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	// to this value resulting in the full path on the Rabbit.
 
 	listOptions := []client.ListOption{
-		client.InNamespace(drvr.RabbitName),
+		client.InNamespace(r.RabbitName),
 		client.MatchingLabels(map[string]string{
 			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
 			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
@@ -637,7 +650,7 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	}
 
 	if len(clientMounts.Items) == 0 {
-		return "", fmt.Errorf("no client mounts found for node '%s'", drvr.RabbitName)
+		return "", fmt.Errorf("no client mounts found for node '%s'", r.RabbitName)
 	}
 
 	for _, clientMount := range clientMounts.Items {
@@ -762,4 +775,25 @@ func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nn
 	}
 
 	return profile, nil
+}
+
+// Use the systemconfiguration to find the compute node's local rabbit node
+func (r *DriverRequest) findRabbitNameFromCompute(compute string) (string, error) {
+	drvr := r.Drvr
+	systemConfigName := "default"
+
+	systemConfig := &dwsv1alpha3.SystemConfiguration{}
+	if err := drvr.Client.Get(context.TODO(), types.NamespacedName{Name: systemConfigName, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
+		return "", fmt.Errorf("failed to retrieve system configuration: %w", err)
+	}
+
+	for _, storageNode := range systemConfig.Spec.StorageNodes {
+		for _, computeNode := range storageNode.ComputesAccess {
+			if computeNode.Name == compute {
+				return storageNode.Name, nil
+			}
+		}
+	}
+
+	return "", nil
 }
