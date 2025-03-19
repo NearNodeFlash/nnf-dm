@@ -49,7 +49,7 @@ static int read_contents(COPY_OFFLOAD *offload, char *path, char **buffer) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to stat %s: errno %d\n", path, errno);
         return 1;
     }
-    if ((*buffer = malloc(stat_blk.st_size + 1)) == NULL) {
+    if ((*buffer = (char *)malloc(stat_blk.st_size + 1)) == NULL) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to allocate a buffer for the bearer token\n");
         return 1;
     }
@@ -87,7 +87,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp) {
     size_t realsize = size * nmemb;
     struct memory *mem = (struct memory *)clientp;
 
-    char *ptr = realloc(mem->response, mem->size + realsize + 1);
+    char *ptr = (char *)realloc(mem->response, mem->size + realsize + 1);
     if(!ptr) {
         return 0;
     }
@@ -103,7 +103,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp) {
 /* Create and initialize a handle. */
 COPY_OFFLOAD *copy_offload_init() {
     CURL *curl;
-    COPY_OFFLOAD *offload = malloc(sizeof(struct copy_offload_s));
+    COPY_OFFLOAD *offload = (COPY_OFFLOAD *)malloc(sizeof(struct copy_offload_s));
 
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
@@ -340,7 +340,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
 /* Submit a new copy-offload request.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int dry_run, char *source_path, char *dest_path, char **output) {
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
@@ -362,7 +362,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         strcpy(dry_run_str, "false");
     }
 
-    char *offload_req =
+    const char *offload_req =
         "{\"computeName\": \"%s\", "
         "\"workflowName\": \"%s\", "
         "\"sourcePath\": \"%s\", "
@@ -371,9 +371,11 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         "\"dryrun\": %s, "
         "\"dcpOptions\": \"\", "
         "\"logStdout\": true, "
-        "\"storeStdout\": false}";
-    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name, dry_run_str);
-    if (n >= sizeof(postbuf)) {
+        "\"storeStdout\": false, "
+        "\"slots\": %d, "
+        "\"maxSlots\": %d}";
+    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
+    if (n >= (int)sizeof(postbuf)) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
         return ret;
     } else if (n < 0) {

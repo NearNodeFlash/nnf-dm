@@ -50,6 +50,8 @@ void usage(const char **argv) {
     fprintf(stderr, "       -P DM_PROFILE_NAME Name of the DM profile to use (optional).\n");
     fprintf(stderr, "       -S SOURCE_PATH     Local path to source file to be copied.\n");
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
+    fprintf(stderr, "       -m SLOTS           Number of slots (processes).\n");
+    fprintf(stderr, "       -M MAX_SLOTS       Maximum number of slots (processes).\n");
     fprintf(stderr, "       -d                 Perform a dry run.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "COMMON_ARGS\n");
@@ -84,10 +86,12 @@ int main(int argc, const char **argv) {
     char *token_path = NULL;
     int dry_run = 0;
     int skip_tls = 0;
+    int slots = -1; /* -1 defers to dm profile, 0 disables slots */
+    int max_slots = -1;
     int H_opt = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:dH")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:m:M:dH")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -122,6 +126,12 @@ int main(int argc, const char **argv) {
                 break;
             case 'D':
                 dest_path = optarg;
+                break;
+            case 'm':
+                slots = atoi(optarg);
+                break;
+            case 'M':
+                max_slots = atoi(optarg);
                 break;
             case 'd':
                 dry_run = 1;
@@ -185,7 +195,7 @@ int main(int argc, const char **argv) {
     } else if (c_opt) {
         ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
-        ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, dry_run, source_path, dest_path, &output);
+        ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
     } else if (H_opt) {
         ret = copy_offload_hello(offload, &output);
     } else {
