@@ -190,11 +190,17 @@ build-copy-offload-with: $(LOCALBIN)
 build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
 
-CROSS_PLATFORM ?= linux/amd64
-.PHONY: build-copy-offload-tester-cross
-build-copy-offload-tester-cross: $(CROSSBIN)
-build-copy-offload-tester-cross: ## Build standalone tester binary for $CROSS_PLATFORM
-	${CONTAINER_TOOL} build --platform=$(CROSS_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.xplatform .
+ROCKY_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-rocky
+build-copy-offload-tester-rocky: $(CROSSBIN)
+build-copy-offload-tester-rocky:
+	${CONTAINER_TOOL} build --platform=$(ROCKY_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.roky .
+
+KIND_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-kind
+build-copy-offload-tester-kind: $(CROSSBIN)
+build-copy-offload-tester-kind:
+	${CONTAINER_TOOL} build --platform=$(KIND_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.kind .
 
 .PHONY: build-copy-offload-docker-local
 build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
