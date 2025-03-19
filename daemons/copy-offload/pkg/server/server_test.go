@@ -309,7 +309,7 @@ func TestD_TrialRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, RabbitName: "rabbit-1", Mock: true}
+	drvr := &driver.Driver{Log: crLog, Mock: true}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -370,7 +370,7 @@ func TestE_Lifecycle(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, RabbitName: "rabbit-1", Mock: true}
+	drvr := &driver.Driver{Log: crLog, Mock: true}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	var listWanted []string
