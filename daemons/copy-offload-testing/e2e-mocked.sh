@@ -60,7 +60,7 @@ fi
 
 set -x
 # shellcheck disable=SC2086
-NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS &
+NNF_NODE_NAME=rabbit01 ENVIRONMENT=test $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS &
 srvr_pid=$!
 set +x
 echo "Server pid is $srvr_pid, my pid is $$"
@@ -106,12 +106,12 @@ if [[ $output != "" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
+if output=$($CO $CO_TLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
-if [[ $output != "" ]]; then
-    echo "FAIL: Expected empty output from cancel before any jobs have been submitted"
+if [[ $output != "unable to cancel request: request not found" ]]; then
+    echo "FAIL: Expected cancel to not find my request before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi

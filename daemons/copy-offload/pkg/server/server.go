@@ -143,7 +143,7 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if err := drvrReq.CancelRequest(context.TODO(), name); err != nil {
-		http.Error(w, fmt.Sprintf("unable to cancel request: %s\n", err.Error()), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("unable to cancel request: %s", err.Error()), http.StatusNotFound)
 		return
 	}
 	http.Error(w, "", http.StatusNoContent)
