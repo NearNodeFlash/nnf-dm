@@ -188,6 +188,15 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		return nil, err
 	}
 
+	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
+	// and the data movement command itself.
+	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
+	if err != nil {
+		crLog.Error(err, "could not create MPI hostfile")
+		return nil, err
+	}
+	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
+
 	// Prepare Destination Directory
 	if err := helpers.PrepareDestination(drvr.Client, ctx, r.dmProfile, dm, r.mpiHostfile, crLog); err != nil {
 		crLog.Error(err, "could not prepare destination")
@@ -200,15 +209,6 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 		crLog.Error(err, "could not create data movement command")
 		return nil, err
 	}
-
-	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
-	// and the data movement command itself.
-	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
-	if err != nil {
-		crLog.Error(err, "could not create MPI hostfile")
-		return nil, err
-	}
-	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
 
 	if err := drvr.Client.Create(ctx, dm); err != nil {
 		crLog.Error(err, "Failed to create NnfDataMovement")
