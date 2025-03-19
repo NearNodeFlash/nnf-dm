@@ -194,7 +194,7 @@ ROCKY_PLATFORM ?= linux/amd64
 .PHONY: build-copy-offload-tester-rocky
 build-copy-offload-tester-rocky: $(CROSSBIN)
 build-copy-offload-tester-rocky:
-	${CONTAINER_TOOL} build --platform=$(ROCKY_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.roky .
+	${CONTAINER_TOOL} build --platform=$(ROCKY_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.rocky .
 
 KIND_PLATFORM ?= linux/amd64
 .PHONY: build-copy-offload-tester-kind
