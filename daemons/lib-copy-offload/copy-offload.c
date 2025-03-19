@@ -268,6 +268,30 @@ static void chop(char **output) {
     }
 }
 
+/* Send a "hello" request.
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
+ */
+int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
+    long http_code;
+    struct memory chunk = {NULL, 0};
+    int ret = 1;
+    char urlbuf[COPY_OFFLOAD_URL_SIZE];
+
+    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/hello", offload->proto, *offload->host_and_port);
+    curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+
+    http_code = copy_offload_perform(offload, &chunk);
+    if (http_code == 200) {
+        ret = 0;
+    }
+    if (chunk.response != NULL) {
+        *output = strdup(chunk.response);
+        chop(output);
+        free(chunk.response);
+    }
+    return ret;
+}
+
 /* List the active copy-offload requests.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */

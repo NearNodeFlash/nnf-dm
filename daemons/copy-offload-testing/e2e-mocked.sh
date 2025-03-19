@@ -95,6 +95,17 @@ if [[ $output != "hello back at ya" ]]; then
 fi
 
 # shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS -H "$SRVR"); then
+    echo "line $LINENO output: $output"
+    cleanup
+fi
+if [[ $output != "hello back at ya" ]]; then
+    echo "FAIL: Tester did not get expected 'hello' response"
+    kill "$srvr_pid"
+    exit 1
+fi
+
+# shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
