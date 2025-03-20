@@ -24,7 +24,9 @@ if [[ -z $SKIP_BUILD ]]; then
     make -C ./daemons/lib-copy-offload tester || exit 1
 fi
 CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
-SRVR="localhost:4000"
+SRVR_NAME="localhost"
+SRVR_PORT="4000"
+SRVR="$SRVR_NAME:$SRVR_PORT"
 PROTO="http"
 
 CERTDIR=daemons/copy-offload-testing/certs
@@ -94,8 +96,13 @@ if [[ $output != "hello back at ya" ]]; then
     exit 1
 fi
 
+export DW_WORKFLOW_NAME=yellow
+export DW_WORKFLOW_NAMESPACE=default
+export NNF_CONTAINER_PORTS="$SRVR_PORT"
+export NNF_CONTAINER_LAUNCHER="$SRVR_NAME"
+
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -H "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -H); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -106,7 +113,7 @@ if [[ $output != "hello back at ya" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -l); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -117,7 +124,7 @@ if [[ $output != "" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if output=$($CO $CO_TLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
+if output=$($CO $CO_TLS_ARGS -c nnf-copy-offload-node-2); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -128,7 +135,7 @@ if [[ $output != "unable to cancel request: request not found" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! job1=$($CO $CO_TLS_ARGS -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR"); then
+if ! job1=$($CO $CO_TLS_ARGS -o -S /mnt/nnf/ooo -D /lus/foo); then
     echo "line $LINENO output: $job1"
     cleanup
 fi
@@ -139,7 +146,7 @@ if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -l); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -150,7 +157,7 @@ if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -c "$job1" "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -c "$job1"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -161,7 +168,7 @@ if [[ $output != "" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -l); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -191,7 +198,7 @@ if [[ -z $SKIP_TLS ]]; then
     echo "$SAY_TESTER"
     echo
     # shellcheck disable=SC2086
-    if output=$($CO $USE_TESTER_ARGS -l "$SRVR" 2>&1); then
+    if output=$($CO $USE_TESTER_ARGS -l 2>&1); then
         echo "$SAY_TESTER_ERR"
         kill "$srvr_pid"
         exit 1
