@@ -51,6 +51,7 @@ void usage(const char **argv) {
     fprintf(stderr, "       -m SLOTS           Number of slots (processes).\n");
     fprintf(stderr, "       -M MAX_SLOTS       Maximum number of slots (processes).\n");
     fprintf(stderr, "       -d                 Perform a dry run.\n");
+    fprintf(stderr, "       -C MY_HOSTNAME     Name of the host submitting the request. (for development/debugging)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "COMMON_ARGS\n");
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
@@ -74,6 +75,7 @@ int main(int argc, const char **argv) {
     int verbose = 0;
     int verbose_libcurl = 0;
     char *job_name = NULL;
+    char *compute_name = NULL;
     char *profile_name = NULL;
     char *source_path = NULL;
     char *dest_path = NULL;
@@ -86,7 +88,7 @@ int main(int argc, const char **argv) {
     int H_opt = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oP:S:D:m:M:dH")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dH")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -106,6 +108,9 @@ int main(int argc, const char **argv) {
                 break;
             case 's':
                 skip_tls = 1;
+                break;
+            case 'C':
+                compute_name = optarg;
                 break;
             case 'P':
                 profile_name = optarg;
@@ -170,6 +175,13 @@ int main(int argc, const char **argv) {
     }
     if (token_path != NULL) {
         ret = copy_offload_override_token(offload, token_path);
+        if (ret != 0) {
+            fprintf(stderr, "%s\n", offload->err_message);
+            exit(1);
+        }
+    }
+    if (compute_name != NULL) {
+        ret = copy_offload_override_hostname(offload, compute_name);
         if (ret != 0) {
             fprintf(stderr, "%s\n", offload->err_message);
             exit(1);

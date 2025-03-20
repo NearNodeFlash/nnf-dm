@@ -200,6 +200,16 @@ int copy_offload_configure_without_tls(COPY_OFFLOAD *offload) {
     return _copy_offload_configure(offload, 1);
 }
 
+/* Override the local host name. */
+int copy_offload_override_hostname(COPY_OFFLOAD *offload, char *hostname) {
+    if (hostname == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "NULL hostname");
+        return 1;
+    }
+    strncpy(offload->my_host_name, hostname, sizeof(offload->my_host_name));
+    return 0;
+}
+
 /* Override the certificate file path. */
 int copy_offload_override_cert(COPY_OFFLOAD *offload, char *cert_path) {
     if (offload->cert_and_token_done) {

@@ -156,3 +156,8 @@ int copy_offload_override_cert(COPY_OFFLOAD *offload, char *cert_path);
  * On failure, returns 1 and places the error message in @offload->err_message. 
  */
 int copy_offload_override_token(COPY_OFFLOAD *offload, char *token_path);
+
+/* Override the local hostname.
+ * By default, this is gethostname(2).
+ */
+int copy_offload_override_hostname(COPY_OFFLOAD *offload, char *hostname);
