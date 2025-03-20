@@ -1,5 +1,5 @@
 ---
-apiVersion: nnf.cray.hpe.com/v1alpha5
+apiVersion: nnf.cray.hpe.com/v1alpha6
 kind: NnfContainerProfile
 metadata:
   name: copy-offload-template
@@ -11,26 +11,38 @@ data:
     - name: DW_GLOBAL_lus
       optional: false
   numPorts: 1
-  spec:
-    containers:
-      - name: copy-offload-srvr
-        image: nnf-dm-copy-offload:latest
-        command:
-          - /nnf-copy-offload
-          - --cert
-          - /etc/copy-offload-server/tls.crt
-          - --cakey
-          - /etc/copy-offload-server/tls.key
-          - --addr
-          - :$(NNF_CONTAINER_PORTS)
-        volumeMounts:
-          - name: copy-offload-server
-            mountPath: /etc/copy-offload-server
-            readOnly: true
-    volumes:
-      - name: copy-offload-server
-        secret:
-          secretName: nnf-dm-copy-offload-server
-    serviceAccount: nnf-dm-copy-offload
-    serviceAccountName: nnf-dm-copy-offload
   retryLimit: 2
+  # Copy offload needs to use mpiSpec to use the mpi-operator model
+  # TODO: Add a webhook check that any template with a serviceAccountName == nnf-dm-copy-offload
+  # needs to have an mpiSpec
+  mpiSpec:
+    runPolicy:
+      cleanPodPolicy: Running
+    mpiReplicaSpecs:
+      Launcher:
+        template:
+          spec:
+            containers:
+              - name: copy-offload-srvr
+                image: nnf-dm-copy-offload:latest
+                command:
+                  - /nnf-copy-offload
+                  - --cert
+                  - $(TLS_CERT_PATH)
+                  - --cakey
+                  - $(TLS_KEY_PATH)
+                  - --tokenkey
+                  - $(TOKEN_KEY_PATH)
+                  - --addr
+                  - :$(NNF_CONTAINER_PORTS)
+            # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to the
+            # Kubernetes API server. This ServiceAccount and its Role are defined in
+            # config/copy-offload.  Normal user containers should not require Kubernetes API server
+            # privilege and should not have a service account.
+            serviceAccountName: nnf-dm-copy-offload
+      Worker:
+        template:
+          spec:
+            containers:
+              - name: copy-offload-worker
+                image: nnf-dm-copy-offload:latest

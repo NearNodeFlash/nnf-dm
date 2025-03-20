@@ -77,6 +77,12 @@ func (m *DMRequest) Validator() error {
 	if m.WorkflowNamespace == "" {
 		m.WorkflowNamespace = corev1.NamespaceDefault
 	}
+	if m.Slots < -1 {
+		return fmt.Errorf("slots must be -1 (defer to profile), 0 (disable), or a positive integer")
+	}
+	if m.MaxSlots < -1 {
+		return fmt.Errorf("maxSlots must be -1 (defer to profile), 0 (disable), or a positive integer")
+	}
 
 	return nil
 }

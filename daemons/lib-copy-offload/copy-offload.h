@@ -26,14 +26,20 @@
 
 #define COPY_OFFLOAD_MSG_SIZE CURL_ERROR_SIZE * 2
 
+// The name of the environment variable that will contain the workflow's token.
+#define WORKFLOW_TOKEN_ENV "DW_WORKFLOW_TOKEN"
+
+// Default path of the TLS certificate. This should be a text file holding the
+// PEM form of the certificate.
+#define CERT_PATH "/etc/nnf-dm-usercontainer/cert.pem"
+
 struct copy_offload_s {
     CURL *curl;
     int skip_tls;
     char **host_and_port;
+    int cert_and_token_done;
     char *cacert;
-    char *key;
-    char *clientcert;
-    char *token_path;
+    char *token;
     char proto[6];
 
     /* The post-processed error message. If there was an error from libcurl, then
@@ -52,12 +58,30 @@ COPY_OFFLOAD *copy_offload_init();
 
 /* Store the host-and-port in the handle and set the basic configuration
  * for the handle.
- * This will enable mTLS when @clientcert and @key are non-NULL, otherwise it will enable TLS.
- * If @skip_tls is set, then TLS/mTLS will not be enabled.
+ * If @skip_tls is set, then TLS will not be enabled.
  * Returns 0 on success.
  * On failure, returns 1 and places the error message in @offload->err_message. 
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls, char *cacert, char *key, char *clientcert, char *token_path);
+int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls);
+
+/* Override the default certificate path. By default, the certificate will be
+ * read from CERT_PATH, as set by the administrator. This may be overridden by
+ * placing the PEM form of the certificate in the @cert_path file.
+ * This may be called any time before the first message is sent to the server.
+ * Returns 0 on success.
+ * On failure, returns 1 and places the error message in @offload->err_message. 
+ */
+int copy_offload_override_cert(COPY_OFFLOAD *offload, char *cert_path);
+
+/* Override the default token. By default, the token will be found in the
+ * $DW_WORKFLOW_TOKEN environment variable.
+ * Set @token_path to NULL to not use a token, or set it to a file that contains
+ * the token if not using the environment variable.
+ * This may be called any time before the first message is sent to the server.
+ * Returns 0 on success.
+ * On failure, returns 1 and places the error message in @offload->err_message. 
+ */
+int copy_offload_override_token(COPY_OFFLOAD *offload, char *token_path);
 
 /* Reset the handle so it can be used for the next command.
  * After this, the handle is ready for things like the following:
@@ -76,6 +100,14 @@ void copy_offload_verbose(COPY_OFFLOAD *offload);
  */
 int copy_offload_list(COPY_OFFLOAD *offload, char **output);
 
+/* Send a hello message to the server.
+ * The server's response will be placed in @output. The caller is responsible
+ * for calling free() on @output if *output is non-NULL.
+ * Returns 0 on success.
+ * On failure it returns 1 and places an error message in @offload->err_message.
+ */
+int copy_offload_hello(COPY_OFFLOAD *offload, char **output);
+
 /* Cancel a specific copy-offload request.
  * Any output from the server, if present, will be placed in @output. The caller
  * is responsible for calling free() on @output if *output is non-NULL.
@@ -90,7 +122,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output);
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, char *source_path, char *dest_path, char **output);
+int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output);
 
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload);

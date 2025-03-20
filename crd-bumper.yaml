@@ -8,3 +8,7 @@ extra_go_dirs: daemons/compute/server,daemons/copy-offload
 # that ArgoCD can sync them.
 extra_config_dirs: config/manager,config/examples
 
+# The main file to look at to see how APIs are being imported. The default file
+# is cmd/main.go. Set this if a different file should be used.
+alternate_main: daemons/copy-offload/cmd/main.go
+

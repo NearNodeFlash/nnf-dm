@@ -30,31 +30,31 @@ import (
 	"strings"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
-	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
+	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
 	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type UserHttp struct {
-	Log    logr.Logger
-	Drvr   *driver.Driver
-	InTest bool
-	Mock   bool
-	DerKey string
+	Log      logr.Logger
+	Drvr     *driver.Driver
+	InTest   bool
+	Mock     bool
+	KeyBytes []byte
 }
 
 // The signing algorithm that we expect was used when signing the JWT.
-const jwtSigningAlgorithm = "HS256"
+var jwtSigningAlgorithm = jwt.SigningMethodHS256
 
 func (user *UserHttp) verifyToken(tokenString string) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if token.Method.Alg() != jwtSigningAlgorithm {
+		if token.Method.Alg() != jwtSigningAlgorithm.Name {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(user.DerKey), nil
+		return user.KeyBytes, nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("token parse failed: %w", err)
 	}
 	if !token.Valid {
 		return fmt.Errorf("invalid token")
@@ -64,7 +64,7 @@ func (user *UserHttp) verifyToken(tokenString string) error {
 
 func (user *UserHttp) validateMessage(w http.ResponseWriter, req *http.Request) string {
 	// Validate the bearer token, if the server is using one.
-	if user.DerKey != "" {
+	if len(user.KeyBytes) > 0 {
 		authHeader := req.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -143,7 +143,7 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if err := drvrReq.CancelRequest(context.TODO(), name); err != nil {
-		http.Error(w, fmt.Sprintf("unable to cancel request: %s\n", err.Error()), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("unable to cancel request: %s", err.Error()), http.StatusNotFound)
 		return
 	}
 	http.Error(w, "", http.StatusNoContent)
@@ -171,7 +171,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var dm *nnfv1alpha5.NnfDataMovement
+	var dm *nnfv1alpha6.NnfDataMovement
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {

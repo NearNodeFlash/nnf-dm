@@ -19,19 +19,24 @@
 
 set -o pipefail
 
-make build-copy-offload-local || exit 1
-
-make -C ./daemons/lib-copy-offload tester || exit 1
+if [[ -z $SKIP_BUILD ]]; then
+    make build-copy-offload-local || exit 1
+    make -C ./daemons/lib-copy-offload tester || exit 1
+fi
 CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
 SRVR="localhost:4000"
 PROTO="http"
 
 CERTDIR=daemons/copy-offload-testing/certs
-SKIP_SAN=1 ./tools/gen_certs.sh $CERTDIR || exit 1
+./tools/mk-usercontainer-secrets.sh -A -S $CERTDIR || exit 1
+
+TOKEN_KEY=$CERTDIR/token_key.pem
+JWT=$CERTDIR/token
+go run ./daemons/copy-offload-testing/make-jwt/make-jwt.go -tokenkey "$TOKEN_KEY" -token "$JWT"
 
 SRVR_CMD="./bin/nnf-copy-offload -addr $SRVR -mock ${SKIP_TOKEN:+-skip-token} ${SKIP_TLS:+-skip-tls}"
 CURL_APIVER_HDR="Accepts-version: 1.0"
-CA_KEY="$CERTDIR/ca/private/ca_key.pem"
+CA_KEY="$CERTDIR/ca/ca_key.pem"
 if [[ -z $SKIP_TLS ]]; then
     PROTO="https"
     cacert="$CERTDIR/server/server_cert.pem"
@@ -40,20 +45,14 @@ if [[ -z $SKIP_TLS ]]; then
     SRVR_CMD_TLS_ARGS="-cert $cacert"
     CO_TLS_ARGS="-x $cacert"
     CURL_TLS_ARGS="--cacert $cacert"
-
-    # Enable mTLS?
-    if [[ -z $SKIP_MTLS ]]; then
-        clientcert="$CERTDIR/client/client_cert.pem"
-        SRVR_CMD_MTLS_ARGS="-clientcert $clientcert"
-        CO_MTLS_ARGS="-z $clientcert -y $CA_KEY"
-        CURL_MTLS_ARGS="--cert $clientcert --key $CA_KEY"
-    fi
 fi
 if [[ -z $SKIP_TOKEN ]]; then
-    SRVR_WANTS_KEY=1
-    TOKEN=$(<"$CERTDIR/client/token")
-    CURL_BEARER_TOKEN_HDR="Authorization: Bearer $TOKEN"
-    CO_TLS_ARGS="$CO_TLS_ARGS -t $CERTDIR/client/token"
+    DW_WORKFLOW_TOKEN=$(<"$JWT")
+    export DW_WORKFLOW_TOKEN
+    CURL_BEARER_TOKEN_HDR="Authorization: Bearer $DW_WORKFLOW_TOKEN"
+
+    token_key_file="$TOKEN_KEY"
+    SRVR_CMD_TOKEN_ARGS="-tokenkey $token_key_file"
 fi
 if [[ -n $SRVR_WANTS_KEY ]]; then
     SRVR_CMD_TLS_ARGS="$SRVR_CMD_TLS_ARGS -cakey $CA_KEY"
@@ -61,7 +60,7 @@ fi
 
 set -x
 # shellcheck disable=SC2086
-NNF_NODE_NAME=rabbit01 $SRVR_CMD $SRVR_CMD_TLS_ARGS $SRVR_CMD_MTLS_ARGS &
+NNF_NODE_NAME=rabbit01 ENVIRONMENT=test $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS &
 srvr_pid=$!
 set +x
 echo "Server pid is $srvr_pid, my pid is $$"
@@ -84,7 +83,7 @@ cnt=10
 while (( cnt > 0 )) ; do
     sleep 1
     # shellcheck disable=SC2086
-    if output=$(curl -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" $CURL_TLS_ARGS $CURL_MTLS_ARGS "$PROTO://$SRVR/hello"); then
+    if output=$(curl -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" $CURL_TLS_ARGS "$PROTO://$SRVR/hello"); then
         break
     fi
     (( cnt = cnt - 1 ))
@@ -96,7 +95,18 @@ if [[ $output != "hello back at ya" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -H "$SRVR"); then
+    echo "line $LINENO output: $output"
+    cleanup
+fi
+if [[ $output != "hello back at ya" ]]; then
+    echo "FAIL: Tester did not get expected 'hello' response"
+    kill "$srvr_pid"
+    exit 1
+fi
+
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -107,18 +117,18 @@ if [[ $output != "" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
+if output=$($CO $CO_TLS_ARGS -c nnf-copy-offload-node-2 "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
-if [[ $output != "" ]]; then
-    echo "FAIL: Expected empty output from cancel before any jobs have been submitted"
+if [[ $output != "unable to cancel request: request not found" ]]; then
+    echo "FAIL: Expected cancel to not find my request before any jobs have been submitted"
     kill "$srvr_pid"
     exit 1
 fi
 
 # shellcheck disable=SC2086
-if ! job1=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR"); then
+if ! job1=$($CO $CO_TLS_ARGS -o -C compute-01 -W yellow -S /mnt/nnf/ooo -D /lus/foo "$SRVR"); then
     echo "line $LINENO output: $job1"
     cleanup
 fi
@@ -129,7 +139,7 @@ if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -140,7 +150,7 @@ if [[ $(echo "$output" | wc -l) -ne 1 ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -c "$job1" "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -c "$job1" "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -151,7 +161,7 @@ if [[ $output != "" ]]; then
 fi
 
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS $CO_MTLS_ARGS -l "$SRVR"); then
+if ! output=$($CO $CO_TLS_ARGS -l "$SRVR"); then
     echo "line $LINENO output: $output"
     cleanup
 fi
@@ -162,21 +172,10 @@ if [[ $output != "" ]]; then
 fi
 
 if [[ -z $SKIP_TLS ]]; then
-    if [[ -z $SKIP_MTLS ]]; then
-        SAY_CURL="Verify that mTLS args are required for curl. Expect curl to fail here."
-        USE_CURL_ARGS="$CURL_TLS_ARGS"
-        SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the mTLS cert"
-
-        SAY_TESTER="Verify that mTLS args are required for test tool. Expect it to fail here."
-        USE_TESTER_ARGS="$CO_TLS_ARGS"
-        SAY_TESTER_ERR="FAIL: Expected test tool to get failure when not specifying the mTLS cert"
-   else
-        SAY_CURL="Verify that TLS args are required for curl. Expect curl to fail here."
-        SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the TLS cert/key"
-
-        SAY_TESTER_ERR="FAIL: Expected test tool to get failure when not specifying the TLS cert/key"
-        SAY_TESTER="Verify that TLS args are required for test tool. Expect it to fail here."
-    fi
+    SAY_CURL="Verify that TLS args are required for curl. Expect curl to fail here."
+    SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the TLS cert/key"
+    SAY_TESTER_ERR="FAIL: Expected test tool to get failure when not specifying the TLS cert/key"
+    SAY_TESTER="Verify that TLS args are required for test tool. Expect it to fail here."
 
     echo
     echo "$SAY_CURL"
