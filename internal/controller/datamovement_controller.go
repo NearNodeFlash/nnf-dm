@@ -44,10 +44,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
+	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
 	. "github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
-	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
+	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
 )
 
 const (
@@ -86,18 +86,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	metrics.NnfDmDataMovementReconcilesTotal.Inc()
 
-	dm := &nnfv1alpha5.NnfDataMovement{}
+	dm := &nnfv1alpha6.NnfDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	defer func() {
 		if err != nil {
-			resourceError, ok := err.(*dwsv1alpha2.ResourceErrorInfo)
+			resourceError, ok := err.(*dwsv1alpha3.ResourceErrorInfo)
 			if ok {
-				if resourceError.Severity != dwsv1alpha2.SeverityMinor {
-					dm.Status.State = nnfv1alpha5.DataMovementConditionTypeFinished
-					dm.Status.Status = nnfv1alpha5.DataMovementConditionReasonInvalid
+				if resourceError.Severity != dwsv1alpha3.SeverityMinor {
+					dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
+					dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonInvalid
 				}
 			}
 			dm.Status.SetResourceErrorAndLog(err, log)
@@ -138,21 +138,21 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Prevent gratuitous wakeups for a resource that is already finished.
-	if dm.Status.State == nnfv1alpha5.DataMovementConditionTypeFinished {
+	if dm.Status.State == nnfv1alpha6.DataMovementConditionTypeFinished {
 		return ctrl.Result{}, nil
 	}
 
 	// Handle cancellation
 	if dm.Spec.Cancel {
 		if err := r.cancel(ctx, dm); err != nil {
-			return ctrl.Result{}, dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("Unable to cancel data movement")
+			return ctrl.Result{}, dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("Unable to cancel data movement")
 		}
 
 		return ctrl.Result{}, nil
 	}
 
 	// Make sure if the DM is already running that we don't start up another command
-	if dm.Status.State == nnfv1alpha5.DataMovementConditionTypeRunning {
+	if dm.Status.State == nnfv1alpha6.DataMovementConditionTypeRunning {
 
 		// If we're currently tracking the resource, then we know for certain the
 		// resource is running and there's nothing further we need to do.
@@ -170,18 +170,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Get DM Profile
 	profile, err := GetDMProfile(r.Client, ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get profile for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get profile for data movement").WithError(err).WithMajor()
 	}
 	log.Info("Using profile", "profile", profile)
 
 	nodes, err := GetStorageNodeNames(r.Client, ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get storage nodes for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get storage nodes for data movement").WithError(err).WithMajor()
 	}
 
 	hosts, err := GetWorkerHostnames(r.Client, ctx, nodes)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
 	}
 
 	// Expand the context with cancel and store it in the map so the cancel function can be used in
@@ -196,7 +196,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// command itself.
 	mpiHostfile, err := CreateMpiHostfile(profile, hosts, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create MPI hostfile").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not create MPI hostfile").WithError(err).WithMajor()
 	}
 	log.Info("MPI Hostfile preview", "first line", PeekMpiHostfile(mpiHostfile))
 
@@ -206,17 +206,17 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Build command
-	cmdArgs, err := BuildDMCommand(profile, mpiHostfile, dm, log)
+	cmdArgs, err := BuildDMCommand(profile, mpiHostfile, true, dm, log)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha2.NewResourceError("could not create data movement command").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
-	dm.Status.State = nnfv1alpha5.DataMovementConditionTypeRunning
-	cmdStatus := nnfv1alpha5.NnfDataMovementCommandStatus{}
+	dm.Status.State = nnfv1alpha6.DataMovementConditionTypeRunning
+	cmdStatus := nnfv1alpha6.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
@@ -285,13 +285,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 					// Update the CommandStatus in the DM resource after we parsed all the lines
 					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						dm := &nnfv1alpha5.NnfDataMovement{}
+						dm := &nnfv1alpha6.NnfDataMovement{}
 						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 							return client.IgnoreNotFound(err)
 						}
 
 						if dm.Status.CommandStatus == nil {
-							dm.Status.CommandStatus = &nnfv1alpha5.NnfDataMovementCommandStatus{}
+							dm.Status.CommandStatus = &nnfv1alpha6.NnfDataMovementCommandStatus{}
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
@@ -332,8 +332,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Command is finished, update status
 		now := metav1.NowMicro()
 		dm.Status.EndTime = &now
-		dm.Status.State = nnfv1alpha5.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha5.DataMovementConditionReasonSuccess
+		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonSuccess
 
 		// Grab the output and trim it to remove the progress bloat
 		output := TrimDcpProgressFromOutput(combinedOutBuf.String())
@@ -343,12 +343,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
-			dm.Status.Status = nnfv1alpha5.DataMovementConditionReasonCancelled
+			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", output)
-			dm.Status.Status = nnfv1alpha5.DataMovementConditionReasonFailed
+			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
-			resourceErr := dwsv1alpha2.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
+			resourceErr := dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
@@ -369,7 +369,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		status := dm.Status.DeepCopy()
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			dm := &nnfv1alpha5.NnfDataMovement{}
+			dm := &nnfv1alpha6.NnfDataMovement{}
 			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -392,15 +392,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha5.NnfDataMovement) error {
+func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) error {
 	log := log.FromContext(ctx)
 
 	// Check for the scenario where a request is canceled but not deleted before the DM has started.
 	// If so, record it as cancelled and do nothing more with the data movement operation
 	if dm.Status.StartTime.IsZero() && !dm.DeletionTimestamp.IsZero() {
 		now := metav1.NowMicro()
-		dm.Status.State = nnfv1alpha5.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha5.DataMovementConditionReasonCancelled
+		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonCancelled
 		dm.Status.StartTime = &now
 		dm.Status.EndTime = &now
 
@@ -439,7 +439,7 @@ func filterByNamespace(namespace string) predicate.Predicate {
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	maxReconciles := runtime.GOMAXPROCS(0)
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha5.NnfDataMovement{}).
+		For(&nnfv1alpha6.NnfDataMovement{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxReconciles}).
 		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)

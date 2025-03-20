@@ -34,6 +34,9 @@
  * Print the usage of the current command line tool
  */
 void usage(const char **argv) {
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -H <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "    -H            Send a hello message to the server.\n");
+    fprintf(stderr, "\n");
     fprintf(stderr, "Usage: %s [COMMON_ARGS] -l <server_ip>:<server_port>\n", argv[0]);
     fprintf(stderr, "    -l            List all active copy-offload requests.\n");
     fprintf(stderr, "\n");
@@ -44,8 +47,12 @@ void usage(const char **argv) {
     fprintf(stderr, "    -o            Perform a copy-offload request, using the following args:\n");
     fprintf(stderr, "       -C COMPUTE_NAME    Name of the local compute node.\n");
     fprintf(stderr, "       -W WORKFLOW_NAME   Name of the associated Workflow.\n");
+    fprintf(stderr, "       -P DM_PROFILE_NAME Name of the DM profile to use (optional).\n");
     fprintf(stderr, "       -S SOURCE_PATH     Local path to source file to be copied.\n");
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
+    fprintf(stderr, "       -m SLOTS           Number of slots (processes).\n");
+    fprintf(stderr, "       -M MAX_SLOTS       Maximum number of slots (processes).\n");
+    fprintf(stderr, "       -d                 Perform a dry run.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "COMMON_ARGS\n");
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
@@ -53,10 +60,6 @@ void usage(const char **argv) {
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
     fprintf(stderr, "    -t TOKEN_FILE       Bearer token file.\n");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
-    fprintf(stderr, "    -y KEY_FILE         CA/Server key file. Required for mTLS.\n");
-    fprintf(stderr, "    -z CLIENTCERT_FILE  Client certificate file. Required for mTLS.\n");
-
-
 }
 
 /*
@@ -76,16 +79,19 @@ int main(int argc, const char **argv) {
     char *job_name = NULL;
     char *compute_name = NULL;
     char *workflow_name = NULL;
+    char *profile_name = NULL;
     char *source_path = NULL;
     char *dest_path = NULL;
     char *cacert_path = NULL; /* CA/server cert - a self-signed certficate */
-    char *cakey_path = NULL;
     char *token_path = NULL;
-    char *clientcert_path = NULL;
+    int dry_run = 0;
     int skip_tls = 0;
+    int slots = -1; /* -1 defers to dm profile, 0 disables slots */
+    int max_slots = -1;
+    int H_opt = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:y:z:c:oC:W:S:D:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:m:M:dH")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -112,11 +118,23 @@ int main(int argc, const char **argv) {
             case 'W':
                 workflow_name = optarg;
                 break;
+            case 'P':
+                profile_name = optarg;
+                break;
             case 'S':
                 source_path = optarg;
                 break;
             case 'D':
                 dest_path = optarg;
+                break;
+            case 'm':
+                slots = atoi(optarg);
+                break;
+            case 'M':
+                max_slots = atoi(optarg);
+                break;
+            case 'd':
+                dry_run = 1;
                 break;
             case 't':
                 token_path = optarg;
@@ -124,11 +142,8 @@ int main(int argc, const char **argv) {
             case 'x':
                 cacert_path = optarg;
                 break;
-            case 'y':
-                cakey_path = optarg;
-                break;
-            case 'z':
-                clientcert_path = optarg;
+            case 'H':
+                H_opt = 1;
                 break;
             default:
                 usage(argv);
@@ -150,10 +165,24 @@ int main(int argc, const char **argv) {
     }
 
     offload = copy_offload_init();
-    ret = copy_offload_configure(offload, &host_and_port, skip_tls, cacert_path, cakey_path, clientcert_path, token_path);
+    ret = copy_offload_configure(offload, &host_and_port, skip_tls);
     if (ret != 0) {
         fprintf(stderr, "%s\n", offload->err_message);
         exit(1);
+    }
+    if (cacert_path != NULL) {
+        ret = copy_offload_override_cert(offload, cacert_path);
+        if (ret != 0) {
+            fprintf(stderr, "%s\n", offload->err_message);
+            exit(1);
+        }
+    }
+    if (token_path != NULL) {
+        ret = copy_offload_override_token(offload, token_path);
+        if (ret != 0) {
+            fprintf(stderr, "%s\n", offload->err_message);
+            exit(1);
+        }
     }
     if (verbose_libcurl) {
         copy_offload_verbose(offload);
@@ -166,7 +195,9 @@ int main(int argc, const char **argv) {
     } else if (c_opt) {
         ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
-        ret = copy_offload_copy(offload, compute_name, workflow_name, source_path, dest_path, &output);
+        ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
+    } else if (H_opt) {
+        ret = copy_offload_hello(offload, &output);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
@@ -183,7 +214,7 @@ int main(int argc, const char **argv) {
         printf("ret %d, http_code %ld\n", ret, offload->http_code);
     }
     if (ret) {
-        fprintf(stderr, "%s", offload->err_message);
+        fprintf(stderr, "%s\n", offload->err_message);
     }
 
     copy_offload_cleanup(offload);

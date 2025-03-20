@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
+	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
 )
 
 var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
@@ -44,7 +44,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 
 	ns := &corev1.Namespace{}
 	deployment := &appsv1.Deployment{}
-	mgr := &nnfv1alpha5.NnfDataMovementManager{}
+	mgr := &nnfv1alpha6.NnfDataMovementManager{}
 	labels := map[string]string{"control-plane": "controller-manager"}
 
 	maxUnavailStr := "50%"
@@ -54,7 +54,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	BeforeEach(func() {
 		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: nnfv1alpha5.DataMovementNamespace,
+				Name: nnfv1alpha6.DataMovementNamespace,
 			},
 		}
 
@@ -65,7 +65,7 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		deployment = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: nnfv1alpha5.DataMovementNamespace,
+				Namespace: nnfv1alpha6.DataMovementNamespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -95,12 +95,12 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 	BeforeEach(func() {
 		maxUnavailable := intstr.FromString(maxUnavailStr)
 		maxSurge := intstr.FromString(maxSurgeStr)
-		mgr = &nnfv1alpha5.NnfDataMovementManager{
+		mgr = &nnfv1alpha6.NnfDataMovementManager{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "nnf-dm-manager-controller-manager",
-				Namespace: nnfv1alpha5.DataMovementNamespace,
+				Namespace: nnfv1alpha6.DataMovementNamespace,
 			},
-			Spec: nnfv1alpha5.NnfDataMovementManagerSpec{
+			Spec: nnfv1alpha6.NnfDataMovementManagerSpec{
 				Selector: metav1.LabelSelector{
 					MatchLabels: labels,
 				},

@@ -22,8 +22,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -42,10 +40,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
+	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
+	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
-	nnfv1alpha5 "github.com/NearNodeFlash/nnf-sos/api/v1alpha5"
+	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
 )
 
 var (
@@ -55,8 +54,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha5.AddToScheme(scheme))
-	utilruntime.Must(dwsv1alpha2.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha6.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha3.AddToScheme(scheme))
+	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 }
 
 func setupLog() logr.Logger {
@@ -82,7 +82,7 @@ func setupClient(crLog logr.Logger) client.Client {
 
 func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 	// Sanity check the client connection.
-	nnfNode := &nnfv1alpha5.NnfNode{}
+	nnfNode := &nnfv1alpha6.NnfNode{}
 	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "nnf-nlc", Namespace: rabbitName}, nnfNode); err != nil {
 		crLog.Error(err, "Failed to retrieve my own NnfNode")
 		os.Exit(1)
@@ -94,15 +94,13 @@ func main() {
 	skipTls := false
 	skipToken := false
 	var tlsConfig *tls.Config
-	usingMtls := false
-	var derStr string
 	var keyBlock *pem.Block
 
 	addr := flag.String("addr", "localhost:4000", "HTTPS network address")
 	certFile := flag.String("cert", "cert.pem", "CA/server certificate PEM file. A self-signed cert.")
 	keyFile := flag.String("cakey", "key.pem", "CA key PEM file")
-	clientCertFile := flag.String("clientcert", "", "Client certificate PEM file. This enables mTLS.")
-	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS/mTLS.")
+	tokenKeyFile := flag.String("tokenkey", "token_key.pem", "File with PEM key used to sign the token.")
+	flag.BoolVar(&skipTls, "skip-tls", skipTls, "Skip setting up TLS.")
 	flag.BoolVar(&skipToken, "skip-token", skipToken, "Skip the use of a bearer token.")
 	flag.BoolVar(&mock, "mock", mock, "Mock mode for tests; does not use k8s.")
 	flag.Parse()
@@ -112,10 +110,15 @@ func main() {
 		slog.Error("Did not find NNF_NODE_NAME")
 		os.Exit(1)
 	}
+	if os.Getenv("ENVIRONMENT") == "" {
+		// "production" or "kind" or "test"
+		slog.Error("Did not find ENVIRONMENT")
+		os.Exit(1)
+	}
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
-	drvr := &driver.Driver{Log: crLog, RabbitName: rabbitName, Mock: mock}
+	drvr := &driver.Driver{Log: crLog, Mock: mock}
 
 	if !skipTls {
 		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
@@ -124,45 +127,25 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Trusted client certificate.
-		var clientCertPool *x509.CertPool
-		if *clientCertFile != "" {
-			clientCert, err := os.ReadFile(*clientCertFile)
-			if err != nil {
-				slog.Error("Error reading the client certificate file", "error", err.Error())
-				os.Exit(1)
-			}
-			clientCertPool = x509.NewCertPool()
-			clientCertPool.AppendCertsFromPEM(clientCert)
-			usingMtls = true
-		}
-
 		tlsConfig = &tls.Config{
 			MinVersion:               tls.VersionTLS13,
 			PreferServerCipherSuites: true,
 			Certificates:             []tls.Certificate{serverTLSCert},
 		}
-		if usingMtls {
-			tlsConfig.ClientCAs = clientCertPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		}
 	}
 
 	if !skipToken {
-		// Read the key out of its PEM file and convert it to DER form. Then
-		// base64-encode it so we are using the same representation that was
-		// used when signing the token.
-		inKey, err := os.ReadFile(*keyFile)
+		// Read the token's key out of its PEM file and decode it to DER form.
+		inKey, err := os.ReadFile(*tokenKeyFile)
 		if err != nil {
 			slog.Error("unable to read back the key file", "error", err.Error())
 			os.Exit(1)
 		}
 		keyBlock, _ = pem.Decode(inKey)
 		if keyBlock == nil {
-			slog.Error("unable to decode PEM key")
+			slog.Error("unable to decode PEM key for token")
 			os.Exit(1)
 		}
-		derStr = base64.StdEncoding.EncodeToString(keyBlock.Bytes)
 	}
 
 	if !mock {
@@ -171,7 +154,7 @@ func main() {
 		drvr.Client = clnt
 	}
 
-	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "mTLS", usingMtls, "token", !skipToken)
+	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "token", !skipToken)
 
 	httpHandler := &userHttp.UserHttp{
 		Log:  crLog,
@@ -179,7 +162,7 @@ func main() {
 		Mock: mock,
 	}
 	if !skipToken {
-		httpHandler.DerKey = derStr
+		httpHandler.KeyBytes = keyBlock.Bytes
 	}
 
 	mux := http.NewServeMux()

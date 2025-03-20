@@ -21,6 +21,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -45,17 +46,17 @@ import (
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 )
 
-// A bearer token and the base64-encoded form of the DER key that was used to sign it.
+// A bearer token and the DER form of the key that was used to sign it.
 var bearerToken1 = ""
-var derKey1 = ""
+var derKey1 = []byte("")
 
 // A different, but otherwise valid, bearer token and its DER key.
 var bearerToken2 = ""
-var derKey2 = ""
+var derKey2 = []byte("")
 
 // A different bearer token and DER key using a different signing algorithm.
 var bearerTokenAlg2 = ""
-var derKeyAlg2 = ""
+var derKeyAlg2 = []byte("")
 
 // Fill in the tokens/keys prior to running the tests.
 func TestMain(m *testing.M) {
@@ -70,11 +71,11 @@ func TestMain(m *testing.M) {
 func createTokensAndKeys() error {
 	var err error
 
-	createTokenAndKey := func(signingMethod *jwt.SigningMethodHMAC, verifiesOK bool) (string, string, error) {
+	createTokenAndKey := func(signingMethod *jwt.SigningMethodHMAC, verifiesOK bool) (string, []byte, error) {
 		createToken := func(key []byte, method jwt.SigningMethod) (string, error) {
 			token := jwt.NewWithClaims(method,
 				jwt.MapClaims{
-					"sub": "copy-offload-api",
+					"sub": "user-container",
 					"iat": time.Now().Unix(),
 				})
 
@@ -99,19 +100,19 @@ func createTokensAndKeys() error {
 
 		privKey, err := createKey()
 		if err != nil {
-			return "", "", err
+			return "", []byte(""), err
 		}
 		tokenString, err := createToken(privKey, signingMethod)
 		if err != nil {
-			return "", "", err
+			return "", []byte(""), err
 		}
 		if verifiesOK {
-			httpHandler := &UserHttp{DerKey: string(privKey)}
+			httpHandler := &UserHttp{KeyBytes: privKey}
 			if err := httpHandler.verifyToken(tokenString); err != nil {
-				return "", "", fmt.Errorf("Failure in real verifyToken: %w", err)
+				return "", []byte(""), fmt.Errorf("Failure in real verifyToken: %w", err)
 			}
 		}
-		return tokenString, string(privKey), nil
+		return tokenString, privKey, nil
 	}
 
 	// First valid key/token.
@@ -229,8 +230,8 @@ func TestC_CancelRequest(t *testing.T) {
 		{
 			name:       "returns status-no-content",
 			method:     http.MethodDelete,
-			wantText:   "\n",
-			wantStatus: http.StatusNoContent,
+			wantText:   "unable to cancel request: request not found\n",
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "returns status-not-implemented for GET",
@@ -308,7 +309,7 @@ func TestD_TrialRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, RabbitName: "rabbit-1", Mock: true}
+	drvr := &driver.Driver{Log: crLog, Mock: true}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -369,7 +370,7 @@ func TestE_Lifecycle(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, RabbitName: "rabbit-1", Mock: true}
+	drvr := &driver.Driver{Log: crLog, Mock: true}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	var listWanted []string
@@ -443,23 +444,38 @@ func TestE_Lifecycle(t *testing.T) {
 		}
 	})
 
-	stringWanted = strings.Join(listWanted[1:], ",")
+	stringWanted = ""
 	t.Run("list remaining jobs", func(t *testing.T) {
-		request, _ := http.NewRequest(http.MethodGet, "/list", nil)
-		request.Header.Set("Accepts-version", "1.0")
-		response := httptest.NewRecorder()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-		httpHandler.ListRequests(response, request)
+		for {
+			time.Sleep(1 * time.Second)
+			select {
+			case <-ctx.Done():
+				t.Errorf("timeout waiting for jobs to finish")
+				return
+			default:
+				request, _ := http.NewRequest(http.MethodGet, "/list", nil)
+				request.Header.Set("Accepts-version", "1.0")
+				response := httptest.NewRecorder()
 
-		res := response.Result()
-		got := response.Body.String()
-		chopGot := strings.TrimRight(got, "\n")
+				httpHandler.ListRequests(response, request)
 
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
-		}
-		if chopGot != stringWanted {
-			t.Errorf("got %q, want %q", chopGot, stringWanted)
+				res := response.Result()
+				got := response.Body.String()
+
+				chopGot := strings.TrimRight(got, "\n")
+				if res.StatusCode != http.StatusOK {
+					fmt.Printf("got status %d, want status %d\n", res.StatusCode, http.StatusOK)
+					continue
+				}
+				if chopGot != stringWanted {
+					fmt.Printf("got %q, want %q\n", chopGot, stringWanted)
+					continue
+				}
+				return
+			}
 		}
 	})
 }
@@ -571,7 +587,7 @@ func TestG_BearerToken(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -597,7 +613,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken2)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -619,7 +635,9 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1 + "="}
+		invalidKey := derKey1
+		invalidKey = append(invalidKey, byte('='))
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: invalidKey}
 
 		httpHandler.Hello(response, request)
 
@@ -641,7 +659,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey2}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey2}
 
 		httpHandler.Hello(response, request)
 
@@ -662,7 +680,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKey1}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
 
 		httpHandler.Hello(response, request)
 
@@ -684,7 +702,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+string(bearerTokenAlg2))
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), DerKey: derKeyAlg2}
+		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKeyAlg2}
 
 		httpHandler.Hello(response, request)
 

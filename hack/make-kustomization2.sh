@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2023-2024 Hewlett Packard Enterprise Development LP
+# Copyright 2023-2025 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -34,7 +34,7 @@ fi
 COMPONENT_LABELS="
     - op: add
       path: /metadata/labels/app.kubernetes.io~1version
-      value: "$TAG_NNF_DM"
+      value: $TAG_NNF_DM
     - op: add
       path: /metadata/labels/app.kubernetes.io~1component
       value: nnf-dm
@@ -46,7 +46,7 @@ then
     NNF_VER_LABELS="
     - op: add
       path: /metadata/labels/app.kubernetes.io~1nnf-version
-      value: "$NNF_VERSION"
+      value: $NNF_VERSION
     - op: add
       path: /metadata/labels/app.kubernetes.io~1part-of
       value: nnf

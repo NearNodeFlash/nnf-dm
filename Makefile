@@ -53,7 +53,7 @@ IMAGE_COPY_OFFLOAD_TARGET = copy_offload_$(IMAGE_TARGET)
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
-NNFMFU_VERSION ?= 0.1.5
+NNFMFU_VERSION ?= 0.1.6
 
 CONTAINER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
@@ -139,6 +139,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 		KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(LOCALBIN))" go test -v ./$$subdir/... -coverprofile cover-$$(basename $$subdir.out) -ginkgo.v $$failfast; \
 	done
 
+within-container-unit-test: test
+	make -f daemons/copy-offload-testing/Makefile $@
+
 container-unit-test: VERSION ?= $(shell cat .version)
 container-unit-test: .version ## Run tests inside a container image
 	${CONTAINER_TOOL} build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing $(CONTAINER_BUILDARGS) .
@@ -187,11 +190,17 @@ build-copy-offload-with: $(LOCALBIN)
 build-copy-offload-with: fmt vet ## Build standalone copy-offload daemon
 	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/nnf-copy-offload daemons/copy-offload/cmd/main.go
 
-CROSS_PLATFORM ?= linux/amd64
-.PHONY: build-copy-offload-tester-cross
-build-copy-offload-tester-cross: $(CROSSBIN)
-build-copy-offload-tester-cross: ## Build standalone tester binary for $CROSS_PLATFORM
-	${CONTAINER_TOOL} build --platform=$(CROSS_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.xplatform .
+ROCKY_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-rocky
+build-copy-offload-tester-rocky: $(CROSSBIN)
+build-copy-offload-tester-rocky:
+	${CONTAINER_TOOL} build --platform=$(ROCKY_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.rocky .
+
+KIND_PLATFORM ?= linux/amd64
+.PHONY: build-copy-offload-tester-kind
+build-copy-offload-tester-kind: $(CROSSBIN)
+build-copy-offload-tester-kind:
+	${CONTAINER_TOOL} build --platform=$(KIND_PLATFORM) --output=type=local,dest=$(CROSSBIN) --no-cache -f daemons/lib-copy-offload/test-tool/Dockerfile.kind .
 
 .PHONY: build-copy-offload-docker-local
 build-copy-offload-docker-local: GOARCH = $(shell go env GOARCH)
@@ -278,7 +287,7 @@ edit-image: .version
 deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	./deploy.sh deploy $(KUSTOMIZE) config/begin
 	./deploy.sh deploy $(KUSTOMIZE) config/begin-examples
-	./tools/mk-copy-offload-secrets.sh
+	./tools/mk-usercontainer-secrets.sh
 
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	./deploy.sh undeploy $(KUSTOMIZE) config/$(OVERLAY)
@@ -330,8 +339,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.1.1
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -350,7 +359,7 @@ controller-gen: $(LOCALBIN) ## Download controller-gen locally if necessary.
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20240320141353-395cfc7486e6
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.17
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
