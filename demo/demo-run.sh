@@ -7,7 +7,9 @@
 # Begin by storing the client's token and TLS cert in your Mac's /tmp/nnf dir
 # so it can be found from inside a kind-worker container:
 #
-# CLIENT_TOKEN_SECRET=${WORKFLOW_NAME}-token
+# DW_WORKFLOW_NAME=XXX
+#
+# CLIENT_TOKEN_SECRET=${DW_WORKFLOW_NAME}-token
 # CLIENT_TLS_SECRET=nnf-dm-usercontainer-client-tls
 #
 # $ kubectl get secrets $CLIENT_TOKEN_SECRET -o yaml  | yq -rM '.data.token' | base64 -d > /tmp/nnf/token
@@ -27,8 +29,11 @@
 # the copy-offload's IP and port:
 #
 # $ docker exec -it kind-worker3 bash
-# root@kind-worker3:/# DW_WORKFLOW_TOKEN=$(</mnt/nnf/token)
-# root@kind-worker3:/# PORT=5000
+# root@kind-worker3:/# export DW_WORKFLOW_TOKEN=$(</mnt/nnf/token)
+# root@kind-worker3:/# export DW_WORKFLOW_NAME=XXX
+# root@kind-worker3:/# export DW_WORKFLOW_NAMESPACE=default
+# root@kind-worker3:/# export NNF_CONTAINER_LAUNCHER=kind-worker2
+# root@kind-worker3:/# export NNF_CONTAINER_PORTS=5000
 #
 # Now you're ready to use curl to send a "hello" message to the server.
 #
@@ -38,7 +43,7 @@
 #
 # From the kind-worker container, send the hello:
 #
-# root@kind-worker3:/# curl -H 'Accepts-version: 1.0' -H "Authorization: Bearer $DW_WORKFLOW_TOKEN" --cacert /mnt/nnf/tls.crt https://kind-worker2:$PORT/hello
+# root@kind-worker3:/# curl -H 'Accepts-version: 1.0' -H "Authorization: Bearer $DW_WORKFLOW_TOKEN" --cacert /mnt/nnf/tls.crt https://$NNF_CONTAINER_LAUNCHER:$NNF_CONTAINER_PORTS/hello
 #
 
 
