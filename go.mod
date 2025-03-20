@@ -5,10 +5,10 @@ go 1.22.0
 toolchain go1.22.5
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20250224211524-95e559ed4fa8
+	github.com/DataWorkflowServices/dws v0.0.1-0.20250312162549-a682dcdf49b1
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250219194350-45aad5cbbe17
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250220202952-3c878bceb55c // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250304162904-aa2ddc2de8f9
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250312170301-6f4fd32b0173 // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250320152841-1451efa58400
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
