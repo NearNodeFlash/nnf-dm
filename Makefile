@@ -53,7 +53,7 @@ IMAGE_COPY_OFFLOAD_TARGET = copy_offload_$(IMAGE_TARGET)
 
 # The NNF-MFU container image to use in NNFContainerProfile resources.
 NNFMFU_TAG_BASE ?= ghcr.io/nearnodeflash/nnf-mfu
-NNFMFU_VERSION ?= 0.1.5
+NNFMFU_VERSION ?= 0.1.6
 
 CONTAINER_BUILDARGS=--build-arg NNFMFU_TAG_BASE=$(NNFMFU_TAG_BASE) --build-arg NNFMFU_VERSION=$(NNFMFU_VERSION)
 
