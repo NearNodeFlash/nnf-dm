@@ -34,19 +34,17 @@
  * Print the usage of the current command line tool
  */
 void usage(const char **argv) {
-    fprintf(stderr, "Usage: %s [COMMON_ARGS] -H <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -H\n", argv[0]);
     fprintf(stderr, "    -H            Send a hello message to the server.\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage: %s [COMMON_ARGS] -l <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -l\n", argv[0]);
     fprintf(stderr, "    -l            List all active copy-offload requests.\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage: %s [COMMON_ARGS] -c JOB_NAME <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -c JOB_NAME\n", argv[0]);
     fprintf(stderr, "    -c JOB_NAME   Cancel the specified copy-offload request.\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage: %s [COMMON_ARGS] -o <-C> <-W> <-S> <-D> <server_ip>:<server_port>\n", argv[0]);
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -o <ARGS>\n", argv[0]);
     fprintf(stderr, "    -o            Perform a copy-offload request, using the following args:\n");
-    fprintf(stderr, "       -C COMPUTE_NAME    Name of the local compute node.\n");
-    fprintf(stderr, "       -W WORKFLOW_NAME   Name of the associated Workflow.\n");
     fprintf(stderr, "       -P DM_PROFILE_NAME Name of the DM profile to use (optional).\n");
     fprintf(stderr, "       -S SOURCE_PATH     Local path to source file to be copied.\n");
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
@@ -67,7 +65,6 @@ void usage(const char **argv) {
  */
 int main(int argc, const char **argv) {
     COPY_OFFLOAD *offload;
-    char *host_and_port;
     int c;
     opterr = 0;
     char * const *cargv = (char * const *)argv;
@@ -77,8 +74,6 @@ int main(int argc, const char **argv) {
     int verbose = 0;
     int verbose_libcurl = 0;
     char *job_name = NULL;
-    char *compute_name = NULL;
-    char *workflow_name = NULL;
     char *profile_name = NULL;
     char *source_path = NULL;
     char *dest_path = NULL;
@@ -91,7 +86,7 @@ int main(int argc, const char **argv) {
     int H_opt = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:W:P:S:D:m:M:dH")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oP:S:D:m:M:dH")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -111,12 +106,6 @@ int main(int argc, const char **argv) {
                 break;
             case 's':
                 skip_tls = 1;
-                break;
-            case 'C':
-                compute_name = optarg;
-                break;
-            case 'W':
-                workflow_name = optarg;
                 break;
             case 'P':
                 profile_name = optarg;
@@ -151,21 +140,23 @@ int main(int argc, const char **argv) {
         }
     }
 
-    if (optind == argc - 1) {
-        host_and_port = (char *)(argv[optind]);
-    } else {
+    if (optind != argc) {
         usage(argv);
         exit(1);
     }
     if (o_opt) {
-        if (compute_name == NULL || workflow_name == NULL || source_path == NULL || dest_path == NULL) {
+        if (source_path == NULL || dest_path == NULL) {
             usage(argv);
             exit(1);
         }
     }
 
     offload = copy_offload_init();
-    ret = copy_offload_configure(offload, &host_and_port, skip_tls);
+    if (skip_tls) {
+        ret = copy_offload_configure_without_tls(offload);
+    } else {
+        ret = copy_offload_configure(offload);
+    }
     if (ret != 0) {
         fprintf(stderr, "%s\n", offload->err_message);
         exit(1);
@@ -195,7 +186,7 @@ int main(int argc, const char **argv) {
     } else if (c_opt) {
         ret = copy_offload_cancel(offload, job_name, &output);
     } else if (o_opt) {
-        ret = copy_offload_copy(offload, compute_name, workflow_name, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
+        ret = copy_offload_copy(offload, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
     } else if (H_opt) {
         ret = copy_offload_hello(offload, &output);
     } else {
