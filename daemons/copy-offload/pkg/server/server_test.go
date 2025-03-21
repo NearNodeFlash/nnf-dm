@@ -145,12 +145,14 @@ func setupLog() logr.Logger {
 }
 
 func TestA_Hello(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
 	t.Run("returns hello response", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
-
-		httpHandler := &UserHttp{Log: setupLog()}
 
 		httpHandler.Hello(response, request)
 
@@ -196,7 +198,7 @@ func TestB_ListRequests(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -220,7 +222,87 @@ func TestB_ListRequests(t *testing.T) {
 	}
 }
 
-func TestC_CancelRequest(t *testing.T) {
+func TestC_GetRequest(t *testing.T) {
+	testCases := []struct {
+		name        string
+		method      string
+		requestName string
+		params      string
+		wantText    string
+		wantStatus  int
+	}{
+		{
+			name:        "returns status-ok",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&workflowName=yellow&maxWaitSecs=10",
+			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "returns status-badr-request for maxWaitSecs",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&workflowName=yellow",
+			wantText:    "unable to parse maxWaitSecs: strconv.Atoi: parsing \"\": invalid syntax\n",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "returns status-badr-request for requestName",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&maxWaitSecs=10",
+			wantText:    "workflow name must be supplied\n",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "returns status-ok for empty workNamespace",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowName=yellow&maxWaitSecs=10",
+			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:       "returns status-not-implemented for POST",
+			method:     http.MethodPost,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+		{
+			name:       "returns status-not-implemented for PUT",
+			method:     http.MethodPut,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+	}
+
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			request, _ := http.NewRequest(test.method, fmt.Sprintf("/status/%s?%s", test.requestName, test.params), nil)
+			request.Header.Set("Accepts-version", "1.0")
+			response := httptest.NewRecorder()
+
+			httpHandler.GetRequest(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
+}
+
+func TestD_CancelRequest(t *testing.T) {
 	testCases := []struct {
 		name       string
 		method     string
@@ -248,7 +330,7 @@ func TestC_CancelRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -272,7 +354,7 @@ func TestC_CancelRequest(t *testing.T) {
 	}
 }
 
-func TestD_TrialRequest(t *testing.T) {
+func TestE_TrialRequest(t *testing.T) {
 	testCases := []struct {
 		name       string
 		method     string
@@ -283,8 +365,8 @@ func TestD_TrialRequest(t *testing.T) {
 		{
 			name:       "returns status-ok",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-0\n",
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
@@ -309,7 +391,7 @@ func TestD_TrialRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -337,7 +419,7 @@ func TestD_TrialRequest(t *testing.T) {
 	}
 }
 
-func TestE_Lifecycle(t *testing.T) {
+func TestF_Lifecycle(t *testing.T) {
 
 	scheduleJobs := []struct {
 		name       string
@@ -349,28 +431,28 @@ func TestE_Lifecycle(t *testing.T) {
 		{
 			name:       "schedule job 1",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-0\n",
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 2",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-1\n",
+			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-1\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 3",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-2\n",
+			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-2\n",
 			wantStatus: http.StatusOK,
 		},
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	var listWanted []string
@@ -427,7 +509,7 @@ func TestE_Lifecycle(t *testing.T) {
 		// Go bug? If I try to dynamically build the url for this request I will
 		// get a null pointer reference in CancelRequest(), where 'req' will
 		// be null.
-		request, _ := http.NewRequest(http.MethodDelete, "/cancel/nnf-copy-offload-node-0", nil)
+		request, _ := http.NewRequest(http.MethodDelete, "/cancel/mock-rabbit-01--nnf-copy-offload-node-0", nil)
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
@@ -480,10 +562,10 @@ func TestE_Lifecycle(t *testing.T) {
 	})
 }
 
-func TestF_BadAPIVersion(t *testing.T) {
+func TestG_BadAPIVersion(t *testing.T) {
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	testCases := []struct {
@@ -537,14 +619,14 @@ func TestF_BadAPIVersion(t *testing.T) {
 			name:    "bad api version for copy",
 			method:  http.MethodPost,
 			url:     "/trial",
-			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler: httpHandler.TrialRequest,
 		},
 		{
 			name:           "skip api version for copy",
 			method:         http.MethodPost,
 			url:            "/trial",
-			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler:        httpHandler.TrialRequest,
 			skipApiVersion: true,
 		},
@@ -579,7 +661,10 @@ func TestF_BadAPIVersion(t *testing.T) {
 	}
 }
 
-func TestG_BearerToken(t *testing.T) {
+func TestH_BearerToken(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
@@ -587,7 +672,7 @@ func TestG_BearerToken(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -605,7 +690,10 @@ func TestG_BearerToken(t *testing.T) {
 	})
 }
 
-func TestH_BearerTokenNegatives(t *testing.T) {
+func TestI_BearerTokenNegatives(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
@@ -613,7 +701,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken2)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -637,7 +725,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 
 		invalidKey := derKey1
 		invalidKey = append(invalidKey, byte('='))
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: invalidKey}
+		httpHandler.KeyBytes = invalidKey
 
 		httpHandler.Hello(response, request)
 
@@ -659,7 +747,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey2}
+		httpHandler.KeyBytes = derKey2
 
 		httpHandler.Hello(response, request)
 
@@ -680,7 +768,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -702,7 +790,7 @@ func TestH_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+string(bearerTokenAlg2))
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKeyAlg2}
+		httpHandler.KeyBytes = derKeyAlg2
 
 		httpHandler.Hello(response, request)
 

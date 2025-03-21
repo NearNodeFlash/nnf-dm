@@ -25,6 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +39,7 @@ import (
 	"github.com/go-logr/logr"
 	"go.openly.dev/pointy"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -67,13 +70,17 @@ type Driver struct {
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	// The SrvrDataMovementRecord objects are stored here.
 	contexts sync.Map
+
+	// A map of operation completions. When one is completed, its name is recorded
+	// here until it can be reaped.
+	completions map[string]struct{}
+	cond        *sync.Cond
 }
 
 // Keep track of the context and its cancel function so that we can track
 // and cancel data movement operations in progress.
 // These objects are stored in the Driver.contexts map.
 type SrvrDataMovementRecord struct {
-	dmreq         *nnfv1alpha6.NnfDataMovement
 	cancelContext helpers.DataMovementCancelContext
 }
 
@@ -98,7 +105,16 @@ type DriverRequest struct {
 	cmdArgs []string
 }
 
-func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
+func NewDriver(log logr.Logger, mock bool) *Driver {
+	return &Driver{
+		Log:         log,
+		Mock:        mock,
+		completions: make(map[string]struct{}),
+		cond:        sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha6.NnfDataMovement, error) {
 
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
@@ -107,25 +123,25 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	wf := types.NamespacedName{Name: dmreq.WorkflowName, Namespace: dmreq.WorkflowNamespace}
 	if err := drvr.Client.Get(ctx, wf, workflow); err != nil {
 		crLog.Info("Unable to get workflow: %v", err)
-		return nil, err
+		return "", nil, err
 	}
 	if workflow.Status.State != dwsv1alpha3.StatePreRun || workflow.Status.Status != "Completed" {
 		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha3.StatePreRun)
 		crLog.Error(err, "Workflow is in an invalid state")
-		return nil, err
+		return "", nil, err
 	}
 
 	computeClientMount, computeMountInfo, err := r.findComputeMountInfo(ctx, dmreq)
 	if err != nil {
 		crLog.Error(err, "Failed to retrieve compute mountinfo")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Determine which rabbit is local to the compute that made the request
 	rabbit, err := r.findRabbitNameFromCompute(dmreq.ComputeName)
 	if err != nil {
 		crLog.Error(err, "Failed to trace compute node to its rabbit node")
-		return nil, err
+		return "", nil, err
 	}
 	r.RabbitName = rabbit
 
@@ -145,14 +161,14 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 
 	if err != nil {
 		crLog.Error(err, "Failed to create DM request")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Dm Profile - no pinned profiles here since copy_offload could use any profile.
 	r.dmProfile, err = r.selectProfile(ctx, dmreq)
 	if err != nil {
 		crLog.Error(err, "Failed to get data movement profile", "wanted", dmreq.DMProfile)
-		return nil, err
+		return "", nil, err
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
 		Kind:      reflect.TypeOf(nnfv1alpha6.NnfDataMovementProfile{}).Name(),
@@ -178,14 +194,14 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	r.nodes, err = helpers.GetStorageNodeNames(drvr.Client, ctx, dm)
 	if err != nil {
 		crLog.Error(err, "could not get storage nodes for data movement")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
 	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
@@ -193,38 +209,39 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
 	if err != nil {
 		crLog.Error(err, "could not create MPI hostfile")
-		return nil, err
+		return "", nil, err
 	}
 	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
 
 	// Prepare Destination Directory
 	if err := helpers.PrepareDestination(drvr.Client, ctx, r.dmProfile, dm, r.mpiHostfile, crLog); err != nil {
 		crLog.Error(err, "could not prepare destination")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Build command
 	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
-		return nil, err
+		return "", nil, err
 	}
 
 	if err := drvr.Client.Create(ctx, dm); err != nil {
 		crLog.Error(err, "Failed to create NnfDataMovement")
-		return nil, err
+		return "", nil, err
 	}
 	crLog.Info("Created NnfDataMovement", "name", dm.Name)
 	r.recordRequest(ctx, dm)
 
-	return dm, nil
+	return r.dmkey(dm), dm, nil
 }
 
-func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
+func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha6.NnfDataMovement, error) {
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 	var err error
 
+	r.RabbitName = "mock-rabbit-01"
 	dm := &nnfv1alpha6.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
@@ -267,18 +284,18 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
-		return nil, err
+		return "", nil, err
 	}
 
 	r.recordRequest(ctx, dm)
-	return dm, nil
+	return r.dmkey(dm), dm, nil
 }
 
 func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 
-	contextRecord, err := r.loadRequest(dm.Name)
+	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
 		crLog.Error(err, "request not found")
 		return err
@@ -287,7 +304,8 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
-		drvr.contexts.Delete(dm.Name)
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
 		return err
 	}
 
@@ -298,7 +316,7 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
 
-	contextRecord, err := r.loadRequest(dm.Name)
+	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
 		crLog.Error(err, "request not found")
 		return err
@@ -306,11 +324,21 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	cancelContext := contextRecord.cancelContext
 	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
-		drvr.contexts.Delete(dm.Name)
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
 		return err
 	}
 
 	return nil
+}
+
+func (r *DriverRequest) dmkey(dm *nnfv1alpha6.NnfDataMovement) string {
+	return fmt.Sprintf("%s--%s", dm.Namespace, dm.Name)
+}
+
+func (r *DriverRequest) dmkeySplit(key string) (string, string) {
+	split := strings.Split(key, "--")
+	return split[0], split[1]
 }
 
 func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) {
@@ -319,8 +347,8 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 	// Expand the context with cancel and store it in the map so the cancel function can be
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
-	drvr.contexts.Store(dm.Name, SrvrDataMovementRecord{
-		dmreq: dm,
+	key := r.dmkey(dm)
+	drvr.contexts.Store(key, SrvrDataMovementRecord{
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
@@ -328,7 +356,11 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 	})
 }
 
-func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error) {
+func (r *DriverRequest) loadRequest(dm *nnfv1alpha6.NnfDataMovement) (SrvrDataMovementRecord, error) {
+	return r.loadRequestByName(r.dmkey(dm))
+}
+
+func (r *DriverRequest) loadRequestByName(name string) (SrvrDataMovementRecord, error) {
 	storedCancelContext, loaded := r.Drvr.contexts.Load(name)
 	if !loaded {
 		return SrvrDataMovementRecord{}, fmt.Errorf("request not found")
@@ -336,10 +368,14 @@ func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error)
 	return storedCancelContext.(SrvrDataMovementRecord), nil
 }
 
+func (r *DriverRequest) deleteRequest(dm *nnfv1alpha6.NnfDataMovement) {
+	r.Drvr.contexts.Delete(r.dmkey(dm))
+}
+
 func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	drvr := r.Drvr
 
-	contextRecord, err := r.loadRequest(name)
+	contextRecord, err := r.loadRequestByName(name)
 	if err != nil {
 		// Maybe the Go routine already finished and removed the record.
 		return err
@@ -353,6 +389,123 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	// and the status is recorded then.
 
 	return nil
+}
+
+func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	return &DataMovementStatusResponse_v1_0{
+		State:  DataMovementStatusResponse_PENDING,
+		Status: DataMovementStatusResponse_UNKNOWN_STATUS,
+	}, -1, nil
+}
+
+func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	drvr := r.Drvr
+	keyns, keyname := r.dmkeySplit(statreq.RequestName)
+	dmReq := types.NamespacedName{Name: keyname, Namespace: keyns}
+	dm := &nnfv1alpha6.NnfDataMovement{}
+	crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
+
+	drvr.Log.Info("Getting request", "request", dmReq)
+	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.deleteCompletionByName(statreq.RequestName)
+			return nil, http.StatusNotFound, errors.New("request not found")
+		}
+		crLog.Error(err, "failed to get NnfDataMovement resource")
+		return nil, http.StatusInternalServerError, err
+	}
+	if dm.Labels[dwsv1alpha3.WorkflowNameLabel] != statreq.WorkflowName || dm.Labels[dwsv1alpha3.WorkflowNamespaceLabel] != statreq.WorkflowNamespace {
+		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
+	}
+
+	if dm.Status.EndTime.IsZero() && statreq.MaxWaitSecs != 0 {
+
+		r.waitForCompletionOrTimeout(statreq)
+
+		if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.deleteCompletionByName(statreq.RequestName)
+				return nil, http.StatusNotFound, errors.New("request not found after waiting for completion")
+			}
+			crLog.Error(err, "failed to get NnfDataMovement resource afer waiting for completion")
+			return nil, http.StatusInternalServerError, err
+		}
+	}
+
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha6.DataMovementConditionReasonInvalid {
+		return &DataMovementStatusResponse_v1_0{
+			State:  DataMovementStatusResponse_PENDING,
+			Status: DataMovementStatusResponse_UNKNOWN_STATUS,
+		}, -1, nil
+	}
+
+	stateMap := map[string]DataMovementStatusResponse_State{
+		"": DataMovementStatusResponse_UNKNOWN_STATE,
+		nnfv1alpha6.DataMovementConditionTypeStarting: DataMovementStatusResponse_STARTING,
+		nnfv1alpha6.DataMovementConditionTypeRunning:  DataMovementStatusResponse_RUNNING,
+		nnfv1alpha6.DataMovementConditionTypeFinished: DataMovementStatusResponse_COMPLETED,
+	}
+
+	state, ok := stateMap[dm.Status.State]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned state")
+	}
+
+	if state != DataMovementStatusResponse_COMPLETED && dm.Spec.Cancel {
+		state = DataMovementStatusResponse_CANCELLING
+	}
+
+	statusMap := map[string]DataMovementStatusResponse_Status{
+		"": DataMovementStatusResponse_UNKNOWN_STATUS,
+		nnfv1alpha6.DataMovementConditionReasonFailed:    DataMovementStatusResponse_FAILED,
+		nnfv1alpha6.DataMovementConditionReasonSuccess:   DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha6.DataMovementConditionReasonInvalid:   DataMovementStatusResponse_INVALID,
+		nnfv1alpha6.DataMovementConditionReasonCancelled: DataMovementStatusResponse_CANCELLED,
+	}
+
+	status, ok := statusMap[dm.Status.Status]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned status")
+	}
+
+	cmdStatus := DataMovementCommandStatus{}
+	if dm.Status.CommandStatus != nil {
+		cmdStatus.Command = dm.Status.CommandStatus.Command
+		cmdStatus.LastMessage = dm.Status.CommandStatus.LastMessage
+
+		if dm.Status.CommandStatus.ElapsedTime.Duration > 0 {
+			d := dm.Status.CommandStatus.ElapsedTime.Truncate(time.Millisecond)
+			cmdStatus.ElapsedTime = d.String()
+		}
+		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.Local().String()
+		}
+		if dm.Status.CommandStatus.ProgressPercentage != nil {
+			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
+		}
+	}
+
+	startTimeStr := ""
+	if !dm.Status.StartTime.IsZero() {
+		startTimeStr = dm.Status.StartTime.Local().String()
+	}
+	endTimeStr := ""
+	if !dm.Status.EndTime.IsZero() {
+		endTimeStr = dm.Status.EndTime.Local().String()
+	}
+
+	if state == DataMovementStatusResponse_COMPLETED && !dm.Status.EndTime.IsZero() {
+		r.deleteCompletionByName(statreq.RequestName)
+	}
+
+	return &DataMovementStatusResponse_v1_0{
+		State:         state,
+		Status:        status,
+		Message:       dm.Status.Message,
+		CommandStatus: &cmdStatus,
+		StartTime:     startTimeStr,
+		EndTime:       endTimeStr,
+	}, -1, nil
 }
 
 func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
@@ -404,7 +557,10 @@ func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.
 	}
 
 	crLog.Info("Running Command", "cmd", cmdStatus.Command)
-	contextDelete := func() { drvr.contexts.Delete(dm.Name) }
+	contextDelete := func() {
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
+	}
 	r.runit(ctx, ctxCancel, contextDelete, dmReq, cmd, &cmdStatus, r.dmProfile, r.mpiHostfile, crLog)
 	return nil
 }
@@ -587,6 +743,63 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 
 		contextDelete()
 	}()
+}
+
+func (r *DriverRequest) notifyCompletion(dm *nnfv1alpha6.NnfDataMovement) {
+	drvr := r.Drvr
+	key := r.dmkey(dm)
+
+	drvr.cond.L.Lock()
+	drvr.completions[key] = struct{}{}
+	drvr.cond.L.Unlock()
+	drvr.cond.Broadcast()
+}
+
+func (r *DriverRequest) deleteCompletionByName(name string) {
+	drvr := r.Drvr
+
+	drvr.cond.L.Lock()
+	delete(drvr.completions, name)
+	drvr.cond.L.Unlock()
+}
+
+// waitForCompletionOrTimeout waits for the completion of the status request or for timeout.
+func (r *DriverRequest) waitForCompletionOrTimeout(statreq StatusRequest) {
+	drvr := r.Drvr
+	timeout := false
+	complete := make(chan struct{}, 1)
+
+	// Start a go routine that waits for the completion of this status request or for timeout
+	go func() {
+
+		drvr.cond.L.Lock()
+		for {
+			if _, found := drvr.completions[statreq.RequestName]; found || timeout {
+				break
+			}
+
+			drvr.cond.Wait()
+		}
+
+		drvr.cond.L.Unlock()
+
+		complete <- struct{}{}
+	}()
+
+	var maxWaitTimeDuration time.Duration
+	if statreq.MaxWaitSecs < 0 || time.Duration(statreq.MaxWaitSecs) > math.MaxInt64/time.Second {
+		maxWaitTimeDuration = math.MaxInt64
+	} else {
+		maxWaitTimeDuration = time.Duration(statreq.MaxWaitSecs) * time.Second
+	}
+
+	// Wait for completion signal or timeout
+	select {
+	case <-complete:
+	case <-time.After(maxWaitTimeDuration):
+		timeout = true
+		drvr.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
+	}
 }
 
 // Set the DM's UserConfig options based on the incoming requests's options

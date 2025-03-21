@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
@@ -35,6 +36,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// UserHttp will have only one instance per process, shared by all threads
+// in the process.
 type UserHttp struct {
 	Log      logr.Logger
 	Drvr     *driver.Driver
@@ -103,6 +106,66 @@ func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "hello back at ya\n")
 }
 
+func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
+	var err error
+	var apiVersion string
+	if req.Method != "GET" {
+		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+
+	user.Log.Info("In GetRequest", "version", apiVersion, "url", req.URL)
+	urlParts, err := url.Parse(req.URL.String())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to parse URL query parameters: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	requestName := filepath.Base(urlParts.Path)
+	params := urlParts.Query()
+
+	// This is the v1.0 apiVersion input. See COPY_OFFLOAD_API_VERSION.
+	var statreq driver.StatusRequest
+	statreq.RequestName = requestName
+	statreq.WorkflowName = params.Get("workflowName")
+	statreq.WorkflowNamespace = params.Get("workflowNamespace")
+	statreq.MaxWaitSecs, err = strconv.Atoi(params.Get("maxWaitSecs"))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to parse maxWaitSecs: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	if err := statreq.Validator(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	user.Log.Info("  GetRequest", "dmreq", statreq)
+
+	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
+	var http_code int
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
+	var response *driver.DataMovementStatusResponse_v1_0
+	if user.Mock {
+		response, http_code, err = drvrReq.GetRequestMock(context.TODO(), statreq)
+	} else {
+		response, http_code, err = drvrReq.GetRequest(context.TODO(), statreq)
+	}
+	if err != nil {
+		if http_code > 0 {
+			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http_code)
+		} else {
+			http.Error(w, fmt.Sprintf("unable to get request: %s\n", err.Error()), http.StatusInternalServerError)
+		}
+		return
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("unable to encode data movement status response: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	// StatusOK is implied.
+}
+
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 	var apiVersion string
 	if req.Method != "GET" {
@@ -119,6 +182,7 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, fmt.Sprintf("unable to list requests: %s\n", err.Error()), http.StatusInternalServerError)
 		return
 	}
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
 	if len(items) > 0 {
 		fmt.Fprintln(w, strings.Join(items, ","))
 	}
@@ -136,7 +200,7 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 	user.Log.Info("In DELETE", "version", apiVersion, "url", req.URL)
 	urlParts, err := url.Parse(req.URL.String())
 	if err != nil {
-		http.Error(w, "unable to parse URL", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("unable to parse URL: %s", err.Error()), http.StatusBadRequest)
 		return
 	}
 	name := filepath.Base(urlParts.Path)
@@ -160,22 +224,24 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	}
 	user.Log.Info("In TrialRequest", "version", apiVersion, "url", req.URL)
 
+	// This is the v1.0 apiVersion input. See COPY_OFFLOAD_API_VERSION.
 	var dmreq driver.DMRequest
 	if err := json.NewDecoder(req.Body).Decode(&dmreq); err != nil {
 		http.Error(w, fmt.Sprintf("unable to decode data movement request body: %s", err.Error()), http.StatusBadRequest)
 		return
 	}
-	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 	if err := dmreq.Validator(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 
 	var dm *nnfv1alpha6.NnfDataMovement
+	var dmkey string
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {
-		dm, err = drvrReq.CreateMock(context.TODO(), dmreq)
+		dmkey, dm, err = drvrReq.CreateMock(context.TODO(), dmreq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)
 			return
@@ -187,7 +253,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else {
-		dm, err = drvrReq.Create(context.TODO(), dmreq)
+		dmkey, dm, err = drvrReq.Create(context.TODO(), dmreq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)
 			return
@@ -199,5 +265,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	fmt.Fprintf(w, "name=%s\n", dm.GetName())
+
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
+	fmt.Fprintf(w, "name=%s\n", dmkey)
 }
