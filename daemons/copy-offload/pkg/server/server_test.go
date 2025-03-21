@@ -220,7 +220,65 @@ func TestB_ListRequests(t *testing.T) {
 	}
 }
 
-func TestC_CancelRequest(t *testing.T) {
+func TestC_GetRequest(t *testing.T) {
+	testCases := []struct {
+		name       string
+		method     string
+		body       []byte
+		wantText   string
+		wantStatus int
+	}{
+		{
+			name:       "returns status-no-content",
+			method:     http.MethodGet,
+			body:       []byte("{\"workflowName\": \"yellow\", \"requestName\": \"nnf-copy-offload-node-9ae2a136-4\", \"maxWaitSecs\": 3}"),
+			wantText:   "",
+			wantStatus: http.StatusOK,
+		},
+		//{
+		//	name:       "returns status-not-implemented for POST",
+		//	method:     http.MethodPost,
+		//	wantText:   "method not supported\n",
+		//	wantStatus: http.StatusNotImplemented,
+		//},
+		//{
+		//	name:       "returns status-not-implemented for PUT",
+		//	method:     http.MethodPut,
+		//	wantText:   "method not supported\n",
+		//	wantStatus: http.StatusNotImplemented,
+		//},
+	}
+
+	crLog := setupLog()
+	drvr := &driver.Driver{Log: crLog, Mock: true}
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			var readerBody io.Reader = nil
+			if len(test.body) > 0 {
+				readerBody = bytes.NewReader(test.body)
+			}
+			request, _ := http.NewRequest(test.method, "/status", readerBody)
+			request.Header.Set("Accepts-version", "1.0")
+			response := httptest.NewRecorder()
+
+			httpHandler.GetRequest(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
+}
+
+func TestD_CancelRequest(t *testing.T) {
 	testCases := []struct {
 		name       string
 		method     string
@@ -272,7 +330,7 @@ func TestC_CancelRequest(t *testing.T) {
 	}
 }
 
-func TestD_TrialRequest(t *testing.T) {
+func TestE_TrialRequest(t *testing.T) {
 	testCases := []struct {
 		name       string
 		method     string
@@ -337,7 +395,7 @@ func TestD_TrialRequest(t *testing.T) {
 	}
 }
 
-func TestE_Lifecycle(t *testing.T) {
+func TestF_Lifecycle(t *testing.T) {
 
 	scheduleJobs := []struct {
 		name       string
@@ -480,7 +538,7 @@ func TestE_Lifecycle(t *testing.T) {
 	})
 }
 
-func TestF_BadAPIVersion(t *testing.T) {
+func TestG_BadAPIVersion(t *testing.T) {
 
 	crLog := setupLog()
 	drvr := &driver.Driver{Log: crLog, Mock: true}
@@ -579,7 +637,7 @@ func TestF_BadAPIVersion(t *testing.T) {
 	}
 }
 
-func TestG_BearerToken(t *testing.T) {
+func TestH_BearerToken(t *testing.T) {
 
 	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
@@ -605,7 +663,7 @@ func TestG_BearerToken(t *testing.T) {
 	})
 }
 
-func TestH_BearerTokenNegatives(t *testing.T) {
+func TestI_BearerTokenNegatives(t *testing.T) {
 
 	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)

@@ -103,6 +103,51 @@ func (user *UserHttp) Hello(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "hello back at ya\n")
 }
 
+func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
+	var apiVersion string
+	if req.Method != "GET" {
+		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+
+	user.Log.Info("In GetRequest", "version", apiVersion, "url", req.URL)
+
+	// This is the v1.0 apiVersion input. See COPY_OFFLOAD_API_VERSION.
+	var statreq driver.StatusRequest
+	if err := json.NewDecoder(req.Body).Decode(&statreq); err != nil {
+		http.Error(w, fmt.Sprintf("unable to decode data movement status request body: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	if err := statreq.Validator(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	user.Log.Info("  GetRequest", "dmreq", statreq)
+
+	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
+	var err error
+	var http_code int
+	var response *driver.DataMovementStatusResponse_v1_0
+	if user.Mock {
+		response, http_code, err = drvrReq.GetRequestMock(context.TODO(), statreq)
+	} else {
+		response, http_code, err = drvrReq.GetRequest(context.TODO(), statreq)
+	}
+	if err != nil {
+		if http_code > 0 {
+			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http_code)
+		} else {
+			http.Error(w, fmt.Sprintf("unable to get request: %s\n", err.Error()), http.StatusInternalServerError)
+		}
+		return
+	}
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
+	fmt.Fprintf(w, "%#v\n", response)
+}
+
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 	var apiVersion string
 	if req.Method != "GET" {
@@ -119,6 +164,7 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, fmt.Sprintf("unable to list requests: %s\n", err.Error()), http.StatusInternalServerError)
 		return
 	}
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
 	if len(items) > 0 {
 		fmt.Fprintln(w, strings.Join(items, ","))
 	}
@@ -160,16 +206,17 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	}
 	user.Log.Info("In TrialRequest", "version", apiVersion, "url", req.URL)
 
+	// This is the v1.0 apiVersion input. See COPY_OFFLOAD_API_VERSION.
 	var dmreq driver.DMRequest
 	if err := json.NewDecoder(req.Body).Decode(&dmreq); err != nil {
 		http.Error(w, fmt.Sprintf("unable to decode data movement request body: %s", err.Error()), http.StatusBadRequest)
 		return
 	}
-	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 	if err := dmreq.Validator(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 
 	var dm *nnfv1alpha6.NnfDataMovement
 	var err error
@@ -199,5 +246,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
 	fmt.Fprintf(w, "name=%s\n", dm.GetName())
 }

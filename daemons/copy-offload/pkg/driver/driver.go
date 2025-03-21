@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +38,7 @@ import (
 	"github.com/go-logr/logr"
 	"go.openly.dev/pointy"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -73,7 +75,6 @@ type Driver struct {
 // and cancel data movement operations in progress.
 // These objects are stored in the Driver.contexts map.
 type SrvrDataMovementRecord struct {
-	dmreq         *nnfv1alpha6.NnfDataMovement
 	cancelContext helpers.DataMovementCancelContext
 }
 
@@ -320,7 +321,6 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
 	drvr.contexts.Store(dm.Name, SrvrDataMovementRecord{
-		dmreq: dm,
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
@@ -353,6 +353,123 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	// and the status is recorded then.
 
 	return nil
+}
+
+func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	//drvr := r.Drvr
+	//crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
+
+	//dm := &nnfv1alpha6.NnfDataMovement{}
+
+	return &DataMovementStatusResponse_v1_0{
+		State:  DataMovementStatusResponse_PENDING,
+		Status: DataMovementStatusResponse_UNKNOWN_STATUS,
+	}, -1, nil
+}
+
+func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	drvr := r.Drvr
+	dmReq := types.NamespacedName{Name: statreq.RequestName, Namespace: statreq.WorkflowNamespace}
+	dm := &nnfv1alpha6.NnfDataMovement{}
+	crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
+
+	drvr.Log.Info("Getting request", "name", statreq.RequestName)
+	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+		crLog.Error(err, "XX1 Get failed")
+		if apierrors.IsNotFound(err) {
+			return nil, http.StatusNotFound, errors.New("request not found")
+		}
+		crLog.Error(err, "failed to get NnfDataMovement resource")
+		return nil, http.StatusInternalServerError, err
+	}
+	if dm.Labels[nnfv1alpha6.DataMovementInitiatorLabel] != statreq.WorkflowName {
+		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
+	}
+
+	//if dm.Status.EndTime.IsZero() && statreq.MaxWaitSecs != 0 {
+	//
+	//	r.waitForCompletionOrTimeout(statreq)
+	//
+	//	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+	//		crLog.Error(err, "XX2 Get failed")
+	//		if apierrors.IsNotFound(err) {
+	//			return nil, http.StatusNotFound, errors.New("request not found")
+	//		}
+	//		crLog.Error(err, "failed to get NnfDataMovement resource afer waiting")
+	//		return nil, http.StatusInternalServerError, err
+	//	}
+	//}
+
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha6.DataMovementConditionReasonInvalid {
+		return &DataMovementStatusResponse_v1_0{
+			State:  DataMovementStatusResponse_PENDING,
+			Status: DataMovementStatusResponse_UNKNOWN_STATUS,
+		}, -1, nil
+	}
+
+	stateMap := map[string]DataMovementStatusResponse_State{
+		"": DataMovementStatusResponse_UNKNOWN_STATE,
+		nnfv1alpha6.DataMovementConditionTypeStarting: DataMovementStatusResponse_STARTING,
+		nnfv1alpha6.DataMovementConditionTypeRunning:  DataMovementStatusResponse_RUNNING,
+		nnfv1alpha6.DataMovementConditionTypeFinished: DataMovementStatusResponse_COMPLETED,
+	}
+
+	state, ok := stateMap[dm.Status.State]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned state")
+	}
+
+	if state != DataMovementStatusResponse_COMPLETED && dm.Spec.Cancel {
+		state = DataMovementStatusResponse_CANCELLING
+	}
+
+	statusMap := map[string]DataMovementStatusResponse_Status{
+		"": DataMovementStatusResponse_UNKNOWN_STATUS,
+		nnfv1alpha6.DataMovementConditionReasonFailed:    DataMovementStatusResponse_FAILED,
+		nnfv1alpha6.DataMovementConditionReasonSuccess:   DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha6.DataMovementConditionReasonInvalid:   DataMovementStatusResponse_INVALID,
+		nnfv1alpha6.DataMovementConditionReasonCancelled: DataMovementStatusResponse_CANCELLED,
+	}
+
+	status, ok := statusMap[dm.Status.Status]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned status")
+	}
+
+	cmdStatus := DataMovementCommandStatus{}
+	if dm.Status.CommandStatus != nil {
+		cmdStatus.Command = dm.Status.CommandStatus.Command
+		cmdStatus.LastMessage = dm.Status.CommandStatus.LastMessage
+
+		if dm.Status.CommandStatus.ElapsedTime.Duration > 0 {
+			d := dm.Status.CommandStatus.ElapsedTime.Truncate(time.Millisecond)
+			cmdStatus.ElapsedTime = d.String()
+		}
+		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.Local().String()
+		}
+		if dm.Status.CommandStatus.ProgressPercentage != nil {
+			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
+		}
+	}
+
+	startTimeStr := ""
+	if !dm.Status.StartTime.IsZero() {
+		startTimeStr = dm.Status.StartTime.Local().String()
+	}
+	endTimeStr := ""
+	if !dm.Status.EndTime.IsZero() {
+		endTimeStr = dm.Status.EndTime.Local().String()
+	}
+
+	return &DataMovementStatusResponse_v1_0{
+		State:         state,
+		Status:        status,
+		Message:       dm.Status.Message,
+		CommandStatus: &cmdStatus,
+		StartTime:     startTimeStr,
+		EndTime:       endTimeStr,
+	}, -1, nil
 }
 
 func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
@@ -588,6 +705,44 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 		contextDelete()
 	}()
 }
+
+// waitForCompletionOrTimeout waits for the completion of the status request or for timeout.
+//func (r *DriverRequest) waitForCompletionOrTimeout(statreq StatusRequest) {
+//	timeout := false
+//	complete := make(chan struct{}, 1)
+//
+//	// Start a go routine that waits for the completion of this status request or for timeout
+//	go func() {
+//
+//		s.cond.L.Lock()
+//		for {
+//			if _, found := s.completions[req.Uid]; found || timeout {
+//				break
+//			}
+//
+//			s.cond.Wait()
+//		}
+//
+//		s.cond.L.Unlock()
+//
+//		complete <- struct{}{}
+//	}()
+//
+//	var maxWaitTimeDuration time.Duration
+//	if statreq.MaxWaitSecs < 0 || time.Duration(statreq.MaxWaitSecs) > math.MaxInt64/time.Second {
+//		maxWaitTimeDuration = math.MaxInt64
+//	} else {
+//		maxWaitTimeDuration = time.Duration(statreq.MaxWaitSecs) * time.Second
+//	}
+//
+//	// Wait for completion signal or timeout
+//	select {
+//	case <-complete:
+//	case <-time.After(maxWaitTimeDuration):
+//		timeout = true
+//		s.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
+//	}
+//}
 
 // Set the DM's UserConfig options based on the incoming requests's options
 func setUserConfig(dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) {

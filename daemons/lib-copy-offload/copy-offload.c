@@ -337,6 +337,53 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
     return ret;
 }
 
+/* Submit a status request.
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
+ */
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, char **output) {
+    long http_code;
+    struct memory chunk = {NULL, 0};
+    int ret = 1;
+    int n;
+    char urlbuf[COPY_OFFLOAD_URL_SIZE];
+    char postbuf[COPY_OFFLOAD_POST_SIZE];
+
+    snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/status", offload->proto, offload->server_host, offload->server_port);
+    curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 =
+        "{\"workflowName\": \"%s\", "
+        "\"workflowNamespace\": \"%s\", "
+        "\"requestName\": \"%s\", "
+        "\"maxWaitSecs\": %d}";
+    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->workflow_name, offload->workflow_namespace, job_name, max_wait_secs);
+    if (n >= (int)sizeof(postbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
+    curl_easy_setopt(offload->curl, CURLOPT_POSTFIELDS, postbuf);
+
+    http_code = copy_offload_perform(offload, &chunk);
+    if (chunk.response != NULL) {
+        if (http_code == 200) {
+            char *delim = strchr(chunk.response, '=');
+            if (delim != NULL) {
+                *output = strdup(delim+1);
+                chop(output);
+            }
+            ret = 0;
+        } else if (http_code != -1) {
+            snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "%s", chunk.response);
+        }
+        free(chunk.response);
+    }
+    return ret;
+}
+
 /* List the active copy-offload requests.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
@@ -407,7 +454,8 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
         strcpy(dry_run_str, "false");
     }
 
-    const char *offload_req =
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 =
         "{\"computeName\": \"%s\", "
         "\"workflowName\": \"%s\", "
         "\"workflowNamespace\": \"%s\", "
@@ -420,7 +468,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
         "\"storeStdout\": false, "
         "\"slots\": %d, "
         "\"maxSlots\": %d}";
-    n = snprintf(postbuf, sizeof(postbuf), offload_req, offload->my_host_name, offload->workflow_name, offload->workflow_namespace, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
+    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->my_host_name, offload->workflow_name, offload->workflow_namespace, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
     if (n >= (int)sizeof(postbuf)) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
         return ret;

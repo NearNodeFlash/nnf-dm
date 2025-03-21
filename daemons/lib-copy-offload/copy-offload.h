@@ -89,37 +89,39 @@ COPY_OFFLOAD *copy_offload_init();
  */
 int copy_offload_configure(COPY_OFFLOAD *offload);
 
+/* Submit a new copy-offload request.
+ * The new job's name will be placed in @output. This name is used to cancel the
+ * request or to check its status.
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
+ * Returns 0 on success.
+ * On failure it returns 1 and places an error message in @offload->err_message.
+ */
+int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output);
+
 /* List the active copy-offload requests.
- * The comma-separated list of job names will be placed in @output. The caller
- * is responsible for calling free() on @output if *output is non-NULL.
+ * The comma-separated list of job names will be placed in @output. The job names
+ * are the same ones returned by copy_offload_copy().
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
 int copy_offload_list(COPY_OFFLOAD *offload, char **output);
 
-/* Send a hello message to the server.
- * The server's response will be placed in @output. The caller is responsible
- * for calling free() on @output if *output is non-NULL.
+/* Submit a status request. The @job_name is the value returned by copy_offload_copy().
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
- * On failure it returns 1 and places an error message in @offload->err_message.
+ * On failure it returns 1 and places an error message in @offload->err_message. 
  */
-int copy_offload_hello(COPY_OFFLOAD *offload, char **output);
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, char **output);
 
-/* Cancel a specific copy-offload request.
+/* Cancel a specific copy-offload request. The @job_name is the value returned
+ * by copy_offload_copy().
  * Any output from the server, if present, will be placed in @output. The caller
  * is responsible for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message.
  */
 int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output);
-
-/* Submit a new copy-offload request.
- * The new job's name will be placed in @output. The caller is responsible
- * for calling free() on @output if *output is non-NULL.
- * Returns 0 on success.
- * On failure it returns 1 and places an error message in @offload->err_message.
- */
-int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output);
 
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload);
@@ -130,6 +132,14 @@ void copy_offload_cleanup(COPY_OFFLOAD *offload);
 
 /* Request verbose output from libcurl. */
 void copy_offload_verbose(COPY_OFFLOAD *offload);
+
+/* Send a hello message to the server.
+ * The server's response will be placed in @output. The caller is responsible
+ * for calling free() on @output if *output is non-NULL.
+ * Returns 0 on success.
+ * On failure it returns 1 and places an error message in @offload->err_message.
+ */
+int copy_offload_hello(COPY_OFFLOAD *offload, char **output);
 
 /* Setup the handle with information needed to connect to the server but with
  * TLS disabled.
