@@ -118,7 +118,7 @@ func main() {
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
-	drvr := &driver.Driver{Log: crLog, Mock: mock}
+	drvr := driver.NewDriver(crLog, mock)
 
 	if !skipTls {
 		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
@@ -156,6 +156,7 @@ func main() {
 
 	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "token", !skipToken)
 
+	// Make one of these for this server, and use it in all requests.
 	httpHandler := &userHttp.UserHttp{
 		Log:  crLog,
 		Drvr: drvr,

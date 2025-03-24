@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -69,6 +70,11 @@ type Driver struct {
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	// The SrvrDataMovementRecord objects are stored here.
 	contexts sync.Map
+
+	// A map of operation completions. When one is completed, its name is recorded
+	// here until it can be reaped.
+	completions map[string]struct{}
+	cond        *sync.Cond
 }
 
 // Keep track of the context and its cancel function so that we can track
@@ -97,6 +103,15 @@ type DriverRequest struct {
 	RabbitName string
 	// Command arguments.
 	cmdArgs []string
+}
+
+func NewDriver(log logr.Logger, mock bool) *Driver {
+	return &Driver{
+		Log:         log,
+		Mock:        mock,
+		completions: make(map[string]struct{}),
+		cond:        sync.NewCond(&sync.Mutex{}),
+	}
 }
 
 func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
@@ -289,6 +304,7 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
 		drvr.contexts.Delete(dm.Name)
+		r.notifyCompletion(dm.Name)
 		return err
 	}
 
@@ -308,6 +324,7 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		drvr.contexts.Delete(dm.Name)
+		r.notifyCompletion(dm.Name)
 		return err
 	}
 
@@ -370,8 +387,8 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 
 	drvr.Log.Info("Getting request", "name", statreq.RequestName)
 	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
-		crLog.Error(err, "XX1 Get failed")
 		if apierrors.IsNotFound(err) {
+			r.deleteCompletion(statreq.RequestName)
 			return nil, http.StatusNotFound, errors.New("request not found")
 		}
 		crLog.Error(err, "failed to get NnfDataMovement resource")
@@ -381,19 +398,19 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
 	}
 
-	//if dm.Status.EndTime.IsZero() && statreq.MaxWaitSecs != 0 {
-	//
-	//	r.waitForCompletionOrTimeout(statreq)
-	//
-	//	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
-	//		crLog.Error(err, "XX2 Get failed")
-	//		if apierrors.IsNotFound(err) {
-	//			return nil, http.StatusNotFound, errors.New("request not found")
-	//		}
-	//		crLog.Error(err, "failed to get NnfDataMovement resource afer waiting")
-	//		return nil, http.StatusInternalServerError, err
-	//	}
-	//}
+	if dm.Status.EndTime.IsZero() && statreq.MaxWaitSecs != 0 {
+
+		r.waitForCompletionOrTimeout(statreq)
+
+		if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.deleteCompletion(statreq.RequestName)
+				return nil, http.StatusNotFound, errors.New("request not found after waiting for completion")
+			}
+			crLog.Error(err, "failed to get NnfDataMovement resource afer waiting for completion")
+			return nil, http.StatusInternalServerError, err
+		}
+	}
 
 	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha6.DataMovementConditionReasonInvalid {
 		return &DataMovementStatusResponse_v1_0{
@@ -457,6 +474,10 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 		endTimeStr = dm.Status.EndTime.Local().String()
 	}
 
+	if state == DataMovementStatusResponse_COMPLETED && !dm.Status.EndTime.IsZero() {
+		r.deleteCompletion(statreq.RequestName)
+	}
+
 	return &DataMovementStatusResponse_v1_0{
 		State:         state,
 		Status:        status,
@@ -516,7 +537,10 @@ func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.
 	}
 
 	crLog.Info("Running Command", "cmd", cmdStatus.Command)
-	contextDelete := func() { drvr.contexts.Delete(dm.Name) }
+	contextDelete := func() {
+		drvr.contexts.Delete(dm.Name)
+		r.notifyCompletion(dm.Name)
+	}
 	r.runit(ctx, ctxCancel, contextDelete, dmReq, cmd, &cmdStatus, r.dmProfile, r.mpiHostfile, crLog)
 	return nil
 }
@@ -701,43 +725,61 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 	}()
 }
 
+func (r *DriverRequest) notifyCompletion(name string) {
+	drvr := r.Drvr
+
+	drvr.cond.L.Lock()
+	drvr.completions[name] = struct{}{}
+	drvr.cond.L.Unlock()
+	drvr.cond.Broadcast()
+}
+
+func (r *DriverRequest) deleteCompletion(name string) {
+	drvr := r.Drvr
+
+	drvr.cond.L.Lock()
+	delete(drvr.completions, name)
+	drvr.cond.L.Unlock()
+}
+
 // waitForCompletionOrTimeout waits for the completion of the status request or for timeout.
-//func (r *DriverRequest) waitForCompletionOrTimeout(statreq StatusRequest) {
-//	timeout := false
-//	complete := make(chan struct{}, 1)
-//
-//	// Start a go routine that waits for the completion of this status request or for timeout
-//	go func() {
-//
-//		s.cond.L.Lock()
-//		for {
-//			if _, found := s.completions[req.Uid]; found || timeout {
-//				break
-//			}
-//
-//			s.cond.Wait()
-//		}
-//
-//		s.cond.L.Unlock()
-//
-//		complete <- struct{}{}
-//	}()
-//
-//	var maxWaitTimeDuration time.Duration
-//	if statreq.MaxWaitSecs < 0 || time.Duration(statreq.MaxWaitSecs) > math.MaxInt64/time.Second {
-//		maxWaitTimeDuration = math.MaxInt64
-//	} else {
-//		maxWaitTimeDuration = time.Duration(statreq.MaxWaitSecs) * time.Second
-//	}
-//
-//	// Wait for completion signal or timeout
-//	select {
-//	case <-complete:
-//	case <-time.After(maxWaitTimeDuration):
-//		timeout = true
-//		s.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
-//	}
-//}
+func (r *DriverRequest) waitForCompletionOrTimeout(statreq StatusRequest) {
+	drvr := r.Drvr
+	timeout := false
+	complete := make(chan struct{}, 1)
+
+	// Start a go routine that waits for the completion of this status request or for timeout
+	go func() {
+
+		drvr.cond.L.Lock()
+		for {
+			if _, found := drvr.completions[statreq.RequestName]; found || timeout {
+				break
+			}
+
+			drvr.cond.Wait()
+		}
+
+		drvr.cond.L.Unlock()
+
+		complete <- struct{}{}
+	}()
+
+	var maxWaitTimeDuration time.Duration
+	if statreq.MaxWaitSecs < 0 || time.Duration(statreq.MaxWaitSecs) > math.MaxInt64/time.Second {
+		maxWaitTimeDuration = math.MaxInt64
+	} else {
+		maxWaitTimeDuration = time.Duration(statreq.MaxWaitSecs) * time.Second
+	}
+
+	// Wait for completion signal or timeout
+	select {
+	case <-complete:
+	case <-time.After(maxWaitTimeDuration):
+		timeout = true
+		drvr.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
+	}
+}
 
 // Set the DM's UserConfig options based on the incoming requests's options
 func setUserConfig(dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) {

@@ -145,12 +145,14 @@ func setupLog() logr.Logger {
 }
 
 func TestA_Hello(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
 	t.Run("returns hello response", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
-
-		httpHandler := &UserHttp{Log: setupLog()}
 
 		httpHandler.Hello(response, request)
 
@@ -196,7 +198,7 @@ func TestB_ListRequests(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -250,7 +252,7 @@ func TestC_GetRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -306,7 +308,7 @@ func TestD_CancelRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -367,7 +369,7 @@ func TestE_TrialRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -428,7 +430,7 @@ func TestF_Lifecycle(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	var listWanted []string
@@ -541,7 +543,7 @@ func TestF_Lifecycle(t *testing.T) {
 func TestG_BadAPIVersion(t *testing.T) {
 
 	crLog := setupLog()
-	drvr := &driver.Driver{Log: crLog, Mock: true}
+	drvr := driver.NewDriver(crLog, true)
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	testCases := []struct {
@@ -638,6 +640,9 @@ func TestG_BadAPIVersion(t *testing.T) {
 }
 
 func TestH_BearerToken(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
@@ -645,7 +650,7 @@ func TestH_BearerToken(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -664,6 +669,9 @@ func TestH_BearerToken(t *testing.T) {
 }
 
 func TestI_BearerTokenNegatives(t *testing.T) {
+	crLog := setupLog()
+	drvr := driver.NewDriver(crLog, true)
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/hello", nil)
@@ -671,7 +679,7 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken2)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -695,7 +703,7 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 
 		invalidKey := derKey1
 		invalidKey = append(invalidKey, byte('='))
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: invalidKey}
+		httpHandler.KeyBytes = invalidKey
 
 		httpHandler.Hello(response, request)
 
@@ -717,7 +725,7 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+bearerToken1)
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey2}
+		httpHandler.KeyBytes = derKey2
 
 		httpHandler.Hello(response, request)
 
@@ -738,7 +746,7 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKey1}
+		httpHandler.KeyBytes = derKey1
 
 		httpHandler.Hello(response, request)
 
@@ -760,7 +768,7 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 		request.Header.Set("Authorization", "Bearer "+string(bearerTokenAlg2))
 		response := httptest.NewRecorder()
 
-		httpHandler := &UserHttp{Log: setupLog(), KeyBytes: derKeyAlg2}
+		httpHandler.KeyBytes = derKeyAlg2
 
 		httpHandler.Hello(response, request)
 

@@ -35,6 +35,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// UserHttp will have only one instance per process, shared by all threads
+// in the process.
 type UserHttp struct {
 	Log      logr.Logger
 	Drvr     *driver.Driver
