@@ -130,6 +130,7 @@ func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	var err error
 	var http_code int
+	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
 	var response *driver.DataMovementStatusResponse_v1_0
 	if user.Mock {
 		response, http_code, err = drvrReq.GetRequestMock(context.TODO(), statreq)
@@ -144,8 +145,11 @@ func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
-	fmt.Fprintf(w, "%#v\n", response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("unable to encode data movement status response: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	// StatusOK is implied.
 }
 
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {

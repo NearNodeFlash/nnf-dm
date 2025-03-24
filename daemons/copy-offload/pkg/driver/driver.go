@@ -356,11 +356,6 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 }
 
 func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
-	//drvr := r.Drvr
-	//crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
-
-	//dm := &nnfv1alpha6.NnfDataMovement{}
-
 	return &DataMovementStatusResponse_v1_0{
 		State:  DataMovementStatusResponse_PENDING,
 		Status: DataMovementStatusResponse_UNKNOWN_STATUS,

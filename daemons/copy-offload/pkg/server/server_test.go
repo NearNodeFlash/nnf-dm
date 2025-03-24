@@ -229,24 +229,24 @@ func TestC_GetRequest(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:       "returns status-no-content",
+			name:       "returns status-ok",
 			method:     http.MethodGet,
 			body:       []byte("{\"workflowName\": \"yellow\", \"requestName\": \"nnf-copy-offload-node-9ae2a136-4\", \"maxWaitSecs\": 3}"),
-			wantText:   "",
+			wantText:   "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
 			wantStatus: http.StatusOK,
 		},
-		//{
-		//	name:       "returns status-not-implemented for POST",
-		//	method:     http.MethodPost,
-		//	wantText:   "method not supported\n",
-		//	wantStatus: http.StatusNotImplemented,
-		//},
-		//{
-		//	name:       "returns status-not-implemented for PUT",
-		//	method:     http.MethodPut,
-		//	wantText:   "method not supported\n",
-		//	wantStatus: http.StatusNotImplemented,
-		//},
+		{
+			name:       "returns status-not-implemented for POST",
+			method:     http.MethodPost,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
+		{
+			name:       "returns status-not-implemented for PUT",
+			method:     http.MethodPut,
+			wantText:   "method not supported\n",
+			wantStatus: http.StatusNotImplemented,
+		},
 	}
 
 	crLog := setupLog()
