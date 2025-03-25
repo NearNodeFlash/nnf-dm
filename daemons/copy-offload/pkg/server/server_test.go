@@ -224,18 +224,44 @@ func TestB_ListRequests(t *testing.T) {
 
 func TestC_GetRequest(t *testing.T) {
 	testCases := []struct {
-		name       string
-		method     string
-		body       []byte
-		wantText   string
-		wantStatus int
+		name        string
+		method      string
+		requestName string
+		params      string
+		wantText    string
+		wantStatus  int
 	}{
 		{
-			name:       "returns status-ok",
-			method:     http.MethodGet,
-			body:       []byte("{\"workflowName\": \"yellow\", \"requestName\": \"nnf-copy-offload-node-9ae2a136-4\", \"maxWaitSecs\": 3}"),
-			wantText:   "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
-			wantStatus: http.StatusOK,
+			name:        "returns status-ok",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&workflowName=yellow&maxWaitSecs=10",
+			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "returns status-badr-request for maxWaitSecs",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&workflowName=yellow",
+			wantText:    "unable to parse maxWaitSecs: strconv.Atoi: parsing \"\": invalid syntax\n",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "returns status-badr-request for requestName",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowNamespace=default&maxWaitSecs=10",
+			wantText:    "workflow name must be supplied\n",
+			wantStatus:  http.StatusBadRequest,
+		},
+		{
+			name:        "returns status-ok for empty workNamespace",
+			method:      http.MethodGet,
+			requestName: "nnf-copy-offload-node-9ae2a136-4",
+			params:      "workflowName=yellow&maxWaitSecs=10",
+			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
+			wantStatus:  http.StatusOK,
 		},
 		{
 			name:       "returns status-not-implemented for POST",
@@ -257,11 +283,7 @@ func TestC_GetRequest(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			var readerBody io.Reader = nil
-			if len(test.body) > 0 {
-				readerBody = bytes.NewReader(test.body)
-			}
-			request, _ := http.NewRequest(test.method, "/status", readerBody)
+			request, _ := http.NewRequest(test.method, fmt.Sprintf("/status/%s?%s", test.requestName, test.params), nil)
 			request.Header.Set("Accepts-version", "1.0")
 			response := httptest.NewRecorder()
 
@@ -343,7 +365,7 @@ func TestE_TrialRequest(t *testing.T) {
 		{
 			name:       "returns status-ok",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
@@ -409,21 +431,21 @@ func TestF_Lifecycle(t *testing.T) {
 		{
 			name:       "schedule job 1",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 2",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=nnf-copy-offload-node-1\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 3",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=nnf-copy-offload-node-2\n",
 			wantStatus: http.StatusOK,
 		},
@@ -597,14 +619,14 @@ func TestG_BadAPIVersion(t *testing.T) {
 			name:    "bad api version for copy",
 			method:  http.MethodPost,
 			url:     "/trial",
-			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler: httpHandler.TrialRequest,
 		},
 		{
 			name:           "skip api version for copy",
 			method:         http.MethodPost,
 			url:            "/trial",
-			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"yellow\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler:        httpHandler.TrialRequest,
 			skipApiVersion: true,
 		},

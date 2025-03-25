@@ -171,7 +171,7 @@ func main() {
 	mux.HandleFunc("/trial", httpHandler.TrialRequest)
 	mux.HandleFunc("/cancel/", httpHandler.CancelRequest)
 	mux.HandleFunc("/list", httpHandler.ListRequests)
-	mux.HandleFunc("/status", httpHandler.GetRequest)
+	mux.HandleFunc("/status/", httpHandler.GetRequest)
 
 	srv := &http.Server{
 		Addr:      *addr,

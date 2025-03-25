@@ -108,6 +108,9 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
 int copy_offload_list(COPY_OFFLOAD *offload, char **output);
 
 /* Submit a status request. The @job_name is the value returned by copy_offload_copy().
+ * The maximum number of seconds to wait for the job to complete is @max_wait_secs.
+ * If @max_wait_secs is 0, then the server will return immediately. If it is -1, then
+ * the server will wait indefinitely.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message. 
