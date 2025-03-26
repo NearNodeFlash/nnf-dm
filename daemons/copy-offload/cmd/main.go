@@ -118,7 +118,11 @@ func main() {
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
-	drvr := driver.NewDriver(crLog, mock)
+	drvr, err := driver.NewDriver(crLog, mock)
+	if err != nil {
+		slog.Error("Unable to create driver", "error", err.Error())
+		os.Exit(1)
+	}
 
 	if !skipTls {
 		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
@@ -179,7 +183,6 @@ func main() {
 		TLSConfig: tlsConfig,
 	}
 
-	var err error
 	if !skipTls {
 		err = srv.ListenAndServeTLS("", "")
 	} else {

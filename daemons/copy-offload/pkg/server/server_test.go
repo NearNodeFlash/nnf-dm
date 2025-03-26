@@ -60,6 +60,8 @@ var derKeyAlg2 = []byte("")
 
 // Fill in the tokens/keys prior to running the tests.
 func TestMain(m *testing.M) {
+	os.Setenv("DW_WORKFLOW_NAME", "yellow")
+	os.Setenv("DW_WORKFLOW_NAMESPACE", "default")
 	err := createTokensAndKeys()
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
@@ -146,7 +148,11 @@ func setupLog() logr.Logger {
 
 func TestA_Hello(t *testing.T) {
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("returns hello response", func(t *testing.T) {
@@ -198,7 +204,11 @@ func TestB_ListRequests(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -235,7 +245,7 @@ func TestC_GetRequest(t *testing.T) {
 			name:        "returns status-ok",
 			method:      http.MethodGet,
 			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "workflowNamespace=default&workflowName=yellow&maxWaitSecs=10",
+			params:      "maxWaitSecs=10",
 			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
 			wantStatus:  http.StatusOK,
 		},
@@ -243,25 +253,17 @@ func TestC_GetRequest(t *testing.T) {
 			name:        "returns status-badr-request for maxWaitSecs",
 			method:      http.MethodGet,
 			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "workflowNamespace=default&workflowName=yellow",
+			params:      "",
 			wantText:    "unable to parse maxWaitSecs: strconv.Atoi: parsing \"\": invalid syntax\n",
 			wantStatus:  http.StatusBadRequest,
 		},
 		{
-			name:        "returns status-badr-request for requestName",
+			name:        "returns status-badr-request for extra params",
 			method:      http.MethodGet,
 			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "workflowNamespace=default&maxWaitSecs=10",
-			wantText:    "workflow name must be supplied\n",
+			params:      "maxWaitSecs=10&extra=1",
+			wantText:    "unexpected query parameters: extra=1\n",
 			wantStatus:  http.StatusBadRequest,
-		},
-		{
-			name:        "returns status-ok for empty workNamespace",
-			method:      http.MethodGet,
-			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "workflowName=yellow&maxWaitSecs=10",
-			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
-			wantStatus:  http.StatusOK,
 		},
 		{
 			name:       "returns status-not-implemented for POST",
@@ -278,7 +280,11 @@ func TestC_GetRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -330,7 +336,11 @@ func TestD_CancelRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -391,7 +401,11 @@ func TestE_TrialRequest(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	for _, test := range testCases {
@@ -452,7 +466,11 @@ func TestF_Lifecycle(t *testing.T) {
 	}
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	var listWanted []string
@@ -565,7 +583,11 @@ func TestF_Lifecycle(t *testing.T) {
 func TestG_BadAPIVersion(t *testing.T) {
 
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	testCases := []struct {
@@ -663,7 +685,11 @@ func TestG_BadAPIVersion(t *testing.T) {
 
 func TestH_BearerToken(t *testing.T) {
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("accepts valid bearer token when using matching key", func(t *testing.T) {
@@ -692,7 +718,11 @@ func TestH_BearerToken(t *testing.T) {
 
 func TestI_BearerTokenNegatives(t *testing.T) {
 	crLog := setupLog()
-	drvr := driver.NewDriver(crLog, true)
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
 	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
 
 	t.Run("fails when bearer token is expected but is not correct", func(t *testing.T) {
