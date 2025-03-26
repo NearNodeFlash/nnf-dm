@@ -347,8 +347,7 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 	// Expand the context with cancel and store it in the map so the cancel function can be
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
-	key := r.dmkey(dm)
-	drvr.contexts.Store(key, SrvrDataMovementRecord{
+	drvr.contexts.Store(r.dmkey(dm), SrvrDataMovementRecord{
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
