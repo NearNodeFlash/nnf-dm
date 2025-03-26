@@ -233,7 +233,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 	crLog.Info("Created NnfDataMovement", "name", dm.Name)
 	r.recordRequest(ctx, dm)
 
-	return r.dmkey(dm), dm, nil
+	return r.dmKey(dm), dm, nil
 }
 
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha6.NnfDataMovement, error) {
@@ -288,7 +288,7 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string
 	}
 
 	r.recordRequest(ctx, dm)
-	return r.dmkey(dm), dm, nil
+	return r.dmKey(dm), dm, nil
 }
 
 func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
@@ -332,11 +332,11 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	return nil
 }
 
-func (r *DriverRequest) dmkey(dm *nnfv1alpha6.NnfDataMovement) string {
+func (r *DriverRequest) dmKey(dm *nnfv1alpha6.NnfDataMovement) string {
 	return fmt.Sprintf("%s--%s", dm.Namespace, dm.Name)
 }
 
-func (r *DriverRequest) dmkeySplit(key string) (string, string) {
+func (r *DriverRequest) dmKeySplit(key string) (string, string) {
 	split := strings.Split(key, "--")
 	return split[0], split[1]
 }
@@ -347,7 +347,7 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 	// Expand the context with cancel and store it in the map so the cancel function can be
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
-	drvr.contexts.Store(r.dmkey(dm), SrvrDataMovementRecord{
+	drvr.contexts.Store(r.dmKey(dm), SrvrDataMovementRecord{
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
@@ -356,7 +356,7 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDa
 }
 
 func (r *DriverRequest) loadRequest(dm *nnfv1alpha6.NnfDataMovement) (SrvrDataMovementRecord, error) {
-	return r.loadRequestByName(r.dmkey(dm))
+	return r.loadRequestByName(r.dmKey(dm))
 }
 
 func (r *DriverRequest) loadRequestByName(name string) (SrvrDataMovementRecord, error) {
@@ -368,7 +368,7 @@ func (r *DriverRequest) loadRequestByName(name string) (SrvrDataMovementRecord, 
 }
 
 func (r *DriverRequest) deleteRequest(dm *nnfv1alpha6.NnfDataMovement) {
-	r.Drvr.contexts.Delete(r.dmkey(dm))
+	r.Drvr.contexts.Delete(r.dmKey(dm))
 }
 
 func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
@@ -399,7 +399,7 @@ func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusReques
 
 func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
 	drvr := r.Drvr
-	keyNS, keyName := r.dmkeySplit(statreq.RequestName)
+	keyNS, keyName := r.dmKeySplit(statreq.RequestName)
 	dmReq := types.NamespacedName{Name: keyName, Namespace: keyNS}
 	dm := &nnfv1alpha6.NnfDataMovement{}
 	crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
@@ -746,7 +746,7 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 
 func (r *DriverRequest) notifyCompletion(dm *nnfv1alpha6.NnfDataMovement) {
 	drvr := r.Drvr
-	key := r.dmkey(dm)
+	key := r.dmKey(dm)
 
 	drvr.cond.L.Lock()
 	drvr.completions[key] = struct{}{}
