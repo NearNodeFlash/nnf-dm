@@ -62,7 +62,7 @@ fi
 
 set -x
 # shellcheck disable=SC2086
-NNF_NODE_NAME=rabbit01 ENVIRONMENT=test $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS &
+NNF_NODE_NAME=rabbit01 ENVIRONMENT=test DW_WORKFLOW_NAME=yellow DW_WORKFLOW_NAMESPACE=default $SRVR_CMD $SRVR_CMD_TOKEN_ARGS $SRVR_CMD_TLS_ARGS &
 srvr_pid=$!
 set +x
 echo "Server pid is $srvr_pid, my pid is $$"
@@ -96,8 +96,6 @@ if [[ $output != "hello back at ya" ]]; then
     exit 1
 fi
 
-export DW_WORKFLOW_NAME=yellow
-export DW_WORKFLOW_NAMESPACE=default
 export NNF_CONTAINER_PORTS="$SRVR_PORT"
 export NNF_CONTAINER_LAUNCHER="$SRVR_NAME"
 

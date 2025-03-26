@@ -129,11 +129,14 @@ func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
 	// This is the v1.0 apiVersion input. See COPY_OFFLOAD_API_VERSION.
 	var statreq driver.StatusRequest
 	statreq.RequestName = requestName
-	statreq.WorkflowName = params.Get("workflowName")
-	statreq.WorkflowNamespace = params.Get("workflowNamespace")
 	statreq.MaxWaitSecs, err = strconv.Atoi(params.Get("maxWaitSecs"))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to parse maxWaitSecs: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	params.Del("maxWaitSecs")
+	if params.Encode() != "" {
+		http.Error(w, fmt.Sprintf("unexpected query parameters: %s", params.Encode()), http.StatusBadRequest)
 		return
 	}
 	if err := statreq.Validator(); err != nil {

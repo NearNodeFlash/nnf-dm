@@ -173,14 +173,6 @@ static int _copy_offload_configure(COPY_OFFLOAD *offload, int skip_tls) {
     if ((c = strchr(offload->server_port, ',')) != NULL) {
         *c = '\0';
     }
-    if ((offload->workflow_name = getenv(WORKFLOW_NAME_ENV)) == NULL) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to get workflow name from environment variable %s\n", WORKFLOW_NAME_ENV);
-        return 1;
-    }
-    if ((offload->workflow_namespace = getenv(WORKFLOW_NAMESPACE_ENV)) == NULL) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to get workflow namespace from environment variable %s\n", WORKFLOW_NAMESPACE_ENV);
-        return 1;
-    }
     // The token is optional, depending on how the server is configured.
     offload->token_buf = NULL;
     offload->token = getenv(WORKFLOW_TOKEN_ENV);
@@ -357,8 +349,8 @@ int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs
     char parambuf[COPY_OFFLOAD_URL_SIZE];
 
     // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
-    const char *offload_req_v1_0 = "workflowNamespace=%s&workflowName=%s&maxWaitSecs=%d";
-    n = snprintf(parambuf, sizeof(parambuf), offload_req_v1_0, offload->workflow_namespace, offload->workflow_name, max_wait_secs);
+    const char *offload_req_v1_0 = "maxWaitSecs=%d";
+    n = snprintf(parambuf, sizeof(parambuf), offload_req_v1_0, max_wait_secs);
     if (n >= (int)sizeof(parambuf)) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting parameters: buffer too small");
         return ret;
@@ -484,8 +476,6 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
     // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
     const char *offload_req_v1_0 =
         "{\"computeName\": \"%s\", "
-        "\"workflowName\": \"%s\", "
-        "\"workflowNamespace\": \"%s\", "
         "\"sourcePath\": \"%s\", "
         "\"destinationPath\": \"%s\", "
         "\"dmProfile\": \"%s\", "
@@ -495,7 +485,7 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
         "\"storeStdout\": false, "
         "\"slots\": %d, "
         "\"maxSlots\": %d}";
-    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->my_host_name, offload->workflow_name, offload->workflow_namespace, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
+    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->my_host_name, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
     if (n >= (int)sizeof(postbuf)) {
         snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting body: buffer too small");
         return ret;
