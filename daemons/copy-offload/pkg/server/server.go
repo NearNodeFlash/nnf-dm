@@ -237,7 +237,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 
 	var dm *nnfv1alpha6.NnfDataMovement
-	var dmkey string
+	var dmKey string
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {
