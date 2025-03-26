@@ -57,7 +57,7 @@ import (
 
 	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
+	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
@@ -76,7 +76,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha3.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha6.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -244,7 +244,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(ce event.CreateEvent) bool { return false },
 		UpdateFunc: func(ue event.UpdateEvent) bool {
-			if initiator := ue.ObjectNew.GetLabels()[nnfv1alpha6.DataMovementInitiatorLabel]; initiator == s.name {
+			if initiator := ue.ObjectNew.GetLabels()[nnfv1alpha7.DataMovementInitiatorLabel]; initiator == s.name {
 				return true
 			}
 			return false
@@ -253,7 +253,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	}
 
 	err := ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha6.NnfDataMovement{}, builder.WithPredicates(p)).
+		For(&nnfv1alpha7.NnfDataMovement{}, builder.WithPredicates(p)).
 		Complete(&dataMovementReconciler{s})
 	if err != nil {
 		return err
@@ -268,7 +268,7 @@ type dataMovementReconciler struct {
 
 func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
-	dm := &nnfv1alpha6.NnfDataMovement{}
+	dm := &nnfv1alpha7.NnfDataMovement{}
 	if err := r.server.client.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -321,7 +321,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-	var dm *nnfv1alpha6.NnfDataMovement
+	var dm *nnfv1alpha7.NnfDataMovement
 	dmFunc := ""
 	switch computeMountInfo.Type {
 	case "lustre":
@@ -365,7 +365,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
-		Kind:      reflect.TypeOf(nnfv1alpha6.NnfDataMovementProfile{}).Name(),
+		Kind:      reflect.TypeOf(nnfv1alpha7.NnfDataMovementProfile{}).Name(),
 		Name:      profile.Name,
 		Namespace: profile.Namespace,
 	}
@@ -379,7 +379,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha6.AddDataMovementTeardownStateLabel(dm, dwsv1alpha3.StatePostRun)
+	nnfv1alpha7.AddDataMovementTeardownStateLabel(dm, dwsv1alpha3.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
 	setUserConfig(req, dm)
@@ -398,8 +398,8 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 }
 
 // Set the DM's UserConfig options based on the incoming requests's options
-func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha6.NnfDataMovement) {
-	dm.Spec.UserConfig = &nnfv1alpha6.NnfDataMovementConfig{}
+func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha7.NnfDataMovement) {
+	dm.Spec.UserConfig = &nnfv1alpha7.NnfDataMovementConfig{}
 	dm.Spec.UserConfig.Dryrun = req.Dryrun
 	dm.Spec.UserConfig.MpirunOptions = req.MpirunOptions
 	dm.Spec.UserConfig.DcpOptions = req.DcpOptions
@@ -414,13 +414,13 @@ func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha6.NnfDataMov
 	}
 }
 
-func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nnfv1alpha6.NnfDataMovementProfile, error) {
+func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nnfv1alpha7.NnfDataMovementProfile, error) {
 	ns := "nnf-system"
 
 	// If a profile is named then verify that it exists.  Otherwise, verify that a default profile
 	// can be found.
 	if len(profileName) == 0 {
-		NnfDataMovementProfiles := &nnfv1alpha6.NnfDataMovementProfileList{}
+		NnfDataMovementProfiles := &nnfv1alpha7.NnfDataMovementProfileList{}
 		if err := s.client.List(ctx, NnfDataMovementProfiles, &client.ListOptions{Namespace: ns}); err != nil {
 			return nil, err
 		}
@@ -440,7 +440,7 @@ func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nn
 		profileName = profilesFound[0]
 	}
 
-	profile := &nnfv1alpha6.NnfDataMovementProfile{
+	profile := &nnfv1alpha7.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      profileName,
 			Namespace: ns,
@@ -462,7 +462,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, 
 		return "", fmt.Errorf("unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
 	}
 
-	dwIndex, found := labels[nnfv1alpha6.DirectiveIndexLabel]
+	dwIndex, found := labels[nnfv1alpha7.DirectiveIndexLabel]
 	if !found {
 		return "", fmt.Errorf("unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
 	}
@@ -470,7 +470,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, 
 	return dwIndex, nil
 }
 
-func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo, computeClientMount *dwsv1alpha3.ClientMount) (*nnfv1alpha6.NnfDataMovement, error) {
+func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo, computeClientMount *dwsv1alpha3.ClientMount) (*nnfv1alpha7.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
@@ -490,25 +490,25 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		return nil, err
 	}
 
-	dm := &nnfv1alpha6.NnfDataMovement{
+	dm := &nnfv1alpha7.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			// Be careful about how much you put into GenerateName.
 			// The MPI operator will use the resulting name as a
 			// prefix for its own names.
 			GenerateName: nameBase,
 			// Use the data movement namespace.
-			Namespace: nnfv1alpha6.DataMovementNamespace,
+			Namespace: nnfv1alpha7.DataMovementNamespace,
 			Labels: map[string]string{
-				nnfv1alpha6.DataMovementInitiatorLabel: s.name,
-				nnfv1alpha6.DirectiveIndexLabel:        dwIndex,
+				nnfv1alpha7.DataMovementInitiatorLabel: s.name,
+				nnfv1alpha7.DirectiveIndexLabel:        dwIndex,
 			},
 		},
-		Spec: nnfv1alpha6.NnfDataMovementSpec{
-			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha7.NnfDataMovementSpec{
+			Source: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 				StorageReference: corev1.ObjectReference{
 					Kind:      reflect.TypeOf(*lustrefs).Name(),
@@ -522,27 +522,27 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 	return dm, nil
 }
 
-func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (*nnfv1alpha6.NnfDataMovement, error) {
+func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (*nnfv1alpha7.NnfDataMovement, error) {
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
 	if err != nil {
 		return nil, err
 	}
 
-	dm := &nnfv1alpha6.NnfDataMovement{
+	dm := &nnfv1alpha7.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
 			Namespace:    s.namespace, // Use the rabbit
 			Labels: map[string]string{
-				nnfv1alpha6.DataMovementInitiatorLabel: s.name,
+				nnfv1alpha7.DataMovementInitiatorLabel: s.name,
 			},
 		},
-		Spec: nnfv1alpha6.NnfDataMovementSpec{
-			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha7.NnfDataMovementSpec{
+			Source: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
 		},
@@ -561,7 +561,7 @@ func (s *defaultServer) List(ctx context.Context, req *pb.DataMovementListReques
 		}),
 	}
 
-	list := nnfv1alpha6.NnfDataMovementList{}
+	list := nnfv1alpha7.NnfDataMovementList{}
 	if err := s.client.List(ctx, &list, opts...); err != nil {
 		return nil, err
 	}
@@ -580,7 +580,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	ns := s.getNamespace(req.Uid)
 
-	dm := &nnfv1alpha6.NnfDataMovement{}
+	dm := &nnfv1alpha7.NnfDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 		if errors.IsNotFound(err) {
 			return &pb.DataMovementStatusResponse{
@@ -608,7 +608,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		}
 	}
 
-	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha6.DataMovementConditionReasonInvalid {
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha7.DataMovementConditionReasonInvalid {
 		return &pb.DataMovementStatusResponse{
 			State:  pb.DataMovementStatusResponse_PENDING,
 			Status: pb.DataMovementStatusResponse_UNKNOWN_STATUS,
@@ -617,9 +617,9 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	stateMap := map[string]pb.DataMovementStatusResponse_State{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATE,
-		nnfv1alpha6.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
-		nnfv1alpha6.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
-		nnfv1alpha6.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
+		nnfv1alpha7.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
+		nnfv1alpha7.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
+		nnfv1alpha7.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
 	}
 
 	state, ok := stateMap[dm.Status.State]
@@ -637,10 +637,10 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	statusMap := map[string]pb.DataMovementStatusResponse_Status{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
-		nnfv1alpha6.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,
-		nnfv1alpha6.DataMovementConditionReasonSuccess:   pb.DataMovementStatusResponse_SUCCESS,
-		nnfv1alpha6.DataMovementConditionReasonInvalid:   pb.DataMovementStatusResponse_INVALID,
-		nnfv1alpha6.DataMovementConditionReasonCancelled: pb.DataMovementStatusResponse_CANCELLED,
+		nnfv1alpha7.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,
+		nnfv1alpha7.DataMovementConditionReasonSuccess:   pb.DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha7.DataMovementConditionReasonInvalid:   pb.DataMovementStatusResponse_INVALID,
+		nnfv1alpha7.DataMovementConditionReasonCancelled: pb.DataMovementStatusResponse_CANCELLED,
 	}
 
 	status, ok := statusMap[dm.Status.Status]
@@ -744,7 +744,7 @@ func (s *defaultServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRe
 	ns := s.getNamespace(req.Uid)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		dm := &nnfv1alpha6.NnfDataMovement{}
+		dm := &nnfv1alpha7.NnfDataMovement{}
 		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 			return err
 		}
@@ -784,7 +784,7 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 
 	ns := s.getNamespace(req.Uid)
 
-	dm := &nnfv1alpha6.NnfDataMovement{}
+	dm := &nnfv1alpha7.NnfDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 		if errors.IsNotFound(err) {
 			return &pb.DataMovementDeleteResponse{
@@ -795,7 +795,7 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 		return nil, err
 	}
 
-	if dm.Status.State != nnfv1alpha6.DataMovementConditionTypeFinished {
+	if dm.Status.State != nnfv1alpha7.DataMovementConditionTypeFinished {
 		return &pb.DataMovementDeleteResponse{
 			Status: pb.DataMovementDeleteResponse_ACTIVE,
 		}, nil
@@ -922,5 +922,5 @@ func (s *defaultServer) getNamespace(uid string) string {
 		return s.namespace
 	}
 
-	return nnfv1alpha6.DataMovementNamespace
+	return nnfv1alpha7.DataMovementNamespace
 }
