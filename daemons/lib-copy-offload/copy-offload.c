@@ -378,17 +378,11 @@ int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
+    if (http_code == 200)
+        ret = 0;
     if (chunk.response != NULL) {
-        if (http_code == 200) {
-            char *delim = strchr(chunk.response, '=');
-            if (delim != NULL) {
-                *output = strdup(delim+1);
-                chop(output);
-            }
-            ret = 0;
-        } else if (http_code != -1) {
-            snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "%s", chunk.response);
-        }
+        *output = strdup(chunk.response);
+        chop(output);
         free(chunk.response);
     }
     return ret;

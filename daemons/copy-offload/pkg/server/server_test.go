@@ -366,7 +366,7 @@ func TestE_TrialRequest(t *testing.T) {
 			name:       "returns status-ok",
 			method:     http.MethodPost,
 			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-0\n",
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
@@ -432,21 +432,21 @@ func TestF_Lifecycle(t *testing.T) {
 			name:       "schedule job 1",
 			method:     http.MethodPost,
 			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-0\n",
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 2",
 			method:     http.MethodPost,
 			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-1\n",
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-1\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 3",
 			method:     http.MethodPost,
 			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
-			wantText:   "name=nnf-copy-offload-node-2\n",
+			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-2\n",
 			wantStatus: http.StatusOK,
 		},
 	}
@@ -509,7 +509,7 @@ func TestF_Lifecycle(t *testing.T) {
 		// Go bug? If I try to dynamically build the url for this request I will
 		// get a null pointer reference in CancelRequest(), where 'req' will
 		// be null.
-		request, _ := http.NewRequest(http.MethodDelete, "/cancel/nnf-copy-offload-node-0", nil)
+		request, _ := http.NewRequest(http.MethodDelete, "/cancel/mock-rabbit-01--nnf-copy-offload-node-0", nil)
 		request.Header.Set("Accepts-version", "1.0")
 		response := httptest.NewRecorder()
 

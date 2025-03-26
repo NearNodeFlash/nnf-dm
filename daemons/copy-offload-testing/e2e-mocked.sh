@@ -139,7 +139,7 @@ if ! job1=$($CO $CO_TLS_ARGS -o -S /mnt/nnf/ooo -D /lus/foo); then
     echo "line $LINENO output: $job1"
     cleanup
 fi
-if [[ $job1 != "nnf-copy-offload-node-0" ]]; then
+if [[ $job1 != "mock-rabbit-01--nnf-copy-offload-node-0" ]]; then
     echo "FAIL: Unexpected output from copy. Got ($job1)."
     kill "$srvr_pid"
     exit 1
