@@ -53,7 +53,7 @@ void usage(const char **argv) {
     fprintf(stderr, "       -d                 Perform a dry run.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage: %s [COMMON_ARGS] -S <ARGS>\n", argv[0]);
-    fprintf(stderr, "    -Q            Submit a status request for the specified job.\n");
+    fprintf(stderr, "    -q            Submit a status request for the specified job.\n");
     fprintf(stderr, "       -j JOB_NAME    The job name returned by the copy-offload request.\n");
     fprintf(stderr, "       -w MAX_WAIT    Maximum number of seconds to wait for the job to complete. (default 0)\n");
     fprintf(stderr, "\n");
@@ -91,11 +91,11 @@ int main(int argc, const char **argv) {
     int slots = -1; /* -1 defers to dm profile, 0 disables slots */
     int max_slots = -1;
     int H_opt = 0;
-    int Q_opt = 0;
+    int q_opt = 0;
     int max_wait_secs = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHQj:w:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHqj:w:")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -146,8 +146,8 @@ int main(int argc, const char **argv) {
             case 'H':
                 H_opt = 1;
                 break;
-            case 'Q':
-                Q_opt = 1;
+            case 'q':
+                q_opt = 1;
                 break;
             case 'j':
                 job_name = optarg;
@@ -171,7 +171,7 @@ int main(int argc, const char **argv) {
             exit(1);
         }
     }
-    if (Q_opt || c_opt) {
+    if (q_opt || c_opt) {
         if (job_name == NULL) {
             usage(argv);
             exit(1);
@@ -223,7 +223,7 @@ int main(int argc, const char **argv) {
         ret = copy_offload_copy(offload, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
     } else if (H_opt) {
         ret = copy_offload_hello(offload, &output);
-    } else if (Q_opt) {
+    } else if (q_opt) {
         ret = copy_offload_status(offload, job_name, max_wait_secs, &output);
     } else {
         fprintf(stderr, "What action?\n");
