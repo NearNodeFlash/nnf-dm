@@ -1,0 +1,19 @@
+apiVersion: nnf.cray.hpe.com/v1alpha7
+data:
+  command: ulimit -n 2048 && mpirun --allow-run-as-root --hostfile $HOSTFILE dcp --progress
+    1 --uid $UID --gid $GID $SRC $DEST
+  createDestDir: true
+  default: false
+  logStdout: false
+  maxSlots: 0
+  mkdirCommand: mkdir -p $PATH
+  pinned: false
+  progressIntervalSeconds: 5
+  setprivCommand: setpriv --euid $UID --egid $GID --clear-groups
+  slots: 8
+  statCommand: stat --cached never -c '%F' $PATH
+  storeStdout: false
+kind: NnfDataMovementProfile
+metadata:
+  name: local
+  namespace: nnf-system
