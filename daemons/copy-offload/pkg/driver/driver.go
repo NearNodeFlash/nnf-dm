@@ -400,7 +400,7 @@ func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusReques
 func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
 	drvr := r.Drvr
 	keyNS, keyName := r.dmkeySplit(statreq.RequestName)
-	dmReq := types.NamespacedName{Name: keyname, Namespace: keyns}
+	dmReq := types.NamespacedName{Name: keyName, Namespace: keyNS}
 	dm := &nnfv1alpha6.NnfDataMovement{}
 	crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
 

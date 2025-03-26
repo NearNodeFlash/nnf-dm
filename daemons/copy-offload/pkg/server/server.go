@@ -241,7 +241,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
 	if user.Mock {
-		dmkey, dm, err = drvrReq.CreateMock(context.TODO(), dmreq)
+		dmKey, dm, err = drvrReq.CreateMock(context.TODO(), dmreq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)
 			return
@@ -253,7 +253,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else {
-		dmkey, dm, err = drvrReq.Create(context.TODO(), dmreq)
+		dmKey, dm, err = drvrReq.Create(context.TODO(), dmreq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http.StatusInternalServerError)
 			return
@@ -267,5 +267,5 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
-	fmt.Fprintf(w, "name=%s\n", dmkey)
+	fmt.Fprintf(w, "name=%s\n", dmKey)
 }
