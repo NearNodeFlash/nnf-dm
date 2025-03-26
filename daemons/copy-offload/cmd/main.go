@@ -44,7 +44,7 @@ import (
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
-	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
+	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 )
 
 var (
@@ -54,7 +54,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha6.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha3.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 }
@@ -82,7 +82,7 @@ func setupClient(crLog logr.Logger) client.Client {
 
 func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 	// Sanity check the client connection.
-	nnfNode := &nnfv1alpha6.NnfNode{}
+	nnfNode := &nnfv1alpha7.NnfNode{}
 	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "nnf-nlc", Namespace: rabbitName}, nnfNode); err != nil {
 		crLog.Error(err, "Failed to retrieve my own NnfNode")
 		os.Exit(1)
