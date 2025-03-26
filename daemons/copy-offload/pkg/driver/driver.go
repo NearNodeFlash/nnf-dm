@@ -411,7 +411,7 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 	drvr := r.Drvr
 	keyNS, keyName := r.dmKeySplit(statreq.RequestName)
 	dmReq := types.NamespacedName{Name: keyName, Namespace: keyNS}
-	dm := &nnfv1alpha6.NnfDataMovement{}
+	dm := &nnfv1alpha7.NnfDataMovement{}
 	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName, "request", statreq.RequestName)
 
 	drvr.Log.Info("Getting request", "request", dmReq)
