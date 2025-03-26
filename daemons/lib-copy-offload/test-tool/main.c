@@ -51,12 +51,17 @@ void usage(const char **argv) {
     fprintf(stderr, "       -m SLOTS           Number of slots (processes).\n");
     fprintf(stderr, "       -M MAX_SLOTS       Maximum number of slots (processes).\n");
     fprintf(stderr, "       -d                 Perform a dry run.\n");
-    fprintf(stderr, "       -C MY_HOSTNAME     Name of the host submitting the request. (for development/debugging)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -S <ARGS>\n", argv[0]);
+    fprintf(stderr, "    -q            Submit a status request for the specified job.\n");
+    fprintf(stderr, "       -j JOB_NAME    The job name returned by the copy-offload request.\n");
+    fprintf(stderr, "       -w MAX_WAIT    Maximum number of seconds to wait for the job to complete. (default 0)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "COMMON_ARGS\n");
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
     fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
+    fprintf(stderr, "    -C MY_HOSTNAME      Name of the host submitting the request. (for development/debugging)\n");
     fprintf(stderr, "    -t TOKEN_FILE       Bearer token file.\n");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
 }
@@ -86,9 +91,11 @@ int main(int argc, const char **argv) {
     int slots = -1; /* -1 defers to dm profile, 0 disables slots */
     int max_slots = -1;
     int H_opt = 0;
+    int q_opt = 0;
+    int max_wait_secs = 0;
     int ret;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dH")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHqj:w:")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -139,6 +146,15 @@ int main(int argc, const char **argv) {
             case 'H':
                 H_opt = 1;
                 break;
+            case 'q':
+                q_opt = 1;
+                break;
+            case 'j':
+                job_name = optarg;
+                break;
+            case 'w':
+                max_wait_secs = atoi(optarg);
+                break;
             default:
                 usage(argv);
                 exit(1);
@@ -151,6 +167,12 @@ int main(int argc, const char **argv) {
     }
     if (o_opt) {
         if (source_path == NULL || dest_path == NULL) {
+            usage(argv);
+            exit(1);
+        }
+    }
+    if (q_opt || c_opt) {
+        if (job_name == NULL) {
             usage(argv);
             exit(1);
         }
@@ -201,6 +223,8 @@ int main(int argc, const char **argv) {
         ret = copy_offload_copy(offload, profile_name, slots, max_slots, dry_run, source_path, dest_path, &output);
     } else if (H_opt) {
         ret = copy_offload_hello(offload, &output);
+    } else if (q_opt) {
+        ret = copy_offload_status(offload, job_name, max_wait_secs, &output);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);

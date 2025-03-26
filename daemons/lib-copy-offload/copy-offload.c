@@ -320,15 +320,66 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s:%s/hello", offload->proto, offload->server_host, offload->server_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/hello", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
     if (http_code == 200) {
         ret = 0;
     }
+    if (chunk.response != NULL) {
+        *output = strdup(chunk.response);
+        chop(output);
+        free(chunk.response);
+    }
+    return ret;
+}
+
+/* Submit a status request.
+ * The caller is responsible for calling free() on @output if *output is non-NULL.
+ */
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, char **output) {
+    long http_code;
+    struct memory chunk = {NULL, 0};
+    int ret = 1;
+    int n;
+    char urlbuf[COPY_OFFLOAD_URL_SIZE];
+    char parambuf[COPY_OFFLOAD_URL_SIZE];
+
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 = "workflowNamespace=%s&workflowName=%s&maxWaitSecs=%d";
+    n = snprintf(parambuf, sizeof(parambuf), offload_req_v1_0, offload->workflow_namespace, offload->workflow_name, max_wait_secs);
+    if (n >= (int)sizeof(parambuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting parameters: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting parameters");
+        return ret;
+    }
+
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/status/%s?%s", offload->proto, offload->server_host, offload->server_port, job_name, parambuf);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
+    curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+
+    http_code = copy_offload_perform(offload, &chunk);
+    if (http_code == 200)
+        ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);
         chop(output);
@@ -344,9 +395,17 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s:%s/list", offload->proto, offload->server_host, offload->server_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/list", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
@@ -365,9 +424,17 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s:%s/cancel/%s", offload->proto, offload->server_host, offload->server_port, job_name);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/cancel/%s", offload->proto, offload->server_host, offload->server_port, job_name);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
@@ -394,7 +461,14 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
     char postbuf[COPY_OFFLOAD_POST_SIZE];
     char dry_run_str[8];
 
-    snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/trial", offload->proto, offload->server_host, offload->server_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/trial", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     if (profile_name == NULL) {
@@ -407,7 +481,8 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
         strcpy(dry_run_str, "false");
     }
 
-    const char *offload_req =
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 =
         "{\"computeName\": \"%s\", "
         "\"workflowName\": \"%s\", "
         "\"workflowNamespace\": \"%s\", "
@@ -420,12 +495,12 @@ int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots
         "\"storeStdout\": false, "
         "\"slots\": %d, "
         "\"maxSlots\": %d}";
-    n = snprintf(postbuf, sizeof(postbuf), offload_req, offload->my_host_name, offload->workflow_name, offload->workflow_namespace, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
+    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->my_host_name, offload->workflow_name, offload->workflow_namespace, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
     if (n >= (int)sizeof(postbuf)) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting body: buffer too small");
         return ret;
     } else if (n < 0) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting body");
         return ret;
     }
     curl_easy_setopt(offload->curl, CURLOPT_POSTFIELDS, postbuf);
