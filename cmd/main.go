@@ -42,7 +42,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
+	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 
 	controllers "github.com/NearNodeFlash/nnf-dm/internal/controller"
 	//+kubebuilder:scaffold:imports
@@ -57,7 +57,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha6.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
@@ -177,7 +177,7 @@ func (*managerController) GetType() string { return ManagerController }
 func (*managerController) SetOptions(opts *ctrl.Options) {
 	namespaceCache := make(map[string]cache.Config)
 	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
-	namespaceCache[nnfv1alpha6.DataMovementNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha7.DataMovementNamespace] = cache.Config{}
 	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
@@ -200,8 +200,8 @@ func (*defaultController) GetType() string { return DefaultController }
 func (*defaultController) SetOptions(opts *ctrl.Options) {
 	namespaceCache := make(map[string]cache.Config)
 	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
-	namespaceCache[nnfv1alpha6.DataMovementNamespace] = cache.Config{}
-	namespaceCache[nnfv1alpha6.DataMovementProfileNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha7.DataMovementNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha7.DataMovementProfileNamespace] = cache.Config{}
 	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
 
@@ -209,7 +209,7 @@ func (c *defaultController) SetupReconcilers(mgr manager.Manager) (err error) {
 	if err = (&controllers.DataMovementReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		WatchNamespace: nnfv1alpha6.DataMovementNamespace,
+		WatchNamespace: nnfv1alpha7.DataMovementNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", c.GetType())
 		os.Exit(1)
@@ -227,8 +227,8 @@ func (*nodeController) GetType() string { return NodeController }
 func (*nodeController) SetOptions(opts *ctrl.Options) {
 	namespaceCache := make(map[string]cache.Config)
 	namespaceCache[corev1.NamespaceDefault] = cache.Config{}
-	namespaceCache[nnfv1alpha6.DataMovementNamespace] = cache.Config{}
-	namespaceCache[nnfv1alpha6.DataMovementProfileNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha7.DataMovementNamespace] = cache.Config{}
+	namespaceCache[nnfv1alpha7.DataMovementProfileNamespace] = cache.Config{}
 	namespaceCache[os.Getenv("NNF_NODE_NAME")] = cache.Config{}
 	opts.Cache = cache.Options{DefaultNamespaces: namespaceCache}
 }
