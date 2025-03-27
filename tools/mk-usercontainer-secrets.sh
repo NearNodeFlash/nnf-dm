@@ -60,6 +60,18 @@ fi
 set -e
 set -o pipefail
 
+#
+# =============
+# =============
+#
+#       A copy of this is in the argocd-boilerplate repo.
+#
+#       Update the two copies together.
+#
+# =============
+# =============
+#
+
 CA_KEY=
 SERVER_CERT=
 SERVER_SECRET_TLS=nnf-dm-usercontainer-server-tls
