@@ -29,12 +29,6 @@
 // The name of the environment variable that contains the workflow's token.
 #define WORKFLOW_TOKEN_ENV "DW_WORKFLOW_TOKEN"
 
-// The name of the environment variable that contains the workflow's name.
-#define WORKFLOW_NAME_ENV "DW_WORKFLOW_NAME"
-
-// The name of the environment variable that contains the workflow's namespace.
-#define WORKFLOW_NAMESPACE_ENV "DW_WORKFLOW_NAMESPACE"
-
 // The name of the environment variable that contains the name of the rabbit
 // that is running the MPI launcher, when MPI is being used.
 #define NNF_CONTAINER_LAUNCHER_ENV "NNF_CONTAINER_LAUNCHER"

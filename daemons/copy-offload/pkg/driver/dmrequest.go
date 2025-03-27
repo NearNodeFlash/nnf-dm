@@ -21,8 +21,6 @@ package driver
 
 import (
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // DMRequest represents the content of one http request. This has a
@@ -31,9 +29,6 @@ import (
 type DMRequest struct {
 	ComputeName string `json:"computeName"`
 
-	// The name and namespace of the initiating workflow
-	WorkflowName      string `json:"workflowName"`
-	WorkflowNamespace string `json:"workflowNamespace"`
 	// Source file or directory
 	SourcePath string `json:"sourcePath"`
 	// Destination file or directory
@@ -65,9 +60,6 @@ type DMRequest struct {
 // one-to-one relationship with a DriverRequest object.
 // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
 type StatusRequest struct {
-	// The name and namespace of the initiating workflow
-	WorkflowName      string `json:"workflowName"`
-	WorkflowNamespace string `json:"workflowNamespace"`
 	// Name of the copy request.
 	RequestName string `json:"requestName"`
 	// Max number of seconds to wait for the completion of the copy request.
@@ -80,17 +72,11 @@ func (m *DMRequest) Validator() error {
 	if m.ComputeName == "" {
 		return fmt.Errorf("compute name must be supplied")
 	}
-	if m.WorkflowName == "" {
-		return fmt.Errorf("workflow name must be supplied")
-	}
 	if m.SourcePath == "" {
 		return fmt.Errorf("source path must be supplied")
 	}
 	if m.DestinationPath == "" {
 		return fmt.Errorf("destination path must be supplied")
-	}
-	if m.WorkflowNamespace == "" {
-		m.WorkflowNamespace = corev1.NamespaceDefault
 	}
 	if m.Slots < -1 {
 		return fmt.Errorf("slots must be -1 (defer to profile), 0 (disable), or a positive integer")
@@ -106,12 +92,6 @@ func (m *StatusRequest) Validator() error {
 
 	if m.RequestName == "" {
 		return fmt.Errorf("request name must be supplied")
-	}
-	if m.WorkflowName == "" {
-		return fmt.Errorf("workflow name must be supplied")
-	}
-	if m.WorkflowNamespace == "" {
-		m.WorkflowNamespace = corev1.NamespaceDefault
 	}
 
 	return nil

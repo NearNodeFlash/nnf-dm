@@ -66,6 +66,9 @@ type Driver struct {
 	Mock      bool
 	MockCount int
 
+	WorkflowName      string
+	WorkflowNamespace string
+
 	// We maintain a map of active operations which allows us to process cancel requests.
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	// The SrvrDataMovementRecord objects are stored here.
@@ -105,22 +108,29 @@ type DriverRequest struct {
 	cmdArgs []string
 }
 
-func NewDriver(log logr.Logger, mock bool) *Driver {
-	return &Driver{
-		Log:         log,
-		Mock:        mock,
-		completions: make(map[string]struct{}),
-		cond:        sync.NewCond(&sync.Mutex{}),
+func NewDriver(log logr.Logger, mock bool) (*Driver, error) {
+	workflowName := os.Getenv("DW_WORKFLOW_NAME")
+	workflowNamespace := os.Getenv("DW_WORKFLOW_NAMESPACE")
+	if workflowName == "" || workflowNamespace == "" {
+		return nil, errors.New("DW_WORKFLOW_NAME and DW_WORKFLOW_NAMESPACE must be set")
 	}
+	return &Driver{
+		Log:               log,
+		Mock:              mock,
+		WorkflowName:      workflowName,
+		WorkflowNamespace: workflowNamespace,
+		completions:       make(map[string]struct{}),
+		cond:              sync.NewCond(&sync.Mutex{}),
+	}, nil
 }
 
 func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha7.NnfDataMovement, error) {
 
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 	workflow := &dwsv1alpha3.Workflow{}
 
-	wf := types.NamespacedName{Name: dmreq.WorkflowName, Namespace: dmreq.WorkflowNamespace}
+	wf := types.NamespacedName{Name: drvr.WorkflowName, Namespace: drvr.WorkflowNamespace}
 	if err := drvr.Client.Get(ctx, wf, workflow); err != nil {
 		crLog.Info("Unable to get workflow: %v", err)
 		return "", nil, err
@@ -198,7 +208,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 	}
 
 	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
-	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
+	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, drvr.WorkflowName, drvr.WorkflowNamespace, dm)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
 		return "", nil, err
@@ -238,7 +248,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 
 func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha7.NnfDataMovement, error) {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 	var err error
 
 	r.RabbitName = "mock-rabbit-01"
@@ -293,7 +303,7 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string
 
 func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha7.NnfDataMovement) error {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 
 	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
@@ -314,7 +324,7 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 
 func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha7.NnfDataMovement) error {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 
 	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
@@ -402,7 +412,7 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 	keyNS, keyName := r.dmKeySplit(statreq.RequestName)
 	dmReq := types.NamespacedName{Name: keyName, Namespace: keyNS}
 	dm := &nnfv1alpha7.NnfDataMovement{}
-	crLog := drvr.Log.WithValues("workflow", statreq.WorkflowName, "request", statreq.RequestName, "namespace", statreq.WorkflowNamespace)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName, "request", statreq.RequestName)
 
 	drvr.Log.Info("Getting request", "request", dmReq)
 	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
@@ -413,7 +423,7 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 		crLog.Error(err, "failed to get NnfDataMovement resource")
 		return nil, http.StatusInternalServerError, err
 	}
-	if dm.Labels[dwsv1alpha3.WorkflowNameLabel] != statreq.WorkflowName || dm.Labels[dwsv1alpha3.WorkflowNamespaceLabel] != statreq.WorkflowNamespace {
+	if dm.Labels[dwsv1alpha3.WorkflowNameLabel] != drvr.WorkflowName || dm.Labels[dwsv1alpha3.WorkflowNamespaceLabel] != drvr.WorkflowNamespace {
 		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
 	}
 
@@ -930,8 +940,8 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	listOptions := []client.ListOption{
 		client.InNamespace(r.RabbitName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
-			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
+			dwsv1alpha3.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha3.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
@@ -964,8 +974,8 @@ func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMReques
 	listOptions := []client.ListOption{
 		client.InNamespace(dmreq.ComputeName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
-			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
+			dwsv1alpha3.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha3.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
