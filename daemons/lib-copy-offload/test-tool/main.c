@@ -50,6 +50,7 @@ void usage(const char **argv) {
     fprintf(stderr, "       -D DEST_PATH       Local path to destination.\n");
     fprintf(stderr, "       -m SLOTS           Number of slots (processes).\n");
     fprintf(stderr, "       -M MAX_SLOTS       Maximum number of slots (processes).\n");
+    fprintf(stderr, "       -C MY_HOSTNAME     Name of the host submitting the request. (for development/debugging)\n");
     fprintf(stderr, "       -d                 Perform a dry run.\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage: %s [COMMON_ARGS] -S <ARGS>\n", argv[0]);
@@ -61,7 +62,6 @@ void usage(const char **argv) {
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
     fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
     fprintf(stderr, "    -s                  Skip TLS configuration.\n");
-    fprintf(stderr, "    -C MY_HOSTNAME      Name of the host submitting the request. (for development/debugging)\n");
     fprintf(stderr, "    -t TOKEN_FILE       Bearer token file.\n");
     fprintf(stderr, "    -x CERT_FILE        CA/Server certificate file. A self-signed certificate.\n");
 }
