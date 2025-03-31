@@ -18,6 +18,7 @@
  */
 
 #include <curl/curl.h>
+#include "copy-offload-status.h"
 
 // Define the API version. This applies to the request format sent by the client
 // as well as the response format sent by the server.
@@ -73,6 +74,7 @@ struct copy_offload_s {
 };
 typedef struct copy_offload_s COPY_OFFLOAD;
 
+
 /* Create and initialize a handle. */
 COPY_OFFLOAD *copy_offload_init();
 
@@ -105,11 +107,18 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output);
  * The maximum number of seconds to wait for the job to complete is @max_wait_secs.
  * If @max_wait_secs is 0, then the server will return immediately. If it is -1, then
  * the server will wait indefinitely.
- * The caller is responsible for calling free() on @output if *output is non-NULL.
+ * The caller is responsible for calling copy_offload_status_cleanup() on
+ * @status_response if *status_response is non-NULL.
  * Returns 0 on success.
  * On failure it returns 1 and places an error message in @offload->err_message. 
  */
-int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, char **output);
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, copy_offload_status_response_t **status_response);
+void copy_offload_status_cleanup(copy_offload_status_response_t *status_response);
+
+/* Pretty-print the response record from copy_offload_status() to the given file
+ * descriptor.
+ */
+void copy_offload_status_pretty_print(FILE *out, copy_offload_status_response_t *status_response);
 
 /* Cancel a specific copy-offload request. The @job_name is the value returned
  * by copy_offload_copy().

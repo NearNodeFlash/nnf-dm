@@ -19,8 +19,6 @@
 
 package driver
 
-import "fmt"
-
 type DataMovementStatusResponse_State string
 
 const (
@@ -72,23 +70,4 @@ type DataMovementStatusResponse_v1_0 struct {
 	StartTime string `json:"startTime,omitempty"`
 	// The end time (local) of the data movement operation
 	EndTime string `json:"endTime,omitempty"`
-}
-
-func (dmr *DataMovementStatusResponse_v1_0) String() error {
-	if dmr.State == "" {
-		return fmt.Errorf("State must be set")
-	}
-	if dmr.Status == "" {
-		return fmt.Errorf("Status must be set")
-	}
-	if dmr.CommandStatus == nil {
-		return fmt.Errorf("CommandStatus must be set")
-	}
-	if dmr.StartTime == "" {
-		return fmt.Errorf("StartTime must be set")
-	}
-	if dmr.EndTime == "" {
-		return fmt.Errorf("EndTime must be set")
-	}
-	return nil
 }

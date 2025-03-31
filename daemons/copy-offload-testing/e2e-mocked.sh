@@ -144,6 +144,14 @@ if [[ $job1 != "mock-rabbit-01--nnf-copy-offload-node-0" ]]; then
 fi
 
 # shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS -q -j $job1); then
+    echo "line $LINENO output: $output"
+    cleanup
+fi
+echo "GETREQUEST:"
+echo "$output"
+
+# shellcheck disable=SC2086
 if ! output=$($CO $CO_TLS_ARGS -l); then
     echo "line $LINENO output: $output"
     cleanup
