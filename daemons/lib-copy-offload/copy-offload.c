@@ -338,9 +338,9 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
 }
 
 /* Submit a status request.
- * The caller is responsible for calling free() on @output if *output is non-NULL.
+ * The caller is responsible for calling copy_offload_status_cleanup() on @status_response if *status_response is non-NULL.
  */
-int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, char **output) {
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, copy_offload_status_response_t **status_response) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
@@ -373,9 +373,11 @@ int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs
     if (http_code == 200)
         ret = 0;
     if (chunk.response != NULL) {
-        *output = strdup(chunk.response);
-        chop(output);
+        char *output;
+        output = strdup(chunk.response);
+        chop(&output);
         free(chunk.response);
+        *status_response = _copy_offload_status_parse(output);
     }
     return ret;
 }
@@ -431,7 +433,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
     http_code = copy_offload_perform(offload, &chunk);
-    if (http_code == 204)
+    if (http_code == 200)
         ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);

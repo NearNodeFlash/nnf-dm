@@ -176,195 +176,7 @@ func TestA_Hello(t *testing.T) {
 	})
 }
 
-func TestB_ListRequests(t *testing.T) {
-	testCases := []struct {
-		name       string
-		method     string
-		wantText   string
-		wantStatus int
-	}{
-		{
-			name:       "returns status-no-content",
-			method:     http.MethodGet,
-			wantText:   "",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "returns status-not-implemented for POST",
-			method:     http.MethodPost,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-		{
-			name:       "returns status-not-implemented for PUT",
-			method:     http.MethodPut,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-	}
-
-	crLog := setupLog()
-	drvr, err := driver.NewDriver(crLog, true)
-	if err != nil {
-		t.Errorf("NewDriver failed: %s", err.Error())
-		t.FailNow()
-	}
-	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			request, _ := http.NewRequest(test.method, "/list", nil)
-			request.Header.Set("Accepts-version", "1.0")
-			response := httptest.NewRecorder()
-
-			httpHandler.ListRequests(response, request)
-
-			res := response.Result()
-			got := response.Body.String()
-
-			if res.StatusCode != test.wantStatus {
-				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
-			}
-			if got != test.wantText {
-				t.Errorf("got %q, want %q", got, test.wantText)
-			}
-		})
-	}
-}
-
-func TestC_GetRequest(t *testing.T) {
-	testCases := []struct {
-		name        string
-		method      string
-		requestName string
-		params      string
-		wantText    string
-		wantStatus  int
-	}{
-		{
-			name:        "returns status-ok",
-			method:      http.MethodGet,
-			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "maxWaitSecs=10",
-			wantText:    "{\"state\":\"pending\",\"status\":\"unknown status\"}\n",
-			wantStatus:  http.StatusOK,
-		},
-		{
-			name:        "returns status-badr-request for maxWaitSecs",
-			method:      http.MethodGet,
-			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "",
-			wantText:    "unable to parse maxWaitSecs: strconv.Atoi: parsing \"\": invalid syntax\n",
-			wantStatus:  http.StatusBadRequest,
-		},
-		{
-			name:        "returns status-badr-request for extra params",
-			method:      http.MethodGet,
-			requestName: "nnf-copy-offload-node-9ae2a136-4",
-			params:      "maxWaitSecs=10&extra=1",
-			wantText:    "unexpected query parameters: extra=1\n",
-			wantStatus:  http.StatusBadRequest,
-		},
-		{
-			name:       "returns status-not-implemented for POST",
-			method:     http.MethodPost,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-		{
-			name:       "returns status-not-implemented for PUT",
-			method:     http.MethodPut,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-	}
-
-	crLog := setupLog()
-	drvr, err := driver.NewDriver(crLog, true)
-	if err != nil {
-		t.Errorf("NewDriver failed: %s", err.Error())
-		t.FailNow()
-	}
-	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			request, _ := http.NewRequest(test.method, fmt.Sprintf("/status/%s?%s", test.requestName, test.params), nil)
-			request.Header.Set("Accepts-version", "1.0")
-			response := httptest.NewRecorder()
-
-			httpHandler.GetRequest(response, request)
-
-			res := response.Result()
-			got := response.Body.String()
-
-			if res.StatusCode != test.wantStatus {
-				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
-			}
-			if got != test.wantText {
-				t.Errorf("got %q, want %q", got, test.wantText)
-			}
-		})
-	}
-}
-
-func TestD_CancelRequest(t *testing.T) {
-	testCases := []struct {
-		name       string
-		method     string
-		wantText   string
-		wantStatus int
-	}{
-		{
-			name:       "returns status-no-content",
-			method:     http.MethodDelete,
-			wantText:   "unable to cancel request: request not found\n",
-			wantStatus: http.StatusNotFound,
-		},
-		{
-			name:       "returns status-not-implemented for GET",
-			method:     http.MethodGet,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-		{
-			name:       "returns status-not-implemented for PUT",
-			method:     http.MethodPut,
-			wantText:   "method not supported\n",
-			wantStatus: http.StatusNotImplemented,
-		},
-	}
-
-	crLog := setupLog()
-	drvr, err := driver.NewDriver(crLog, true)
-	if err != nil {
-		t.Errorf("NewDriver failed: %s", err.Error())
-		t.FailNow()
-	}
-	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			request, _ := http.NewRequest(test.method, "/cancel/nnf-copy-offload-node-9ae2a136-4", nil)
-			request.Header.Set("Accepts-version", "1.0")
-			response := httptest.NewRecorder()
-
-			httpHandler.CancelRequest(response, request)
-
-			res := response.Result()
-			got := response.Body.String()
-
-			if res.StatusCode != test.wantStatus {
-				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
-			}
-			if got != test.wantText {
-				t.Errorf("got %q, want %q", got, test.wantText)
-			}
-		})
-	}
-}
-
-func TestE_TrialRequest(t *testing.T) {
+func TestB_TrialRequest(t *testing.T) {
 	testCases := []struct {
 		name       string
 		method     string
@@ -375,7 +187,7 @@ func TestE_TrialRequest(t *testing.T) {
 		{
 			name:       "returns status-ok",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
@@ -433,6 +245,276 @@ func TestE_TrialRequest(t *testing.T) {
 	}
 }
 
+func makeOneRequest(t *testing.T, httpHandler *UserHttp) string {
+	body := []byte("{\"computeName\": \"rabbit-compute-3\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}")
+	readerBody := bytes.NewReader(body)
+	request, _ := http.NewRequest(http.MethodPost, "/trial", readerBody)
+	request.Header.Set("Accepts-version", "1.0")
+	response := httptest.NewRecorder()
+	httpHandler.TrialRequest(response, request)
+
+	res := response.Result()
+	got := response.Body.String()
+
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
+	}
+	wantText := "name=mock-rabbit-01--nnf-copy-offload-node-"
+	if !strings.HasPrefix(got, wantText) {
+		t.Errorf("got %q, want %q", got, wantText)
+	}
+	parts := strings.Split(got, "=")
+	return strings.TrimSuffix(parts[1], "\n")
+}
+
+func TestC_ListRequests(t *testing.T) {
+	testCases := []struct {
+		name        string
+		method      string
+		wantText    string
+		wantStatus  int
+		makeRequest bool
+	}{
+		{
+			name:        "returns status-no-content",
+			method:      http.MethodGet,
+			wantText:    "",
+			wantStatus:  http.StatusOK,
+			makeRequest: false,
+		},
+		{
+			name:        "returns status-not-implemented for POST",
+			method:      http.MethodPost,
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: false,
+		},
+		{
+			name:        "returns status-not-implemented for PUT",
+			method:      http.MethodPut,
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: false,
+		},
+		{
+			name:        "returns the list",
+			method:      http.MethodGet,
+			wantText:    "REQNAME\n",
+			wantStatus:  http.StatusOK,
+			makeRequest: true,
+		},
+	}
+
+	crLog := setupLog()
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			var reqName string
+			if test.makeRequest {
+				reqName = makeOneRequest(t, httpHandler)
+			}
+			request, _ := http.NewRequest(test.method, "/list", nil)
+			request.Header.Set("Accepts-version", "1.0")
+			response := httptest.NewRecorder()
+
+			httpHandler.ListRequests(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			wantText := test.wantText
+			if reqName != "" {
+				wantText = strings.ReplaceAll(test.wantText, "REQNAME", reqName)
+			}
+			if got != wantText {
+				t.Errorf("got %q, want %q", got, wantText)
+			}
+		})
+	}
+}
+
+func TestD_GetRequest(t *testing.T) {
+	testCases := []struct {
+		name        string
+		method      string
+		requestName string
+		params      string
+		wantText    string
+		wantStatus  int
+		makeRequest bool
+	}{
+		{
+			name:        "returns status-ok",
+			method:      http.MethodGet,
+			requestName: "REQNAME",
+			params:      "maxWaitSecs=10",
+			wantText:    "{\"state\":\"running\",\"status\":\"unknown status\",\"commandStatus\":{\"command\":\"/bin/bash -c true\"},\"startTime\":\"2025-04-01 11:46:36.535519 -0500 CDT\"}\n",
+			wantStatus:  http.StatusOK,
+			makeRequest: true,
+		},
+		{
+			name:        "returns status-not-found for unknown request",
+			method:      http.MethodGet,
+			requestName: "unknown-request",
+			params:      "maxWaitSecs=10",
+			wantText:    "request not found\n",
+			wantStatus:  http.StatusNotFound,
+			makeRequest: false,
+		},
+		{
+			name:        "returns status-badr-request for maxWaitSecs",
+			method:      http.MethodGet,
+			requestName: "REQNAME-nonesuch",
+			params:      "",
+			wantText:    "unable to parse maxWaitSecs: strconv.Atoi: parsing \"\": invalid syntax\n",
+			wantStatus:  http.StatusBadRequest,
+			makeRequest: true,
+		},
+		{
+			name:        "returns status-badr-request for extra params",
+			method:      http.MethodGet,
+			requestName: "REQNAME",
+			params:      "maxWaitSecs=10&extra=1",
+			wantText:    "unexpected query parameters: extra=1\n",
+			wantStatus:  http.StatusBadRequest,
+			makeRequest: true,
+		},
+		{
+			name:        "returns status-not-implemented for POST",
+			method:      http.MethodPost,
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: true,
+		},
+		{
+			name:        "returns status-not-implemented for PUT",
+			method:      http.MethodPut,
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: true,
+		},
+	}
+
+	crLog := setupLog()
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			reqName := test.requestName
+			if test.makeRequest {
+				name := makeOneRequest(t, httpHandler)
+				reqName = strings.ReplaceAll(test.requestName, "REQNAME", name)
+			}
+			request, _ := http.NewRequest(test.method, fmt.Sprintf("/status/%s?%s", reqName, test.params), nil)
+			request.Header.Set("Accepts-version", "1.0")
+			response := httptest.NewRecorder()
+
+			httpHandler.GetRequest(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
+}
+
+func TestE_CancelRequest(t *testing.T) {
+	testCases := []struct {
+		name        string
+		method      string
+		requestName string
+		wantText    string
+		wantStatus  int
+		makeRequest bool
+	}{
+		{
+			name:        "returns status-no-content",
+			method:      http.MethodDelete,
+			requestName: "unknown-request-1",
+			wantText:    "unable to cancel request: request not found\n",
+			wantStatus:  http.StatusNotFound,
+			makeRequest: false,
+		},
+		{
+			name:        "returns status-ok",
+			method:      http.MethodDelete,
+			requestName: "REQNAME",
+			wantText:    "",
+			wantStatus:  http.StatusOK,
+			makeRequest: true,
+		},
+		{
+			name:        "returns status-not-implemented for GET",
+			method:      http.MethodGet,
+			requestName: "unknown-request-2",
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: false,
+		},
+		{
+			name:        "returns status-not-implemented for PUT",
+			method:      http.MethodPut,
+			requestName: "unknown-request-3",
+			wantText:    "method not supported\n",
+			wantStatus:  http.StatusNotImplemented,
+			makeRequest: false,
+		},
+	}
+
+	crLog := setupLog()
+	drvr, err := driver.NewDriver(crLog, true)
+	if err != nil {
+		t.Errorf("NewDriver failed: %s", err.Error())
+		t.FailNow()
+	}
+	httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			reqName := test.requestName
+			if test.makeRequest {
+				name := makeOneRequest(t, httpHandler)
+				reqName = strings.ReplaceAll(test.requestName, "REQNAME", name)
+			}
+			request, _ := http.NewRequest(test.method, fmt.Sprintf("/cancel/%s", reqName), nil)
+			request.Header.Set("Accepts-version", "1.0")
+			response := httptest.NewRecorder()
+
+			httpHandler.CancelRequest(response, request)
+
+			res := response.Result()
+			got := response.Body.String()
+
+			if res.StatusCode != test.wantStatus {
+				t.Errorf("got status %d, want status %d", res.StatusCode, test.wantStatus)
+			}
+			if got != test.wantText {
+				t.Errorf("got %q, want %q", got, test.wantText)
+			}
+		})
+	}
+}
+
 func TestF_Lifecycle(t *testing.T) {
 
 	scheduleJobs := []struct {
@@ -445,21 +527,21 @@ func TestF_Lifecycle(t *testing.T) {
 		{
 			name:       "schedule job 1",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-3\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-0\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 2",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-1\n",
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "schedule job 3",
 			method:     http.MethodPost,
-			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:       []byte("{\"computeName\": \"rabbit-compute-5\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			wantText:   "name=mock-rabbit-01--nnf-copy-offload-node-2\n",
 			wantStatus: http.StatusOK,
 		},
@@ -536,11 +618,12 @@ func TestF_Lifecycle(t *testing.T) {
 		res := response.Result()
 		got := response.Body.String()
 
-		if res.StatusCode != http.StatusNoContent {
-			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusNoContent)
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
 		}
-		if got != "\n" {
-			t.Errorf("got %q, want %q", got, "(newline)")
+		want := ""
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
 		}
 	})
 
@@ -641,14 +724,14 @@ func TestG_BadAPIVersion(t *testing.T) {
 			name:    "bad api version for copy",
 			method:  http.MethodPost,
 			url:     "/trial",
-			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:    []byte("{\"computeName\": \"rabbit-compute-3\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler: httpHandler.TrialRequest,
 		},
 		{
 			name:           "skip api version for copy",
 			method:         http.MethodPost,
 			url:            "/trial",
-			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"workflowName\": \"nnf-copy-offload-node-9ae2a136-4\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
+			body:           []byte("{\"computeName\": \"rabbit-compute-3\", \"sourcePath\": \"/mnt/nnf/dc51a384-99bd-4ef1-8444-4ee3b0cdc8a8-0\", \"destinationPath\": \"/lus/global/dean/foo\", \"dryrun\": true}"),
 			handler:        httpHandler.TrialRequest,
 			skipApiVersion: true,
 		},

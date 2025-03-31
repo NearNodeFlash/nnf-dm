@@ -85,6 +85,9 @@ type Driver struct {
 // These objects are stored in the Driver.contexts map.
 type SrvrDataMovementRecord struct {
 	cancelContext helpers.DataMovementCancelContext
+
+	// Save a reference to the NnfDataMovement when in mock mode.
+	mockDM *nnfv1alpha7.NnfDataMovement
 }
 
 // DriverRequest contains the information that is collected during the initial examination
@@ -357,12 +360,16 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha7.NnfDa
 	// Expand the context with cancel and store it in the map so the cancel function can be
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
-	drvr.contexts.Store(r.dmKey(dm), SrvrDataMovementRecord{
+	record := SrvrDataMovementRecord{
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
 		},
-	})
+	}
+	if drvr.Mock {
+		record.mockDM = dm
+	}
+	drvr.contexts.Store(r.dmKey(dm), record)
 }
 
 func (r *DriverRequest) loadRequest(dm *nnfv1alpha7.NnfDataMovement) (SrvrDataMovementRecord, error) {
@@ -401,10 +408,16 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 }
 
 func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
-	return &DataMovementStatusResponse_v1_0{
-		State:  DataMovementStatusResponse_PENDING,
-		Status: DataMovementStatusResponse_UNKNOWN_STATUS,
-	}, -1, nil
+	contextRecord, err := r.loadRequestByName(statreq.RequestName)
+	if err != nil {
+		return nil, http.StatusNotFound, errors.New("request not found")
+	}
+	dm := contextRecord.mockDM
+
+	statusResponse, code, err := r.buildStatusResponse(statreq, dm)
+	// A static timestamp that the tests know.
+	statusResponse.StartTime = "2025-04-01 11:46:36.535519 -0500 CDT"
+	return statusResponse, code, err
 }
 
 func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
@@ -440,6 +453,12 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 			return nil, http.StatusInternalServerError, err
 		}
 	}
+
+	statusResponse, code, err := r.buildStatusResponse(statreq, dm)
+	return statusResponse, code, err
+}
+
+func (r *DriverRequest) buildStatusResponse(statreq StatusRequest, dm *nnfv1alpha7.NnfDataMovement) (*DataMovementStatusResponse_v1_0, int, error) {
 
 	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha7.DataMovementConditionReasonInvalid {
 		return &DataMovementStatusResponse_v1_0{
