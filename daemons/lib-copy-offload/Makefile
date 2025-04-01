@@ -26,7 +26,7 @@ all: lib-dependencies libcopyoffload.a tester
 
 .PHONY: lib-dependencies
 lib-dependencies:
-	@ pkg-config --libs libcurl json-c > /dev/null || echo "On a Mac use 'brew install json-c' and on a Linux node look up the json-c package on rpmfind.net."
+	@ pkg-config --libs libcurl json-c > /dev/null || echo "On a Mac use 'brew install json-c' and on a Linux node 'dnf install json-c json-c-devel'."
 
 libcopyoffload.a: copy-offload.o copy-offload-status.o
 	$(AR) $(ARFLAGS) libcopyoffload.a copy-offload.o copy-offload-status.o
