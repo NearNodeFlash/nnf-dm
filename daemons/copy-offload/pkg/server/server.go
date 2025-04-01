@@ -156,7 +156,7 @@ func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
 	}
 	if err != nil {
 		if http_code > 0 {
-			http.Error(w, fmt.Sprintf("%s\n", err.Error()), http_code)
+			http.Error(w, err.Error(), http_code)
 		} else {
 			http.Error(w, fmt.Sprintf("unable to get request: %s\n", err.Error()), http.StatusInternalServerError)
 		}
@@ -213,7 +213,7 @@ func (user *UserHttp) CancelRequest(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, fmt.Sprintf("unable to cancel request: %s", err.Error()), http.StatusNotFound)
 		return
 	}
-	http.Error(w, "", http.StatusNoContent)
+	// StatusOK is implied.
 }
 
 func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {

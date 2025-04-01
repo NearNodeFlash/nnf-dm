@@ -415,6 +415,8 @@ func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusReques
 	dm := contextRecord.mockDM
 
 	statusResponse, code, err := r.buildStatusResponse(statreq, dm)
+	// A static timestamp that the tests know.
+	statusResponse.StartTime = "2025-04-01 11:46:36.535519 -0500 CDT"
 	return statusResponse, code, err
 }
 

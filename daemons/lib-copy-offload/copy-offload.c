@@ -433,7 +433,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
     http_code = copy_offload_perform(offload, &chunk);
-    if (http_code == 204)
+    if (http_code == 200)
         ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);
