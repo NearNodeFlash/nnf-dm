@@ -4,4 +4,4 @@ The copy-offload API allows a user's compute application to specify data movemen
 
 See [copy-offload.h](./copy-offload.h) for the API description. See the [test tool](./test-tool/main.c) for examples of using the API.
 
-The build environment requires libraries and headers for `libcurl` and `json-c`. On a Mac run `brew install json-c`, and on a Redhat Linux machine look for [json-c rpms](https://www.rpmfind.net/linux/rpm2html/search.php?query=json-c).
+The build environment requires libraries and headers for `libcurl` and `json-c`. On a Mac run `brew install json-c`, and on a Redhat Linux machine `dnf install json-c json-c-devel`.

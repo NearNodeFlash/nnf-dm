@@ -74,7 +74,6 @@ struct copy_offload_s {
 };
 typedef struct copy_offload_s COPY_OFFLOAD;
 
-
 /* Create and initialize a handle. */
 COPY_OFFLOAD *copy_offload_init();
 
