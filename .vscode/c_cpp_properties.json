@@ -4,16 +4,17 @@
             "name": "Mac",
             "includePath": [
                 "${default}",
+                "/opt/homebrew/include",
                 "${workspaceFolder}/daemons/compute/client-cpp/cmake/build"
             ],
             "defines": [],
             "macFrameworkPath": [
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "macos-clang-x64"
+            "intelliSenseMode": "macos-gcc-x64"
         }
     ],
     "version": 4
