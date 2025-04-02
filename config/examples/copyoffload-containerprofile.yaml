@@ -35,6 +35,13 @@ data:
                   - $(TOKEN_KEY_PATH)
                   - --addr
                   - :$(NNF_CONTAINER_PORTS)
+                # The QPS/BURST settings are used by the nnf-dm-copy-offload
+                # server when communicating with the Kubernetes API server.
+                env:
+                - name: NNF_REST_CONFIG_QPS
+                  value: "50"
+                - name: NNF_REST_CONFIG_BURST
+                  value: "100"
             # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to the
             # Kubernetes API server. This ServiceAccount and its Role are defined in
             # config/copy-offload.  Normal user containers should not require Kubernetes API server

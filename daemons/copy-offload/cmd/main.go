@@ -28,6 +28,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"go.uber.org/zap"
@@ -71,6 +72,26 @@ func setupLog() logr.Logger {
 
 func setupClient(crLog logr.Logger) client.Client {
 	config := ctrl.GetConfigOrDie()
+
+	qpsString, found := os.LookupEnv("NNF_REST_CONFIG_QPS")
+	if found {
+		qps, err := strconv.ParseFloat(qpsString, 32)
+		if err != nil {
+			crLog.Error(err, "invalid value for NNF_REST_CONFIG_QPS")
+			os.Exit(1)
+		}
+		config.QPS = float32(qps)
+	}
+
+	burstString, found := os.LookupEnv("NNF_REST_CONFIG_BURST")
+	if found {
+		burst, err := strconv.Atoi(burstString)
+		if err != nil {
+			crLog.Error(err, "invalid value for NNF_REST_CONFIG_BURST")
+			os.Exit(1)
+		}
+		config.Burst = burst
+	}
 
 	clnt, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
