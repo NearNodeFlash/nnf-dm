@@ -64,7 +64,7 @@ set -o pipefail
 # =============
 # =============
 #
-#       A copy of this is in the argocd-boilerplate repo.
+#       A copy of this is in both the nnf-dm and the argocd-boilerplate repos.
 #
 #       Update the two copies together.
 #

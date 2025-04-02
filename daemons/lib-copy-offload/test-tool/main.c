@@ -94,6 +94,7 @@ int main(int argc, const char **argv) {
     int q_opt = 0;
     int max_wait_secs = 0;
     int ret;
+    copy_offload_status_response_t *status_response = NULL;
 
     while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHqj:w:")) != -1) {
         switch (c) {
@@ -224,7 +225,7 @@ int main(int argc, const char **argv) {
     } else if (H_opt) {
         ret = copy_offload_hello(offload, &output);
     } else if (q_opt) {
-        ret = copy_offload_status(offload, job_name, max_wait_secs, &output);
+        ret = copy_offload_status(offload, job_name, max_wait_secs, &status_response);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
@@ -235,6 +236,9 @@ int main(int argc, const char **argv) {
         printf("%s\n", output);
         free(output);
         output = NULL;
+    } else if (q_opt && status_response != NULL) {
+        copy_offload_status_pretty_print(stdout, status_response);
+        copy_offload_status_cleanup(status_response);
     }
 
     if (verbose) {
