@@ -8,7 +8,7 @@ require (
 	github.com/DataWorkflowServices/dws v0.0.1-0.20250312162549-a682dcdf49b1
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250219194350-45aad5cbbe17
 	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250312170301-6f4fd32b0173 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250326193852-54696ee478a9
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250408183859-f6821f7a9ff4
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
@@ -50,8 +50,6 @@ require (
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kubeflow/common v0.4.6 // indirect
-	github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
