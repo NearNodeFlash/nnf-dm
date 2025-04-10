@@ -17,7 +17,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NNF_CRDS="dataworkflowservices.github.io nnf.cray.hpe.com lus.cray.hpe.com"
+NNF_CRD_GROUPS="dataworkflowservices.github.io nnf.cray.hpe.com lus.cray.hpe.com"
 
 usage() {
     echo "Usage: $0 [-l] [-i CRD]"
@@ -46,7 +46,7 @@ set -o pipefail
 list_crds() {
     local crds
 
-    crds=$(echo " $NNF_CRDS" | sed 's/ / -e /g')
+    crds=$(echo " $NNF_CRD_GROUPS" | sed 's/ / -e /g')
     # shellcheck disable=SC2086
     # Sort by group then list only the CRD names.
     kubectl get crds --no-headers -o=custom-columns='GROUP:.spec.group,NAME:.metadata.name' | grep $crds | sort | awk '{print $2}'
