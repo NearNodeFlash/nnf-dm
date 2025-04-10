@@ -36,12 +36,6 @@ data:
               value: '50'
             - name: NNF_REST_CONFIG_BURST
               value: '100'
-        # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to the
-        # Kubernetes API server. This ServiceAccount and its Role are defined in
-        # config/copy-offload.  Normal user containers should not require Kubernetes API server
-        # privilege and should not have a service account.
-        # TODO: this needs to be set in sos
-        # serviceAccountName: nnf-dm-copy-offload
     worker:
       containers:
         - name: copy-offload-worker
