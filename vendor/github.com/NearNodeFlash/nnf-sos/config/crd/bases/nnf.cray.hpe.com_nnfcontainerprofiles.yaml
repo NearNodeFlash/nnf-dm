@@ -31573,6 +31573,14 @@ spec:
                     required:
                     - containers
                     type: object
+                  slotsPerWorker:
+                    description: |-
+                      Specifies the number of slots per worker used in hostfile.
+                      Note: This is only for container directives that do not use Copy Offload. For Copy Offload
+                      API, the slots field in the specific Data Movement profile will be used instead of this
+                      value.
+                    format: int32
+                    type: integer
                   worker:
                     description: |-
                       Worker is the specification for the worker containers in the MPI job. In a typical MPI job,
