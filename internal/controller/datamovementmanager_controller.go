@@ -28,6 +28,9 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
+
+	"go.openly.dev/pointy"
 
 	"golang.org/x/crypto/ssh"
 
@@ -252,7 +255,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(c
 		deployment.Spec = *base.Spec.DeepCopy()
 		podSpec := &deployment.Spec.Template.Spec
 
-		container, err := findManagerContainer(podSpec)
+		container, err := findContainer(podSpec, "manager")
 		if err != nil {
 			return err
 		}
@@ -448,36 +451,55 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 	}
 
 	mutateFn := func() error {
-		podTemplateSpec := manager.Spec.Template.DeepCopy()
-		podTemplateSpec.Labels = manager.Spec.Selector.DeepCopy().MatchLabels
-		updateStrategy := manager.Spec.UpdateStrategy.DeepCopy()
+		podTemplateSpec := corev1.PodTemplateSpec{}
 
+		// Add labels
+		podTemplateSpec.Labels = manager.Spec.Selector.DeepCopy().MatchLabels
 		if podTemplateSpec.Labels == nil {
 			podTemplateSpec.Labels = make(map[string]string)
 		}
 		podTemplateSpec.Labels[nnfv1alpha7.DataMovementWorkerLabel] = "true"
 
-		podSpec := &podTemplateSpec.Spec
+		// Create corev1.PodSpec from NnfPodSpec
+		podSpec := manager.Spec.PodSpec.ToCorePodSpec()
 		podSpec.NodeSelector = manager.Spec.Selector.MatchLabels
 		podSpec.Subdomain = serviceName
+		podSpec.ServiceAccountName = "nnf-dm-node-controller"
+		podSpec.Tolerations = []corev1.Toleration{
+			{Key: "cray.nnf.node", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule},
+		}
+		podSpec.ShareProcessNamespace = pointy.Bool(true)
 
-		_, isTest := os.LookupEnv("NNF_TEST_ENVIRONMENT")
-		container, err := findManagerContainer(podSpec)
-		// The test env doesn't build the full pod spec, so it may not have
-		// this container.
-		if err != nil && !isTest {
-			return err
-		} else if err == nil {
-			container.Env = append(container.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
+		if managerContainer, err := findContainer(podSpec, "manager"); err == nil {
+			managerContainer.Env = append(managerContainer.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
+		}
+
+		if workerContainer, err := findContainer(podSpec, "worker"); err == nil {
+			workerContainer.Env = append(workerContainer.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
+
+			// Limit what the worker can do - this is enough to support dcp and being able to become
+			// the the UID/GID of the workflow
+			workerContainer.SecurityContext = &corev1.SecurityContext{
+				Privileged: pointy.Bool(true),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{
+						"SETUID",
+						"SETGID",
+						"MKNOD",
+					},
+				},
+			}
 		}
 
 		setupSSHAuthVolumes(manager, podSpec)
-
 		setupLustreVolumes(ctx, manager, podSpec, filesystems.Items)
 
+		// Create the daemonset from the template spec
+		podTemplateSpec.Spec = *podSpec
+		updateStrategy := manager.Spec.UpdateStrategy.DeepCopy()
 		ds.Spec = appsv1.DaemonSetSpec{
 			Selector:       &manager.Spec.Selector,
-			Template:       *podTemplateSpec,
+			Template:       podTemplateSpec,
 			UpdateStrategy: *updateStrategy,
 		}
 
@@ -608,14 +630,15 @@ func setupLustreVolumes(ctx context.Context, manager *nnfv1alpha7.NnfDataMovemen
 	}
 }
 
-func findManagerContainer(podSpec *corev1.PodSpec) (*corev1.Container, error) {
+func findContainer(podSpec *corev1.PodSpec, name string) (*corev1.Container, error) {
+	name = strings.ToLower(name)
 	for idx, container := range podSpec.Containers {
-		if container.Name == "manager" {
+		if container.Name == name {
 			return &podSpec.Containers[idx], nil
 		}
 	}
 
-	return nil, fmt.Errorf("could not locate manager container in pod spec")
+	return nil, fmt.Errorf("could not locate '%s' container in pod spec", name)
 }
 
 // SetupWithManager sets up the controller with the Manager.
