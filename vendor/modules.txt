@@ -1,4 +1,4 @@
-# github.com/DataWorkflowServices/dws v0.0.1-0.20250312162549-a682dcdf49b1
+# github.com/DataWorkflowServices/dws v0.0.1-0.20250410182135-484719f8c390
 ## explicit; go 1.22.0
 github.com/DataWorkflowServices/dws/api/v1alpha3
 github.com/DataWorkflowServices/dws/utils/dwdparse
@@ -10,7 +10,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250312170301-6f4fd32b0173
 ## explicit; go 1.22.0
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250326193852-54696ee478a9
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250414142538-39405b70981a
 ## explicit; go 1.22.0
 github.com/NearNodeFlash/nnf-sos/api/v1alpha7
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
@@ -105,12 +105,6 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/kubeflow/common v0.4.6
-## explicit; go 1.19
-github.com/kubeflow/common/pkg/apis/common/v1
-# github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759
-## explicit; go 1.19
-github.com/kubeflow/mpi-operator/pkg/apis/kubeflow/v2beta1
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer

@@ -13,43 +13,30 @@ data:
   numPorts: 1
   retryLimit: 2
   # Copy offload needs to use mpiSpec to use the mpi-operator model
-  # TODO: Add a webhook check that any template with a serviceAccountName == nnf-dm-copy-offload
-  # needs to have an mpiSpec
   mpiSpec:
-    runPolicy:
-      cleanPodPolicy: Running
-    mpiReplicaSpecs:
-      Launcher:
-        template:
-          spec:
-            containers:
-              - name: copy-offload-srvr
-                image: nnf-dm-copy-offload:latest
-                command:
-                  - /nnf-copy-offload
-                  - --cert
-                  - $(TLS_CERT_PATH)
-                  - --cakey
-                  - $(TLS_KEY_PATH)
-                  - --tokenkey
-                  - $(TOKEN_KEY_PATH)
-                  - --addr
-                  - :$(NNF_CONTAINER_PORTS)
-                # The QPS/BURST settings are used by the nnf-dm-copy-offload
-                # server when communicating with the Kubernetes API server.
-                env:
-                - name: NNF_REST_CONFIG_QPS
-                  value: "50"
-                - name: NNF_REST_CONFIG_BURST
-                  value: "100"
-            # This ServiceAccount is used by the nnf-dm-copy-offload server to talk to the
-            # Kubernetes API server. This ServiceAccount and its Role are defined in
-            # config/copy-offload.  Normal user containers should not require Kubernetes API server
-            # privilege and should not have a service account.
-            serviceAccountName: nnf-dm-copy-offload
-      Worker:
-        template:
-          spec:
-            containers:
-              - name: copy-offload-worker
-                image: nnf-dm-copy-offload:latest
+    copyOffload: true
+    launcher:
+      containers:
+        - name: copy-offload-srvr
+          image: nnf-dm-copy-offload:latest
+          command:
+            - /nnf-copy-offload
+            - --cert
+            - $(TLS_CERT_PATH)
+            - --cakey
+            - $(TLS_KEY_PATH)
+            - --tokenkey
+            - $(TOKEN_KEY_PATH)
+            - --addr
+            - :$(NNF_CONTAINER_PORTS)
+          # The QPS/BURST settings are used by the nnf-dm-copy-offload
+          # server when communicating with the Kubernetes API server.
+          env:
+            - name: NNF_REST_CONFIG_QPS
+              value: '50'
+            - name: NNF_REST_CONFIG_BURST
+              value: '100'
+    worker:
+      containers:
+        - name: copy-offload-worker
+          image: nnf-dm-copy-offload:latest

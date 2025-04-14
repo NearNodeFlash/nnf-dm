@@ -106,14 +106,10 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 				},
 				HostPath:  "/mnt/nnf",
 				MountPath: "/mnt/nnf",
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:  "worker",
-								Image: "controller:latest",
-							},
-						},
+				PodSpec: nnfv1alpha7.NnfPodSpec{
+					Containers: []nnfv1alpha7.NnfContainer{
+						{Name: "manager", Image: "controller:latest"},
+						{Name: "worker", Image: "controller:latest"},
 					},
 				},
 				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
