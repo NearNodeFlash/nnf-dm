@@ -76,62 +76,50 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: '25%'
-  template:
-    spec:
-      serviceAccountName: nnf-dm-node-controller
-      tolerations:
-        - key: 'cray.nnf.node'
-          operator: 'Equal'
-          value: 'true'
-          effect: 'NoSchedule'
-      shareProcessNamespace: true
-      containers:
-        - name: worker
-          image: nnf-mfu:latest
-          command:
-            - /usr/sbin/sshd
-          args:
-            - -De
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ['SETUID', 'SETGID', 'MKNOD']
-          volumeMounts:
-            - name:  worker-config
-              mountPath: /etc/ssh/sshd_config
-              subPath: sshd_config
-            - name: localtime
-              mountPath: /etc/localtime
-              readOnly: true
-            - name: tzdata
-              mountPath: /usr/share/zoneinfo
-              readOnly: true
-        - name: manager
-          command:
-            - /manager
-          args:
-            - --leader-elect=false
-            - --controller=node
-          image: controller:latest
-          env:
-            - name: NNF_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-            - name: localtime
-              mountPath: /etc/localtime
-              readOnly: true
-            - name: tzdata
-              mountPath: /usr/share/zoneinfo
-              readOnly: true
-      volumes:
-        - name: worker-config
-          configMap:
-            name: nnf-dm-worker-config
-        - name: localtime
-          hostPath:
-            path: /etc/localtime
-        - name: tzdata
-          hostPath:
-            path: /usr/share/zoneinfo
+  podSpec:
+    containers:
+      - name: worker
+        image: nnf-mfu:latest
+        command:
+          - /usr/sbin/sshd
+        args:
+          - -De
+        volumeMounts:
+          - name:  worker-config
+            mountPath: /etc/ssh/sshd_config
+            subPath: sshd_config
+          - name: localtime
+            mountPath: /etc/localtime
+            readOnly: true
+          - name: tzdata
+            mountPath: /usr/share/zoneinfo
+            readOnly: true
+      - name: manager
+        command:
+          - /manager
+        args:
+          - --leader-elect=false
+          - --controller=node
+        image: controller:latest
+        env:
+          - name: NNF_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        volumeMounts:
+          - name: localtime
+            mountPath: /etc/localtime
+            readOnly: true
+          - name: tzdata
+            mountPath: /usr/share/zoneinfo
+            readOnly: true
+    volumes:
+      - name: worker-config
+        configMap:
+          name: nnf-dm-worker-config
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      - name: tzdata
+        hostPath:
+          path: /usr/share/zoneinfo
