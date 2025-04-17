@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
+	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
@@ -56,7 +56,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
-	utilruntime.Must(dwsv1alpha3.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha4.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 }
 
