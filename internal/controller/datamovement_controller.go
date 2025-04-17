@@ -44,7 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
+	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
 	. "github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
 	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
@@ -93,9 +93,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	defer func() {
 		if err != nil {
-			resourceError, ok := err.(*dwsv1alpha3.ResourceErrorInfo)
+			resourceError, ok := err.(*dwsv1alpha4.ResourceErrorInfo)
 			if ok {
-				if resourceError.Severity != dwsv1alpha3.SeverityMinor {
+				if resourceError.Severity != dwsv1alpha4.SeverityMinor {
 					dm.Status.State = nnfv1alpha7.DataMovementConditionTypeFinished
 					dm.Status.Status = nnfv1alpha7.DataMovementConditionReasonInvalid
 				}
@@ -145,7 +145,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Handle cancellation
 	if dm.Spec.Cancel {
 		if err := r.cancel(ctx, dm); err != nil {
-			return ctrl.Result{}, dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("Unable to cancel data movement")
+			return ctrl.Result{}, dwsv1alpha4.NewResourceError("").WithError(err).WithUserMessage("Unable to cancel data movement")
 		}
 
 		return ctrl.Result{}, nil
@@ -170,18 +170,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Get DM Profile
 	profile, err := GetDMProfile(r.Client, ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get profile for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha4.NewResourceError("could not get profile for data movement").WithError(err).WithMajor()
 	}
 	log.Info("Using profile", "profile", profile)
 
 	nodes, err := GetStorageNodeNames(r.Client, ctx, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get storage nodes for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha4.NewResourceError("could not get storage nodes for data movement").WithError(err).WithMajor()
 	}
 
 	hosts, err := GetWorkerHostnames(r.Client, ctx, nodes)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha4.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
 	}
 
 	// Expand the context with cancel and store it in the map so the cancel function can be used in
@@ -196,7 +196,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// command itself.
 	mpiHostfile, err := CreateMpiHostfile(profile, hosts, dm)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not create MPI hostfile").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha4.NewResourceError("could not create MPI hostfile").WithError(err).WithMajor()
 	}
 	log.Info("MPI Hostfile preview", "first line", PeekMpiHostfile(mpiHostfile))
 
@@ -208,7 +208,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Build command
 	cmdArgs, err := BuildDMCommand(profile, mpiHostfile, true, dm, log)
 	if err != nil {
-		return ctrl.Result{}, dwsv1alpha3.NewResourceError("could not create data movement command").WithError(err).WithMajor()
+		return ctrl.Result{}, dwsv1alpha4.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
@@ -348,7 +348,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "Data movement operation failed", "output", output)
 			dm.Status.Status = nnfv1alpha7.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
-			resourceErr := dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
+			resourceErr := dwsv1alpha4.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
