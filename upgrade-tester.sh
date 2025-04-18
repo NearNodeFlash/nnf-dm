@@ -33,7 +33,6 @@ msg(){
     echo "${BOLD}${msg}${NORMAL}"
 }
 
-WORKSPACE=workingspace
 GITOPS_ENV=kind
 
 usage() {
@@ -42,15 +41,13 @@ usage() {
     echo "  -e GITOPS_ENV   The name of the gitops env. This is the -e arg for"
     echo "                  the gitops tools. Default: '$GITOPS_ENV'"
     echo "  -n              Dry run."
-    echo "  -w WORKSPACE    Name for working directory. Default: '$WORKSPACE'"
     echo
 }
 
-while getopts 'he:nw:' opt; do
+while getopts 'he:n' opt; do
 case "$opt" in
     e) GITOPS_ENV="$OPTARG" ;;
     n) DRYRUN=1 ;;
-    w) WORKSPACE="$OPTARG" ;;
     h) usage
        exit 0;;
     :) echo "Option -$OPTARG requires an argument."
@@ -70,9 +67,7 @@ elif ! python3 -c 'import yaml' 2>/dev/null; then
     exit 1
 fi
 
-LC_ALL=C
-#DBG=
-#[[ -n $DRYRUN ]] && DBG="echo"
+export LC_ALL=C
 
 set -e
 set -o pipefail
@@ -113,14 +108,27 @@ verify_argocd() {
         command -v argocd >/dev/null 2>&1 || do_fail "ArgoCD CLI is not installed."
         argocd account get-user-info 2> /dev/null | grep -q 'Logged In: true' || do_fail "ArgoCD CLI is not logged in."
     fi
+}
 
-    echo "Checking that ArgoCD is pointing at a repo"
-    if [[ -z $DRYRUN ]]; then
-        argocd repo list > /dev/null 2>&1 || do_fail "ArgoCD repo list command is failing."
-        if [[ $(argocd repo list | grep -cv NAME) == 0 ]]; then
-            do_fail "ArgoCD is not pointing at a repo."
-        fi
+verify_argocd_repo_hookup() {
+    local repo
+    local repo_list
+    local want_repo
+
+    repo_list=$(argocd repo list -o json | jq -rM '.[]|.repo')
+    if ! want_repo=$(grep repoURL: environments/"$GITOPS_ENV"/2-bootstrap0/1-dws.yaml | awk '{print $2}'); then
+        do_fail "Unable to get repoURL from bootstrap for 1-dws.yaml."
     fi
+    for repo in $repo_list; do
+        if [[ $repo == "$want_repo" ]]; then
+            return
+        fi
+    done
+    msg "ArgoCD does not have access to the gitops repo."
+    msg "Repo it needs: $want_repo"
+    msg "Current repos it can access:"
+    argocd repo list
+    exit 1
 }
 
 verify_bootstraps_match_branch() {
@@ -132,9 +140,9 @@ verify_bootstraps_match_branch() {
     *)           want="$branch" ;;
     esac
 
-    if [[ $(grep targetRevision: environments/"$GITOPS_ENV"/*bootstrap*/*.yaml | grep -cvE ' '"$want"'$') != 0 ]]; then
+    if [[ $(grep -E '^ *targetRevision: ' environments/"$GITOPS_ENV"/*bootstrap*/*.yaml | grep -cvE ' '"$want"'$') != 0 ]]; then
         msg "Branch $branch has bootstraps that do not match the branch."
-        grep targetRevision: environments/"$GITOPS_ENV"/*bootstrap*/*.yaml
+        grep -E '^ *targetRevision: ' environments/"$GITOPS_ENV"/*bootstrap*/*.yaml | grep -vE " $want$"
         exit 1
     fi
 }
@@ -169,7 +177,7 @@ wait_until_stable() {
         ;;
     esac
 
-    msg "Waiting until $release_ver stabilizes"
+    msg "Waiting until $release_ver settles"
     sleep 10
     while :; do
         # This is a turbulent time in ArgoCD, so we re-check everything on each
@@ -200,6 +208,7 @@ wait_until_stable() {
 verify_gitops_git_repo "$@"
 verify_kind_cluster
 verify_argocd
+verify_argocd_repo_hookup
 
 echo
 date_begin=$(date)
