@@ -449,8 +449,9 @@ configure_v0_1_14_manifests() {
     # Roll back the API version in SystemConfiguration.
     sed -i.bak -e 's/v1alpha3/v1alpha2/' environments/"$GITOPS_ENV"/site-config/systemconfiguration.yaml && rm environments/"$GITOPS_ENV"/site-config/systemconfiguration.yaml.bak
 
-    # The storage-version-migrator is the only CRD upgrade helper in this
-    # release. Remove the other one.
+    # The CRD upgrade helpers were not being used with this release. So remove
+    # them.
+    remove_storage_version_migrator
     remove_storedversions_maint
 
     git add environments
@@ -460,6 +461,21 @@ configure_v0_1_14_manifests() {
 
     $NO_PUSH_DBG git push --set-upstream origin "$BRANCH"
     msg "Created branch $BRANCH"
+
+    # Make a variation that includes storage-version-migrator.
+    BRANCH2="$BRANCH-svm"
+    reenable_storage_version_migrator
+    unpack_thirdparty "config/storage-version-migrator.tar"
+    set_branch_in_bootstraps "$BRANCH2"
+
+    git checkout -b "$BRANCH2"
+    git add environments
+    git commit -s -m "Release $TAG with storage-version-migrator"
+
+    ./tools/verify-deployment.sh -e "$GITOPS_ENV"
+
+    $NO_PUSH_DBG git push --set-upstream origin "$BRANCH2"
+    msg "Created branch $BRANCH2 with support for storage-version-migrator"
 }
 
 # =====================================
