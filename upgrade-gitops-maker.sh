@@ -21,7 +21,6 @@ PROG=$(basename "$0")
 
 NAME_PREFIX="gitops-"
 DEFAULT_NAME="edentate"
-GH_USER="${GH_USER:=<unset>}"
 NO_PUSH=
 GITOPS_ENV=kind
 
@@ -34,7 +33,7 @@ usage() {
     echo "                  Default: $DEFAULT_NAME. So the repo will be called"
     echo "                  $NAME_PREFIX$DEFAULT_NAME."
     echo "  -u GH_USER      Github user name. Looks at \$GH_USER environment"
-    echo "                  variable for a default. Default: $GH_USER."
+    echo "                  variable for a default. Current: ${GH_USER:-<not set>}."
     echo "  -N              Do no pushes to the repo. For debugging."
 }
 
@@ -52,10 +51,11 @@ msg(){
     echo "${BOLD}${msg}${NORMAL}"
 }
 
-while getopts 'hNu:n:' opt; do
+while getopts 'hNe:u:n:' opt; do
 case "$opt" in
 h) usage
    exit 0;;
+e) GITOPS_ENV="$OPTARG" ;;
 n) DEFAULT_NAME="$OPTARG" ;;
 u) GH_USER="$OPTARG" ;;
 N) NO_PUSH=1 ;;
@@ -181,6 +181,26 @@ get_and_unpack_manfest() {
     rm -f "$tarball"
 }
 
+get_thirdparty() {
+    local name="$1"
+    local url
+
+    if ! url=$(python3 -c 'import yaml, sys; docs = yaml.safe_load_all(sys.stdin); _ = [print(elem["url"]) for doc in docs for elem in doc["thirdPartyServices"] if elem["name"] == "'"$name"'"]' < config/repositories.yaml); then
+        do_fail "Unable to get $name from config/repositories.yaml."
+    fi
+    if ! wget -O config/"$name.tar" "$url"; then
+        do_fail "Unable to pull $url"
+    fi
+}
+
+unpack_thirdparty() {
+    local tar="$1"
+
+    if ! tar xfo "$tar" -C environments/"$GITOPS_ENV"; then
+        do_fail "Unable to unpack $tar"
+    fi
+}
+
 set_branch_in_bootstraps() {
     local branch="$1"
     local bootstrap
@@ -221,10 +241,15 @@ create_new_repo() {
     $NO_PUSH_DBG git push --set-upstream origin boilerplate-main
 
     # Get the SystemConfiguration for the desired environment.
+    # Get the repositories.yaml file so we can find the CRD upgrade helpers
+    # when we need them outside their normal release.
     git remote add nnf-deploy "$NNF_DEPLOY"
     git fetch nnf-deploy
     git checkout nnf-deploy/master -- config/systemconfiguration-"$GITOPS_ENV".yaml
+    git checkout nnf-deploy/master -- config/repositories.yaml
     git remote remove nnf-deploy
+    get_thirdparty "storage-version-migrator"
+    get_thirdparty "nnf-storedversions-maint"
 
     git checkout main
 
@@ -388,9 +413,10 @@ configure_v0_1_13_manifests() {
     msg "Created branch $BRANCH"
 
     # Make a variation that includes storage-version-migrator.
-    # This is where we asked the customer start using it.
+    # This is where we asked the customer to begin using it.
     BRANCH2="$BRANCH-svm"
     reenable_storage_version_migrator
+    unpack_thirdparty "config/storage-version-migrator.tar"
     set_branch_in_bootstraps "$BRANCH2"
 
     git checkout -b "$BRANCH2"
@@ -466,9 +492,10 @@ configure_v0_1_15_manifests() {
     msg "Created branch $BRANCH"
 
     # Make a variation that includes nnf-storedversions-maint.
-    # This is where we asked the customer start using it.
+    # This is where we asked the customer to begin using it.
     BRANCH2="$BRANCH-nsvm"
     reenable_storedversions_maint
+    unpack_thirdparty "config/nnf-storedversions-maint.tar"
     set_branch_in_bootstraps "$BRANCH2"
 
     git checkout -b "$BRANCH2"
