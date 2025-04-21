@@ -23,9 +23,10 @@ NAME_PREFIX="gitops-"
 DEFAULT_NAME="edentate"
 NO_PUSH=
 GITOPS_ENV=kind
+WORKDIR="workingspace"
 
 usage() {
-    echo "Usage: $PROG [ARGS] [-u GH_USER] [-n NAME]"
+    echo "Usage: $PROG [ARGS] [-u GH_USER] [-n NAME] [-w WORKDIR]"
     echo
     echo "  -e GITOPS_ENV   The name of the gitops env. This is the -e arg for"
     echo "                  the gitops tools. Default: '$GITOPS_ENV'"
@@ -34,6 +35,7 @@ usage() {
     echo "                  $NAME_PREFIX$DEFAULT_NAME."
     echo "  -u GH_USER      Github user name. Looks at \$GH_USER environment"
     echo "                  variable for a default. Current: ${GH_USER:-<not set>}."
+    echo "  -w WORKDIR      Name for working directory. Default: $WORKDIR."
     echo "  -N              Do no pushes to the repo. For debugging."
 }
 
@@ -51,13 +53,14 @@ msg(){
     echo "${BOLD}${msg}${NORMAL}"
 }
 
-while getopts 'hNe:u:n:' opt; do
+while getopts 'hNe:u:n:w:' opt; do
 case "$opt" in
 h) usage
    exit 0;;
 e) GITOPS_ENV="$OPTARG" ;;
 n) DEFAULT_NAME="$OPTARG" ;;
 u) GH_USER="$OPTARG" ;;
+w) WORKDIR="$OPTARG" ;;
 N) NO_PUSH=1 ;;
 \?|:)
    usage
@@ -80,10 +83,23 @@ set -o pipefail
 export LC_ALL=C
 [[ -n $NO_PUSH ]] && NO_PUSH_DBG="echo"
 
+if ! which python3 >/dev/null 2>&1; then
+    echo "Unable to find python3 in PATH"
+    exit 1
+elif ! python3 -c 'import yaml' 2>/dev/null; then
+    echo "Unable to find PyYAML"
+    exit 1
+fi
+
 NAME="$NAME_PREFIX$DEFAULT_NAME"
 REPO="git@github.com:$GH_USER/$NAME.git"
 HREPO="https://github.com/$GH_USER/$NAME.git"
 NNF_DEPLOY="https://github.com/NearNodeFlash/nnf-deploy.git"
+
+if [[ ! -d $WORKDIR ]]; then
+    mkdir -p "$WORKDIR" || do_fail "Unable to create $WORKDIR"
+fi
+cd "$WORKDIR"
 
 KUST_RESOURCES=
 kustomization_resources() {
