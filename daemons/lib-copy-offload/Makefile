@@ -29,10 +29,10 @@ lib-dependencies:
 	@ pkg-config --libs libcurl json-c > /dev/null || echo "On a Mac use 'brew install json-c' and on a Linux node 'dnf install json-c json-c-devel'."
 
 libcopyoffload.a: copy-offload.o copy-offload-status.o
-	$(AR) $(ARFLAGS) libcopyoffload.a copy-offload.o copy-offload-status.o
+	$(AR) $(ARFLAGS) $@ $^
 
 tester: test-tool/main.o libcopyoffload.a
-	$(CC) $(CFLAGS) -o tester test-tool/main.o -L. -lcopyoffload $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $< -L. -lcopyoffload $(LDFLAGS)
 
 test-tool/main.o: test-tool/main.c copy-offload.h
 copy-offload.o: copy-offload.c copy-offload.h copy-offload-status.c
