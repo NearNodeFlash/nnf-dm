@@ -80,7 +80,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nn
 ###############################################################################
 FROM builder_setup AS copy_offload_tester_builder
 
-RUN apk add curl-dev gcc libc-dev && \
+RUN apk add curl-dev gcc libc-dev json-c json-c-dev && \
     make -C ./daemons/lib-copy-offload tester
 
 ###############################################################################
@@ -100,7 +100,7 @@ COPY --from=shellchecker /workspace/shellcheck_okay shellcheck_okay
 ENV CGO_ENABLED=0
 
 # These are used by the e2e-mocked test for the copy-offload server.
-RUN apk add curl openssl
+RUN apk add curl openssl json-c
 
 ENTRYPOINT [ "make", "within-container-unit-test" ]
 

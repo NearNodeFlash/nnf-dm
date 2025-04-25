@@ -25,6 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,15 +39,16 @@ import (
 	"github.com/go-logr/logr"
 	"go.openly.dev/pointy"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
+	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
-	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
+	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 )
 
 var (
@@ -63,18 +66,28 @@ type Driver struct {
 	Mock      bool
 	MockCount int
 
+	WorkflowName      string
+	WorkflowNamespace string
+
 	// We maintain a map of active operations which allows us to process cancel requests.
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	// The SrvrDataMovementRecord objects are stored here.
 	contexts sync.Map
+
+	// A map of operation completions. When one is completed, its name is recorded
+	// here until it can be reaped.
+	completions map[string]struct{}
+	cond        *sync.Cond
 }
 
 // Keep track of the context and its cancel function so that we can track
 // and cancel data movement operations in progress.
 // These objects are stored in the Driver.contexts map.
 type SrvrDataMovementRecord struct {
-	dmreq         *nnfv1alpha6.NnfDataMovement
 	cancelContext helpers.DataMovementCancelContext
+
+	// Save a reference to the NnfDataMovement when in mock mode.
+	mockDM *nnfv1alpha7.NnfDataMovement
 }
 
 // DriverRequest contains the information that is collected during the initial examination
@@ -84,7 +97,7 @@ type DriverRequest struct {
 	Drvr *Driver
 
 	// Fresh copy of the chosen NnfDataMovementProfile.
-	dmProfile *nnfv1alpha6.NnfDataMovementProfile
+	dmProfile *nnfv1alpha7.NnfDataMovementProfile
 	// Storage nodes to use.
 	nodes []string
 	// Worker nodes to use.
@@ -98,39 +111,55 @@ type DriverRequest struct {
 	cmdArgs []string
 }
 
-func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
+func NewDriver(log logr.Logger, mock bool) (*Driver, error) {
+	workflowName := os.Getenv("DW_WORKFLOW_NAME")
+	workflowNamespace := os.Getenv("DW_WORKFLOW_NAMESPACE")
+	if workflowName == "" || workflowNamespace == "" {
+		return nil, errors.New("DW_WORKFLOW_NAME and DW_WORKFLOW_NAMESPACE must be set")
+	}
+	return &Driver{
+		Log:               log,
+		Mock:              mock,
+		WorkflowName:      workflowName,
+		WorkflowNamespace: workflowNamespace,
+		completions:       make(map[string]struct{}),
+		cond:              sync.NewCond(&sync.Mutex{}),
+	}, nil
+}
+
+func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha7.NnfDataMovement, error) {
 
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
-	workflow := &dwsv1alpha3.Workflow{}
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
+	workflow := &dwsv1alpha4.Workflow{}
 
-	wf := types.NamespacedName{Name: dmreq.WorkflowName, Namespace: dmreq.WorkflowNamespace}
+	wf := types.NamespacedName{Name: drvr.WorkflowName, Namespace: drvr.WorkflowNamespace}
 	if err := drvr.Client.Get(ctx, wf, workflow); err != nil {
 		crLog.Info("Unable to get workflow: %v", err)
-		return nil, err
+		return "", nil, err
 	}
-	if workflow.Status.State != dwsv1alpha3.StatePreRun || workflow.Status.Status != "Completed" {
-		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha3.StatePreRun)
+	if workflow.Status.State != dwsv1alpha4.StatePreRun || workflow.Status.Status != "Completed" {
+		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha4.StatePreRun)
 		crLog.Error(err, "Workflow is in an invalid state")
-		return nil, err
+		return "", nil, err
 	}
 
 	computeClientMount, computeMountInfo, err := r.findComputeMountInfo(ctx, dmreq)
 	if err != nil {
 		crLog.Error(err, "Failed to retrieve compute mountinfo")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Determine which rabbit is local to the compute that made the request
 	rabbit, err := r.findRabbitNameFromCompute(dmreq.ComputeName)
 	if err != nil {
 		crLog.Error(err, "Failed to trace compute node to its rabbit node")
-		return nil, err
+		return "", nil, err
 	}
 	r.RabbitName = rabbit
 
 	crLog = crLog.WithValues("type", computeMountInfo.Type)
-	var dm *nnfv1alpha6.NnfDataMovement
+	var dm *nnfv1alpha7.NnfDataMovement
 	switch computeMountInfo.Type {
 	case "lustre":
 		dm, err = r.createNnfDataMovement(ctx, dmreq, computeMountInfo, computeClientMount)
@@ -145,17 +174,17 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 
 	if err != nil {
 		crLog.Error(err, "Failed to create DM request")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Dm Profile - no pinned profiles here since copy_offload could use any profile.
 	r.dmProfile, err = r.selectProfile(ctx, dmreq)
 	if err != nil {
 		crLog.Error(err, "Failed to get data movement profile", "wanted", dmreq.DMProfile)
-		return nil, err
+		return "", nil, err
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
-		Kind:      reflect.TypeOf(nnfv1alpha6.NnfDataMovementProfile{}).Name(),
+		Kind:      reflect.TypeOf(nnfv1alpha7.NnfDataMovementProfile{}).Name(),
 		Name:      r.dmProfile.Name,
 		Namespace: r.dmProfile.Namespace,
 	}
@@ -165,12 +194,12 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	dm.Spec.GroupId = workflow.Spec.GroupID
 
 	// Add appropriate workflow labels so this is cleaned up
-	dwsv1alpha3.AddWorkflowLabels(dm, workflow)
-	dwsv1alpha3.AddOwnerLabels(dm, workflow)
+	dwsv1alpha4.AddWorkflowLabels(dm, workflow)
+	dwsv1alpha4.AddOwnerLabels(dm, workflow)
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha6.AddDataMovementTeardownStateLabel(dm, dwsv1alpha3.StatePostRun)
+	nnfv1alpha7.AddDataMovementTeardownStateLabel(dm, dwsv1alpha4.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
 	setUserConfig(dmreq, dm)
@@ -178,14 +207,14 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	r.nodes, err = helpers.GetStorageNodeNames(drvr.Client, ctx, dm)
 	if err != nil {
 		crLog.Error(err, "could not get storage nodes for data movement")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Get the FQDNs of the worker nodes so we can use them to create the mpirun hostfile
-	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, dmreq.WorkflowName, dmreq.WorkflowNamespace, dm)
+	r.hosts, err = helpers.GetCopyOffloadWorkerHostnames(drvr.Client, ctx, r.nodes, drvr.WorkflowName, drvr.WorkflowNamespace, dm)
 	if err != nil {
 		crLog.Error(err, "could not get worker nodes for data movement")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Create the hostfile used by `mpirun`. This is needed for preparing the destination
@@ -193,62 +222,63 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (*nnfv1alph
 	r.mpiHostfile, err = helpers.CreateMpiHostfile(r.dmProfile, r.hosts, dm)
 	if err != nil {
 		crLog.Error(err, "could not create MPI hostfile")
-		return nil, err
+		return "", nil, err
 	}
 	crLog.Info("MPI Hostfile preview", "first line", helpers.PeekMpiHostfile(r.mpiHostfile))
 
 	// Prepare Destination Directory
 	if err := helpers.PrepareDestination(drvr.Client, ctx, r.dmProfile, dm, r.mpiHostfile, crLog); err != nil {
 		crLog.Error(err, "could not prepare destination")
-		return nil, err
+		return "", nil, err
 	}
 
 	// Build command
 	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
-		return nil, err
+		return "", nil, err
 	}
 
 	if err := drvr.Client.Create(ctx, dm); err != nil {
 		crLog.Error(err, "Failed to create NnfDataMovement")
-		return nil, err
+		return "", nil, err
 	}
 	crLog.Info("Created NnfDataMovement", "name", dm.Name)
 	r.recordRequest(ctx, dm)
 
-	return dm, nil
+	return r.dmKey(dm), dm, nil
 }
 
-func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovement, error) {
+func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (string, *nnfv1alpha7.NnfDataMovement, error) {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 	var err error
 
-	dm := &nnfv1alpha6.NnfDataMovement{
+	r.RabbitName = "mock-rabbit-01"
+	dm := &nnfv1alpha7.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
 			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
-				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
+				nnfv1alpha7.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
 		},
-		Spec: nnfv1alpha6.NnfDataMovementSpec{
-			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha7.NnfDataMovementSpec{
+			Source: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: dmreq.SourcePath,
 			},
-			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: dmreq.DestinationPath,
 			},
 		},
 	}
 
-	r.dmProfile = &nnfv1alpha6.NnfDataMovementProfile{
+	r.dmProfile = &nnfv1alpha7.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mock",
-			Namespace: nnfv1alpha6.DataMovementNamespace,
+			Namespace: nnfv1alpha7.DataMovementNamespace,
 		},
-		Data: nnfv1alpha6.NnfDataMovementProfileData{
+		Data: nnfv1alpha7.NnfDataMovementProfileData{
 			ProgressIntervalSeconds: 1,
 			Command:                 "sleep 300",
 		},
@@ -267,18 +297,18 @@ func (r *DriverRequest) CreateMock(ctx context.Context, dmreq DMRequest) (*nnfv1
 	r.cmdArgs, err = helpers.BuildDMCommand(r.dmProfile, r.mpiHostfile, false, dm, crLog)
 	if err != nil {
 		crLog.Error(err, "could not create data movement command")
-		return nil, err
+		return "", nil, err
 	}
 
 	r.recordRequest(ctx, dm)
-	return dm, nil
+	return r.dmKey(dm), dm, nil
 }
 
-func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
+func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha7.NnfDataMovement) error {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 
-	contextRecord, err := r.loadRequest(dm.Name)
+	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
 		crLog.Error(err, "request not found")
 		return err
@@ -287,18 +317,19 @@ func (r *DriverRequest) Drive(ctx context.Context, dmreq DMRequest, dm *nnfv1alp
 	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
 		os.RemoveAll(filepath.Dir(r.mpiHostfile))
-		drvr.contexts.Delete(dm.Name)
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
 		return err
 	}
 
 	return nil
 }
 
-func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) error {
+func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv1alpha7.NnfDataMovement) error {
 	drvr := r.Drvr
-	crLog := drvr.Log.WithValues("workflow", dmreq.WorkflowName)
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
 
-	contextRecord, err := r.loadRequest(dm.Name)
+	contextRecord, err := r.loadRequest(dm)
 	if err != nil {
 		crLog.Error(err, "request not found")
 		return err
@@ -306,29 +337,46 @@ func (r *DriverRequest) DriveMock(ctx context.Context, dmreq DMRequest, dm *nnfv
 	cancelContext := contextRecord.cancelContext
 	if err := r.driveWithContext(ctx, cancelContext.Ctx, dm, crLog); err != nil {
 		crLog.Error(err, "failed copy")
-		drvr.contexts.Delete(dm.Name)
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
 		return err
 	}
 
 	return nil
 }
 
-func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha6.NnfDataMovement) {
+func (r *DriverRequest) dmKey(dm *nnfv1alpha7.NnfDataMovement) string {
+	return fmt.Sprintf("%s--%s", dm.Namespace, dm.Name)
+}
+
+func (r *DriverRequest) dmKeySplit(key string) (string, string) {
+	split := strings.Split(key, "--")
+	return split[0], split[1]
+}
+
+func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha7.NnfDataMovement) {
 	drvr := r.Drvr
 
 	// Expand the context with cancel and store it in the map so the cancel function can be
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
-	drvr.contexts.Store(dm.Name, SrvrDataMovementRecord{
-		dmreq: dm,
+	record := SrvrDataMovementRecord{
 		cancelContext: helpers.DataMovementCancelContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
 		},
-	})
+	}
+	if drvr.Mock {
+		record.mockDM = dm
+	}
+	drvr.contexts.Store(r.dmKey(dm), record)
 }
 
-func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error) {
+func (r *DriverRequest) loadRequest(dm *nnfv1alpha7.NnfDataMovement) (SrvrDataMovementRecord, error) {
+	return r.loadRequestByName(r.dmKey(dm))
+}
+
+func (r *DriverRequest) loadRequestByName(name string) (SrvrDataMovementRecord, error) {
 	storedCancelContext, loaded := r.Drvr.contexts.Load(name)
 	if !loaded {
 		return SrvrDataMovementRecord{}, fmt.Errorf("request not found")
@@ -336,10 +384,14 @@ func (r *DriverRequest) loadRequest(name string) (SrvrDataMovementRecord, error)
 	return storedCancelContext.(SrvrDataMovementRecord), nil
 }
 
+func (r *DriverRequest) deleteRequest(dm *nnfv1alpha7.NnfDataMovement) {
+	r.Drvr.contexts.Delete(r.dmKey(dm))
+}
+
 func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	drvr := r.Drvr
 
-	contextRecord, err := r.loadRequest(name)
+	contextRecord, err := r.loadRequestByName(name)
 	if err != nil {
 		// Maybe the Go routine already finished and removed the record.
 		return err
@@ -353,6 +405,135 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 	// and the status is recorded then.
 
 	return nil
+}
+
+func (r *DriverRequest) GetRequestMock(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	contextRecord, err := r.loadRequestByName(statreq.RequestName)
+	if err != nil {
+		return nil, http.StatusNotFound, errors.New("request not found")
+	}
+	dm := contextRecord.mockDM
+
+	statusResponse, code, err := r.buildStatusResponse(statreq, dm)
+	// A static timestamp that the tests know.
+	statusResponse.StartTime = "2025-04-01 11:46:36.535519 -0500 CDT"
+	return statusResponse, code, err
+}
+
+func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (*DataMovementStatusResponse_v1_0, int, error) {
+	drvr := r.Drvr
+	keyNS, keyName := r.dmKeySplit(statreq.RequestName)
+	dmReq := types.NamespacedName{Name: keyName, Namespace: keyNS}
+	dm := &nnfv1alpha7.NnfDataMovement{}
+	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName, "request", statreq.RequestName)
+
+	drvr.Log.Info("Getting request", "request", dmReq)
+	if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.deleteCompletionByName(statreq.RequestName)
+			return nil, http.StatusNotFound, errors.New("request not found")
+		}
+		crLog.Error(err, "failed to get NnfDataMovement resource")
+		return nil, http.StatusInternalServerError, err
+	}
+	if dm.Labels[dwsv1alpha4.WorkflowNameLabel] != drvr.WorkflowName || dm.Labels[dwsv1alpha4.WorkflowNamespaceLabel] != drvr.WorkflowNamespace {
+		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
+	}
+
+	if dm.Status.EndTime.IsZero() && statreq.MaxWaitSecs != 0 {
+
+		r.waitForCompletionOrTimeout(statreq)
+
+		if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.deleteCompletionByName(statreq.RequestName)
+				return nil, http.StatusNotFound, errors.New("request not found after waiting for completion")
+			}
+			crLog.Error(err, "failed to get NnfDataMovement resource afer waiting for completion")
+			return nil, http.StatusInternalServerError, err
+		}
+	}
+
+	statusResponse, code, err := r.buildStatusResponse(statreq, dm)
+	return statusResponse, code, err
+}
+
+func (r *DriverRequest) buildStatusResponse(statreq StatusRequest, dm *nnfv1alpha7.NnfDataMovement) (*DataMovementStatusResponse_v1_0, int, error) {
+
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha7.DataMovementConditionReasonInvalid {
+		return &DataMovementStatusResponse_v1_0{
+			State:  DataMovementStatusResponse_PENDING,
+			Status: DataMovementStatusResponse_UNKNOWN_STATUS,
+		}, -1, nil
+	}
+
+	stateMap := map[string]DataMovementStatusResponse_State{
+		"": DataMovementStatusResponse_UNKNOWN_STATE,
+		nnfv1alpha7.DataMovementConditionTypeStarting: DataMovementStatusResponse_STARTING,
+		nnfv1alpha7.DataMovementConditionTypeRunning:  DataMovementStatusResponse_RUNNING,
+		nnfv1alpha7.DataMovementConditionTypeFinished: DataMovementStatusResponse_COMPLETED,
+	}
+
+	state, ok := stateMap[dm.Status.State]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned state")
+	}
+
+	if state != DataMovementStatusResponse_COMPLETED && dm.Spec.Cancel {
+		state = DataMovementStatusResponse_CANCELLING
+	}
+
+	statusMap := map[string]DataMovementStatusResponse_Status{
+		"": DataMovementStatusResponse_UNKNOWN_STATUS,
+		nnfv1alpha7.DataMovementConditionReasonFailed:    DataMovementStatusResponse_FAILED,
+		nnfv1alpha7.DataMovementConditionReasonSuccess:   DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha7.DataMovementConditionReasonInvalid:   DataMovementStatusResponse_INVALID,
+		nnfv1alpha7.DataMovementConditionReasonCancelled: DataMovementStatusResponse_CANCELLED,
+	}
+
+	status, ok := statusMap[dm.Status.Status]
+	if !ok {
+		return nil, http.StatusInternalServerError, errors.New("failed to decode returned status")
+	}
+
+	cmdStatus := DataMovementCommandStatus{}
+	if dm.Status.CommandStatus != nil {
+		cmdStatus.Command = dm.Status.CommandStatus.Command
+		cmdStatus.LastMessage = dm.Status.CommandStatus.LastMessage
+
+		if dm.Status.CommandStatus.ElapsedTime.Duration > 0 {
+			d := dm.Status.CommandStatus.ElapsedTime.Truncate(time.Millisecond)
+			cmdStatus.ElapsedTime = d.String()
+		}
+		if !dm.Status.CommandStatus.LastMessageTime.IsZero() {
+			cmdStatus.LastMessageTime = dm.Status.CommandStatus.LastMessageTime.Local().String()
+		}
+		if dm.Status.CommandStatus.ProgressPercentage != nil {
+			cmdStatus.Progress = *dm.Status.CommandStatus.ProgressPercentage
+		}
+	}
+
+	startTimeStr := ""
+	if !dm.Status.StartTime.IsZero() {
+		startTimeStr = dm.Status.StartTime.Local().String()
+	}
+	endTimeStr := ""
+	if !dm.Status.EndTime.IsZero() {
+		endTimeStr = dm.Status.EndTime.Local().String()
+	}
+
+	if state == DataMovementStatusResponse_COMPLETED && !dm.Status.EndTime.IsZero() {
+		r.deleteCompletionByName(statreq.RequestName)
+	}
+
+	return &DataMovementStatusResponse_v1_0{
+		State:         state,
+		Status:        status,
+		Message:       dm.Status.Message,
+		CommandStatus: &cmdStatus,
+		StartTime:     startTimeStr,
+		EndTime:       endTimeStr,
+	}, -1, nil
 }
 
 func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
@@ -371,18 +552,18 @@ func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.Context, dm *nnfv1alpha6.NnfDataMovement, crLog logr.Logger) error {
+func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.Context, dm *nnfv1alpha7.NnfDataMovement, crLog logr.Logger) error {
 	drvr := r.Drvr
 	dmReq := types.NamespacedName{Name: dm.Name, Namespace: dm.Namespace}
 
 	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(r.cmdArgs, " "))
-	cmdStatus := nnfv1alpha6.NnfDataMovementCommandStatus{}
+	cmdStatus := nnfv1alpha7.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
 
 	setStart := func() {
 		now := metav1.NowMicro()
 		dm.Status.StartTime = &now
-		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeRunning
+		dm.Status.State = nnfv1alpha7.DataMovementConditionTypeRunning
 		dm.Status.CommandStatus = &cmdStatus
 	}
 
@@ -404,12 +585,15 @@ func (r *DriverRequest) driveWithContext(ctx context.Context, ctxCancel context.
 	}
 
 	crLog.Info("Running Command", "cmd", cmdStatus.Command)
-	contextDelete := func() { drvr.contexts.Delete(dm.Name) }
+	contextDelete := func() {
+		r.deleteRequest(dm)
+		r.notifyCompletion(dm)
+	}
 	r.runit(ctx, ctxCancel, contextDelete, dmReq, cmd, &cmdStatus, r.dmProfile, r.mpiHostfile, crLog)
 	return nil
 }
 
-func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, contextDelete func(), dmReq types.NamespacedName, cmd *exec.Cmd, cmdStatus *nnfv1alpha6.NnfDataMovementCommandStatus, profile *nnfv1alpha6.NnfDataMovementProfile, mpiHostfile string, log logr.Logger) {
+func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, contextDelete func(), dmReq types.NamespacedName, cmd *exec.Cmd, cmdStatus *nnfv1alpha7.NnfDataMovementCommandStatus, profile *nnfv1alpha7.NnfDataMovementProfile, mpiHostfile string, log logr.Logger) {
 	drvr := r.Drvr
 
 	// Execute the go routine to perform the data movement
@@ -474,13 +658,13 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 					// Update the CommandStatus in the DM resource after we parsed all the lines
 					if !drvr.Mock {
 						err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-							dm := &nnfv1alpha6.NnfDataMovement{}
+							dm := &nnfv1alpha7.NnfDataMovement{}
 							if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
 								return client.IgnoreNotFound(err)
 							}
 
 							if dm.Status.CommandStatus == nil {
-								dm.Status.CommandStatus = &nnfv1alpha6.NnfDataMovementCommandStatus{}
+								dm.Status.CommandStatus = &nnfv1alpha7.NnfDataMovementCommandStatus{}
 							}
 							cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
@@ -520,7 +704,7 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 		}
 
 		// Command is finished, update status
-		dm := &nnfv1alpha6.NnfDataMovement{}
+		dm := &nnfv1alpha7.NnfDataMovement{}
 		if !drvr.Mock {
 			if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
 				log.Error(err, "failed to get NnfDataMovement resource for final status update")
@@ -529,8 +713,8 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 		}
 		now := metav1.NowMicro()
 		dm.Status.EndTime = &now
-		dm.Status.State = nnfv1alpha6.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonSuccess
+		dm.Status.State = nnfv1alpha7.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha7.DataMovementConditionReasonSuccess
 
 		// Grab the output and trim it to remove the progress bloat
 		output := helpers.TrimDcpProgressFromOutput(combinedOutBuf.String())
@@ -540,12 +724,12 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
-			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonCancelled
+			dm.Status.Status = nnfv1alpha7.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", output)
-			dm.Status.Status = nnfv1alpha6.DataMovementConditionReasonFailed
+			dm.Status.Status = nnfv1alpha7.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
-			resourceErr := dwsv1alpha3.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
+			resourceErr := dwsv1alpha4.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
@@ -567,7 +751,7 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 
 		if !drvr.Mock {
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				dm := &nnfv1alpha6.NnfDataMovement{}
+				dm := &nnfv1alpha7.NnfDataMovement{}
 				if err := drvr.Client.Get(ctx, dmReq, dm); err != nil {
 					return client.IgnoreNotFound(err)
 				}
@@ -589,9 +773,66 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 	}()
 }
 
+func (r *DriverRequest) notifyCompletion(dm *nnfv1alpha7.NnfDataMovement) {
+	drvr := r.Drvr
+	key := r.dmKey(dm)
+
+	drvr.cond.L.Lock()
+	drvr.completions[key] = struct{}{}
+	drvr.cond.L.Unlock()
+	drvr.cond.Broadcast()
+}
+
+func (r *DriverRequest) deleteCompletionByName(name string) {
+	drvr := r.Drvr
+
+	drvr.cond.L.Lock()
+	delete(drvr.completions, name)
+	drvr.cond.L.Unlock()
+}
+
+// waitForCompletionOrTimeout waits for the completion of the status request or for timeout.
+func (r *DriverRequest) waitForCompletionOrTimeout(statreq StatusRequest) {
+	drvr := r.Drvr
+	timeout := false
+	complete := make(chan struct{}, 1)
+
+	// Start a go routine that waits for the completion of this status request or for timeout
+	go func() {
+
+		drvr.cond.L.Lock()
+		for {
+			if _, found := drvr.completions[statreq.RequestName]; found || timeout {
+				break
+			}
+
+			drvr.cond.Wait()
+		}
+
+		drvr.cond.L.Unlock()
+
+		complete <- struct{}{}
+	}()
+
+	var maxWaitTimeDuration time.Duration
+	if statreq.MaxWaitSecs < 0 || time.Duration(statreq.MaxWaitSecs) > math.MaxInt64/time.Second {
+		maxWaitTimeDuration = math.MaxInt64
+	} else {
+		maxWaitTimeDuration = time.Duration(statreq.MaxWaitSecs) * time.Second
+	}
+
+	// Wait for completion signal or timeout
+	select {
+	case <-complete:
+	case <-time.After(maxWaitTimeDuration):
+		timeout = true
+		drvr.cond.Broadcast() // Wake up everyone (including myself) to close out the running go routine
+	}
+}
+
 // Set the DM's UserConfig options based on the incoming requests's options
-func setUserConfig(dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) {
-	dm.Spec.UserConfig = &nnfv1alpha6.NnfDataMovementConfig{}
+func setUserConfig(dmreq DMRequest, dm *nnfv1alpha7.NnfDataMovement) {
+	dm.Spec.UserConfig = &nnfv1alpha7.NnfDataMovementConfig{}
 	dm.Spec.UserConfig.Dryrun = dmreq.Dryrun
 	dm.Spec.UserConfig.MpirunOptions = dmreq.MpirunOptions
 	dm.Spec.UserConfig.DcpOptions = dmreq.DcpOptions
@@ -611,7 +852,7 @@ func setUserConfig(dmreq DMRequest, dm *nnfv1alpha6.NnfDataMovement) {
 }
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with Lustre.
-func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo, computeClientMount *dwsv1alpha3.ClientMount) (*nnfv1alpha6.NnfDataMovement, error) {
+func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha4.ClientMountInfo, computeClientMount *dwsv1alpha4.ClientMount) (*nnfv1alpha7.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -631,25 +872,25 @@ func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMReque
 		return nil, err
 	}
 
-	dm := &nnfv1alpha6.NnfDataMovement{
+	dm := &nnfv1alpha7.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			// Be careful about how much you put into GenerateName.
 			// The MPI operator will use the resulting name as a
 			// prefix for its own names.
 			GenerateName: nameBase,
 			// Use the data movement namespace.
-			Namespace: nnfv1alpha6.DataMovementNamespace,
+			Namespace: nnfv1alpha7.DataMovementNamespace,
 			Labels: map[string]string{
-				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
-				nnfv1alpha6.DirectiveIndexLabel:        dwIndex,
+				nnfv1alpha7.DataMovementInitiatorLabel: dmreq.ComputeName,
+				nnfv1alpha7.DirectiveIndexLabel:        dwIndex,
 			},
 		},
-		Spec: nnfv1alpha6.NnfDataMovementSpec{
-			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha7.NnfDataMovementSpec{
+			Source: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: dmreq.DestinationPath,
 				StorageReference: corev1.ObjectReference{
 					Kind:      reflect.TypeOf(*lustrefs).Name(),
@@ -663,14 +904,14 @@ func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMReque
 	return dm, nil
 }
 
-func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, error) {
+func getDirectiveIndexFromClientMount(object *dwsv1alpha4.ClientMount) (string, error) {
 	// Find the DW index for our work.
 	labels := object.GetLabels()
 	if labels == nil {
 		return "", fmt.Errorf("unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
 	}
 
-	dwIndex, found := labels[nnfv1alpha6.DirectiveIndexLabel]
+	dwIndex, found := labels[nnfv1alpha7.DirectiveIndexLabel]
 	if !found {
 		return "", fmt.Errorf("unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
 	}
@@ -679,7 +920,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha3.ClientMount) (string, 
 }
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with GFS2.
-func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (*nnfv1alpha6.NnfDataMovement, error) {
+func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha4.ClientMountInfo) (*nnfv1alpha7.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -687,20 +928,20 @@ func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMR
 		return nil, err
 	}
 
-	dm := &nnfv1alpha6.NnfDataMovement{
+	dm := &nnfv1alpha7.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
 			Namespace:    r.RabbitName, // Use the rabbit
 			Labels: map[string]string{
-				nnfv1alpha6.DataMovementInitiatorLabel: dmreq.ComputeName,
+				nnfv1alpha7.DataMovementInitiatorLabel: dmreq.ComputeName,
 			},
 		},
-		Spec: nnfv1alpha6.NnfDataMovementSpec{
-			Source: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha7.NnfDataMovementSpec{
+			Source: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha6.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha7.NnfDataMovementSpecSourceDestination{
 				Path: dmreq.DestinationPath,
 			},
 		},
@@ -709,7 +950,7 @@ func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMR
 	return dm, nil
 }
 
-func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha3.ClientMountInfo) (string, error) {
+func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha4.ClientMountInfo) (string, error) {
 
 	drvr := r.Drvr
 	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
@@ -718,12 +959,12 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	listOptions := []client.ListOption{
 		client.InNamespace(r.RabbitName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
-			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
+			dwsv1alpha4.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha4.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha3.ClientMountList{}
+	clientMounts := &dwsv1alpha4.ClientMountList{}
 	if err := drvr.Client.List(ctx, clientMounts, listOptions...); err != nil {
 		return "", err
 	}
@@ -746,18 +987,18 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMRequest) (*dwsv1alpha3.ClientMount, *dwsv1alpha3.ClientMountInfo, error) {
+func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMRequest) (*dwsv1alpha4.ClientMount, *dwsv1alpha4.ClientMountInfo, error) {
 
 	drvr := r.Drvr
 	listOptions := []client.ListOption{
 		client.InNamespace(dmreq.ComputeName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha3.WorkflowNameLabel:      dmreq.WorkflowName,
-			dwsv1alpha3.WorkflowNamespaceLabel: dmreq.WorkflowNamespace,
+			dwsv1alpha4.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha4.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha3.ClientMountList{}
+	clientMounts := &dwsv1alpha4.ClientMountList{}
 	if err := drvr.Client.List(ctx, clientMounts, listOptions...); err != nil {
 		return nil, nil, err
 	}
@@ -813,7 +1054,7 @@ func (r *DriverRequest) findDestinationLustreFilesystem(ctx context.Context, des
 	return nil, fmt.Errorf("unable to find a LustreFileSystem resource matching %s", origDest)
 }
 
-func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nnfv1alpha6.NnfDataMovementProfile, error) {
+func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nnfv1alpha7.NnfDataMovementProfile, error) {
 	drvr := r.Drvr
 	profileName := dmreq.DMProfile
 	ns := "nnf-system"
@@ -821,7 +1062,7 @@ func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nn
 	// If a profile is named then verify that it exists.  Otherwise, verify that a default profile
 	// can be found.
 	if len(profileName) == 0 {
-		NnfDataMovementProfiles := &nnfv1alpha6.NnfDataMovementProfileList{}
+		NnfDataMovementProfiles := &nnfv1alpha7.NnfDataMovementProfileList{}
 		if err := drvr.Client.List(ctx, NnfDataMovementProfiles, &client.ListOptions{Namespace: ns}); err != nil {
 			return nil, err
 		}
@@ -841,7 +1082,7 @@ func (r *DriverRequest) selectProfile(ctx context.Context, dmreq DMRequest) (*nn
 		profileName = profilesFound[0]
 	}
 
-	profile := &nnfv1alpha6.NnfDataMovementProfile{
+	profile := &nnfv1alpha7.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      profileName,
 			Namespace: ns,
@@ -861,7 +1102,7 @@ func (r *DriverRequest) findRabbitNameFromCompute(compute string) (string, error
 	drvr := r.Drvr
 	systemConfigName := "default"
 
-	systemConfig := &dwsv1alpha3.SystemConfiguration{}
+	systemConfig := &dwsv1alpha4.SystemConfiguration{}
 	if err := drvr.Client.Get(context.TODO(), types.NamespacedName{Name: systemConfigName, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
 		return "", fmt.Errorf("failed to retrieve system configuration: %w", err)
 	}

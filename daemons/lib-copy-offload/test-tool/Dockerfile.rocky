@@ -1,4 +1,4 @@
-# Copyright 2024 Hewlett Packard Enterprise Development LP
+# Copyright 2024-2025 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -21,7 +21,7 @@ FROM rockylinux/rockylinux:8.10 AS builder
 WORKDIR /workspace
 
 RUN dnf install -y \
-    make gcc libcurl-devel
+    make gcc libcurl-devel json-c json-c-devel
 
 COPY daemons/lib-copy-offload daemons/lib-copy-offload/
 COPY Makefile Makefile

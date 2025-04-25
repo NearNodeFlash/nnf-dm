@@ -20,8 +20,10 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <curl/curl.h>
 #include "copy-offload.h"
 
 #define COPY_OFFLOAD_URL_SIZE 1024
@@ -103,7 +105,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp) {
 /* Create and initialize a handle. */
 COPY_OFFLOAD *copy_offload_init() {
     CURL *curl;
-    COPY_OFFLOAD *offload = (COPY_OFFLOAD *)malloc(sizeof(struct copy_offload_s));
+    COPY_OFFLOAD *offload = (COPY_OFFLOAD *)calloc(1, sizeof(struct copy_offload_s));
 
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
@@ -112,24 +114,25 @@ COPY_OFFLOAD *copy_offload_init() {
         return NULL;
     }
     offload->curl = curl;
-    offload->host_and_port = NULL;
 
     return offload;
 }
 
-/* Store the host-and-port in the handle and set the basic configuration
- * for the handle.
+/* Setup the handle.
  * If @skip_tls is set, then TLS will not be enabled.
  */
-int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip_tls) {
+static int _copy_offload_configure(COPY_OFFLOAD *offload, int skip_tls) {
     int ret = 0;
 
     CURL *curl = offload->curl;
     offload->cert_and_token_done = 0;
-    offload->host_and_port = host_and_port;
     offload->skip_tls = skip_tls;
     offload->cacert = CERT_PATH;
     strncpy(offload->proto, "http", sizeof(offload->proto));
+    if (gethostname(offload->my_host_name, sizeof(offload->my_host_name)) == -1) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to get hostname: errno %d\n", errno);
+        return 1;
+    }
 
     struct curl_slist *chunk = NULL;
     chunk = curl_slist_append(chunk, COPY_OFFLOAD_API_VERSION);
@@ -148,9 +151,55 @@ int copy_offload_configure(COPY_OFFLOAD *offload, char **host_and_port, int skip
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
     }
 
+    // If the copy-offload server is an MPI job then we'll find the rabbit
+    // that is running the server in the launcher env variable. Otherwise, we'll
+    // find the rabbit that is running the server in the LOCAL_RABBIT_CONF.
+    offload->server_host_buf = NULL;
+    if ((offload->server_host = getenv(NNF_CONTAINER_LAUNCHER_ENV)) == NULL) {
+        char *hostname = NULL;
+        if (read_contents(offload, LOCAL_RABBIT_CONF, &hostname) != 0) {
+            snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to get server host from environment variable %s or local file %s\n", NNF_CONTAINER_LAUNCHER_ENV, LOCAL_RABBIT_CONF);
+            return 1;
+        }
+        // server_host_buf is used to free the hostname.
+        offload->server_host = offload->server_host_buf = hostname;
+    }
+    if ((offload->server_port = getenv(NNF_CONTAINER_PORTS_ENV)) == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "Unable to get server port from environment variable %s\n", NNF_CONTAINER_PORTS_ENV);
+        return 1;
+    }
+    // We'll use only the first port.
+    char *c;
+    if ((c = strchr(offload->server_port, ',')) != NULL) {
+        *c = '\0';
+    }
+    // The token is optional, depending on how the server is configured.
+    offload->token_buf = NULL;
     offload->token = getenv(WORKFLOW_TOKEN_ENV);
 
     return ret;
+}
+
+/* Setup the handle, with TLS enabled.
+ */
+int copy_offload_configure(COPY_OFFLOAD *offload) {
+    return _copy_offload_configure(offload, 0);
+}
+
+/* Setup the handle, without TLS.
+ */
+int copy_offload_configure_without_tls(COPY_OFFLOAD *offload) {
+    return _copy_offload_configure(offload, 1);
+}
+
+/* Override the local host name. */
+int copy_offload_override_hostname(COPY_OFFLOAD *offload, char *hostname) {
+    if (hostname == NULL) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE-1, "NULL hostname");
+        return 1;
+    }
+    strncpy(offload->my_host_name, hostname, sizeof(offload->my_host_name));
+    return 0;
 }
 
 /* Override the certificate file path. */
@@ -175,9 +224,9 @@ int copy_offload_override_token(COPY_OFFLOAD *offload, char *token_path) {
         return 1;
     }
     if (token_path == NULL) {
-        if (offload->token != NULL)
-            free(offload->token);
-        offload->token = NULL;
+        if (offload->token_buf != NULL)
+            free(offload->token_buf);
+        offload->token = offload->token_buf = NULL;
         return 0;
     }
 
@@ -186,9 +235,9 @@ int copy_offload_override_token(COPY_OFFLOAD *offload, char *token_path) {
     ret = read_contents(offload, token_path, &token);
     if (ret != 0)
         return ret;
-    if (offload->token != NULL)
-        free(offload->token);
-    offload->token = token;
+    if (offload->token_buf != NULL)
+        free(offload->token_buf);
+    offload->token = offload->token_buf = token;
     return 0;
 }
 
@@ -203,18 +252,6 @@ static void copy_offload_setup_cert_and_token(COPY_OFFLOAD *offload) {
         curl_easy_setopt(offload->curl, CURLOPT_HTTPAUTH, CURLAUTH_BEARER);
     }
     offload->cert_and_token_done = 1;
-}
-
-/* Reset the handle so it can be used for the next command.
- * After this, the handle is ready for things like the following:
- *  copy_offload_list(), copy_offload_cancel(), copy_offload_docopy().
- */
-void copy_offload_reset(COPY_OFFLOAD *offload) {
-    curl_easy_reset(offload->curl);
-    if (offload->token != NULL)
-        free(offload->token);
-    offload->cert_and_token_done = 0;
-    copy_offload_configure(offload, offload->host_and_port, offload->skip_tls);
 }
 
 /* Request verbose output from libcurl. */
@@ -275,9 +312,17 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/hello", offload->proto, *offload->host_and_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/hello", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
@@ -292,6 +337,51 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
     return ret;
 }
 
+/* Submit a status request.
+ * The caller is responsible for calling copy_offload_status_cleanup() on @status_response if *status_response is non-NULL.
+ */
+int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs, copy_offload_status_response_t **status_response) {
+    long http_code;
+    struct memory chunk = {NULL, 0};
+    int ret = 1;
+    int n;
+    char urlbuf[COPY_OFFLOAD_URL_SIZE];
+    char parambuf[COPY_OFFLOAD_URL_SIZE];
+
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 = "maxWaitSecs=%d";
+    n = snprintf(parambuf, sizeof(parambuf), offload_req_v1_0, max_wait_secs);
+    if (n >= (int)sizeof(parambuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting parameters: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting parameters");
+        return ret;
+    }
+
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/status/%s?%s", offload->proto, offload->server_host, offload->server_port, job_name, parambuf);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
+    curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+
+    http_code = copy_offload_perform(offload, &chunk);
+    if (http_code == 200)
+        ret = 0;
+    if (chunk.response != NULL) {
+        char *output;
+        output = strdup(chunk.response);
+        chop(&output);
+        free(chunk.response);
+        *status_response = _copy_offload_status_parse(output);
+    }
+    return ret;
+}
+
 /* List the active copy-offload requests.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
@@ -299,9 +389,17 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/list", offload->proto, *offload->host_and_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/list", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     http_code = copy_offload_perform(offload, &chunk);
@@ -320,14 +418,22 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
+    int n;
     char urlbuf[COPY_OFFLOAD_URL_SIZE];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/cancel/%s", offload->proto, *offload->host_and_port, job_name);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/cancel/%s", offload->proto, offload->server_host, offload->server_port, job_name);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
     http_code = copy_offload_perform(offload, &chunk);
-    if (http_code == 204)
+    if (http_code == 200)
         ret = 0;
     if (chunk.response != NULL) {
         *output = strdup(chunk.response);
@@ -340,7 +446,7 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
 /* Submit a new copy-offload request.
  * The caller is responsible for calling free() on @output if *output is non-NULL.
  */
-int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_name, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output) {
+int copy_offload_copy(COPY_OFFLOAD *offload, const char *profile_name, int slots, int max_slots, int dry_run, char *source_path, char *dest_path, char **output) {
     long http_code;
     struct memory chunk = {NULL, 0};
     int ret = 1;
@@ -349,7 +455,14 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
     char postbuf[COPY_OFFLOAD_POST_SIZE];
     char dry_run_str[8];
 
-    snprintf(urlbuf, COPY_OFFLOAD_URL_SIZE, "%s://%s/trial", offload->proto, *offload->host_and_port);
+    n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/trial", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf)) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: buffer too small");
+        return ret;
+    } else if (n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        return ret;
+    }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
 
     if (profile_name == NULL) {
@@ -362,9 +475,9 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         strcpy(dry_run_str, "false");
     }
 
-    const char *offload_req =
+    // This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+    const char *offload_req_v1_0 =
         "{\"computeName\": \"%s\", "
-        "\"workflowName\": \"%s\", "
         "\"sourcePath\": \"%s\", "
         "\"destinationPath\": \"%s\", "
         "\"dmProfile\": \"%s\", "
@@ -374,12 +487,12 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
         "\"storeStdout\": false, "
         "\"slots\": %d, "
         "\"maxSlots\": %d}";
-    n = snprintf(postbuf, COPY_OFFLOAD_POST_SIZE, offload_req, compute_name, workflow_name, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
+    n = snprintf(postbuf, sizeof(postbuf), offload_req_v1_0, offload->my_host_name, source_path, dest_path, profile_name, dry_run_str, slots, max_slots);
     if (n >= (int)sizeof(postbuf)) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request: request truncated, buffer too small");
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting body: buffer too small");
         return ret;
     } else if (n < 0) {
-        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting request");
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting body");
         return ret;
     }
     curl_easy_setopt(offload->curl, CURLOPT_POSTFIELDS, postbuf);
@@ -403,6 +516,10 @@ int copy_offload_copy(COPY_OFFLOAD *offload, char *compute_name, char *workflow_
 
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload) {
+    if (offload->token_buf != NULL)
+        free(offload->token_buf);
+    if (offload->server_host_buf != NULL)
+        free(offload->server_host_buf);
     curl_easy_cleanup(offload->curl);
     curl_global_cleanup();
     offload->curl = NULL;

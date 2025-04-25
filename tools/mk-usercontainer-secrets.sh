@@ -55,11 +55,22 @@ if [[ -n $1 ]]; then
 fi
 if [[ -e $CERTDIR ]]; then
     echo "The cert dir $CERTDIR already exists"
-    exit 1
 fi
 
 set -e
 set -o pipefail
+
+#
+# =============
+# =============
+#
+#       A copy of this is in both the nnf-dm and the argocd-boilerplate repos.
+#
+#       Update the two copies together.
+#
+# =============
+# =============
+#
 
 CA_KEY=
 SERVER_CERT=
@@ -115,6 +126,7 @@ generate_certs() {
     CA_KEY=$CA_DIR/ca_key.pem
     SERVER_CERT=$SERVER_DIR/server_cert.pem
 
+    [[ -e "$CA_KEY" || -e "$SERVER_CERT" ]] && return
     mkdir -p "$CA_DIR"
     chmod 700 "$CA_DIR"
 
