@@ -28,6 +28,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"go.uber.org/zap"
@@ -40,11 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dwsv1alpha3 "github.com/DataWorkflowServices/dws/api/v1alpha3"
+	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
-	nnfv1alpha6 "github.com/NearNodeFlash/nnf-sos/api/v1alpha6"
+	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 )
 
 var (
@@ -54,8 +55,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha6.AddToScheme(scheme))
-	utilruntime.Must(dwsv1alpha3.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha4.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 }
 
@@ -72,6 +73,26 @@ func setupLog() logr.Logger {
 func setupClient(crLog logr.Logger) client.Client {
 	config := ctrl.GetConfigOrDie()
 
+	qpsString, found := os.LookupEnv("NNF_REST_CONFIG_QPS")
+	if found {
+		qps, err := strconv.ParseFloat(qpsString, 32)
+		if err != nil {
+			crLog.Error(err, "invalid value for NNF_REST_CONFIG_QPS")
+			os.Exit(1)
+		}
+		config.QPS = float32(qps)
+	}
+
+	burstString, found := os.LookupEnv("NNF_REST_CONFIG_BURST")
+	if found {
+		burst, err := strconv.Atoi(burstString)
+		if err != nil {
+			crLog.Error(err, "invalid value for NNF_REST_CONFIG_BURST")
+			os.Exit(1)
+		}
+		config.Burst = burst
+	}
+
 	clnt, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
 		crLog.Error(err, "Unable to create client")
@@ -82,7 +103,7 @@ func setupClient(crLog logr.Logger) client.Client {
 
 func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 	// Sanity check the client connection.
-	nnfNode := &nnfv1alpha6.NnfNode{}
+	nnfNode := &nnfv1alpha7.NnfNode{}
 	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "nnf-nlc", Namespace: rabbitName}, nnfNode); err != nil {
 		crLog.Error(err, "Failed to retrieve my own NnfNode")
 		os.Exit(1)
@@ -118,7 +139,11 @@ func main() {
 
 	crLog := setupLog()
 	// Make one of these for this server, and use it in all requests.
-	drvr := &driver.Driver{Log: crLog, Mock: mock}
+	drvr, err := driver.NewDriver(crLog, mock)
+	if err != nil {
+		slog.Error("Unable to create driver", "error", err.Error())
+		os.Exit(1)
+	}
 
 	if !skipTls {
 		serverTLSCert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
@@ -156,6 +181,7 @@ func main() {
 
 	slog.Info("Ready", "node", rabbitName, "addr", *addr, "mock", mock, "TLS", !skipTls, "token", !skipToken)
 
+	// Make one of these for this server, and use it in all requests.
 	httpHandler := &userHttp.UserHttp{
 		Log:  crLog,
 		Drvr: drvr,
@@ -170,6 +196,7 @@ func main() {
 	mux.HandleFunc("/trial", httpHandler.TrialRequest)
 	mux.HandleFunc("/cancel/", httpHandler.CancelRequest)
 	mux.HandleFunc("/list", httpHandler.ListRequests)
+	mux.HandleFunc("/status/", httpHandler.GetRequest)
 
 	srv := &http.Server{
 		Addr:      *addr,
@@ -177,7 +204,6 @@ func main() {
 		TLSConfig: tlsConfig,
 	}
 
-	var err error
 	if !skipTls {
 		err = srv.ListenAndServeTLS("", "")
 	} else {

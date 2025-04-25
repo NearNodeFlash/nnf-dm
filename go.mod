@@ -5,10 +5,10 @@ go 1.22.0
 toolchain go1.22.5
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20250312162549-a682dcdf49b1
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250219194350-45aad5cbbe17
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250312170301-6f4fd32b0173 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250320152841-1451efa58400
+	github.com/DataWorkflowServices/dws v0.0.1-0.20250424161110-635a3b991607
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250425152023-c5cd382612d7
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250416170223-aeb7554e777b // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250425160245-ae09190c4beb
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
@@ -50,8 +50,6 @@ require (
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kubeflow/common v0.4.6 // indirect
-	github.com/kubeflow/mpi-operator v0.3.1-0.20230228224311-5946ef415759 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

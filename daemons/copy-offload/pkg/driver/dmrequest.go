@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -21,18 +21,14 @@ package driver
 
 import (
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // DMRequest represents the content of one http request. This has a
 // one-to-one relationship with a DriverRequest object.
+// This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
 type DMRequest struct {
 	ComputeName string `json:"computeName"`
 
-	// The name and namespace of the initiating workflow
-	WorkflowName      string `json:"workflowName"`
-	WorkflowNamespace string `json:"workflowNamespace"`
 	// Source file or directory
 	SourcePath string `json:"sourcePath"`
 	// Destination file or directory
@@ -60,13 +56,21 @@ type DMRequest struct {
 	MpirunOptions string `json:"mpirunOptions"`
 }
 
+// StatusRequest represents the content of one http request. This has a
+// one-to-one relationship with a DriverRequest object.
+// This is the v1.0 apiVersion. See COPY_OFFLOAD_API_VERSION.
+type StatusRequest struct {
+	// Name of the copy request.
+	RequestName string `json:"requestName"`
+	// Max number of seconds to wait for the completion of the copy request.
+	// A negative number results in an indefinite wait.
+	MaxWaitSecs int `json:"maxWaitSecs"`
+}
+
 func (m *DMRequest) Validator() error {
 
 	if m.ComputeName == "" {
 		return fmt.Errorf("compute name must be supplied")
-	}
-	if m.WorkflowName == "" {
-		return fmt.Errorf("workflow name must be supplied")
 	}
 	if m.SourcePath == "" {
 		return fmt.Errorf("source path must be supplied")
@@ -74,14 +78,20 @@ func (m *DMRequest) Validator() error {
 	if m.DestinationPath == "" {
 		return fmt.Errorf("destination path must be supplied")
 	}
-	if m.WorkflowNamespace == "" {
-		m.WorkflowNamespace = corev1.NamespaceDefault
-	}
 	if m.Slots < -1 {
 		return fmt.Errorf("slots must be -1 (defer to profile), 0 (disable), or a positive integer")
 	}
 	if m.MaxSlots < -1 {
 		return fmt.Errorf("maxSlots must be -1 (defer to profile), 0 (disable), or a positive integer")
+	}
+
+	return nil
+}
+
+func (m *StatusRequest) Validator() error {
+
+	if m.RequestName == "" {
+		return fmt.Errorf("request name must be supplied")
 	}
 
 	return nil
