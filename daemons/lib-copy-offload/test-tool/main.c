@@ -26,8 +26,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <curl/curl.h>
-
 #include "../copy-offload.h"
 
 /*
