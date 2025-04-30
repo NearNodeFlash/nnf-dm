@@ -154,7 +154,7 @@ DNS.1 = $SRVR_HOST
     echo "Generate a self-signed server certificate signing request and certificate"
     mkdir -p "$SERVER_DIR" && chmod 700 "$SERVER_DIR"
     openssl req -new -key "$CA_KEY" -out "$SERVER_CSR" -subj "/CN=$SRVR_HOST" -config "$RABBIT_SAN_CONF" -extensions 'v3_req'
-    openssl x509 -req -days 365 -in "$SERVER_CSR" -key "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
+    openssl x509 -req -days 365 -in "$SERVER_CSR" -signkey "$CA_KEY" -out "$SERVER_CERT" -extfile "$RABBIT_SAN_CONF" -extensions 'v3_req'
 }
 
 # Create the secrets for the certificate and its signing key.
