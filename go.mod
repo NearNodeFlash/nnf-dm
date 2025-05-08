@@ -7,8 +7,8 @@ toolchain go1.22.5
 require (
 	github.com/DataWorkflowServices/dws v0.0.1-0.20250424161110-635a3b991607
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250425152023-c5cd382612d7
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250416170223-aeb7554e777b // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250425160245-ae09190c4beb
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250508164611-4e8b76ddad31 // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250508182118-6dc2325affff
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
