@@ -15,7 +15,7 @@ spec:
   dwDirectives:
     - "#DW jobdw name=copyoff-lustre type=lustre capacity=50GB requires=copy-offload"
     - "#DW container name=copyoff-container profile=copy-offload-default \
-      DW_JOB_my_storage=copyoff-lustre DW_GLOBAL_lushtx=/lus/global/copyoff"
+      DW_JOB_my_storage=copyoff-lustre DW_GLOBAL_lus=/lus/global/copyoff"
   wlmID: "Bubbly WLM"
   jobID: "fBlakesJob3"
   userID: 1060
