@@ -217,7 +217,7 @@ echo "PASS: Success"
 echo "Requesting server shutdown"
 
 # Send shutdown request
-if ! output=$(curl -X POST -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" $CURL_TLS_ARGS "$PROTO://$SRVR/shutdown"); then
+if ! output=$(curl -X POST -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" "$CURL_TLS_ARGS" "$PROTO://$SRVR/shutdown"); then
     echo "FAIL: Could not shutdown server gracefully"
     kill "$srvr_pid"
     exit 1
