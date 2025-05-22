@@ -197,12 +197,14 @@ func main() {
 	mux.HandleFunc("/cancel/", httpHandler.CancelRequest)
 	mux.HandleFunc("/list", httpHandler.ListRequests)
 	mux.HandleFunc("/status/", httpHandler.GetRequest)
+	mux.HandleFunc("/shutdown", httpHandler.ShutdownRequest)
 
 	srv := &http.Server{
 		Addr:      *addr,
 		Handler:   mux,
 		TLSConfig: tlsConfig,
 	}
+	httpHandler.Server = srv
 
 	if !skipTls {
 		err = srv.ListenAndServeTLS("", "")

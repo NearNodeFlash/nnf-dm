@@ -524,3 +524,45 @@ void copy_offload_cleanup(COPY_OFFLOAD *offload) {
     curl_global_cleanup();
     offload->curl = NULL;
 }
+
+int copy_offload_shutdown(COPY_OFFLOAD *offload) {
+    int ret = 1;
+    long http_code;
+    char *list_output = NULL;
+    char urlbuf[COPY_OFFLOAD_URL_SIZE];
+    struct memory chunk = {NULL, 0};
+
+    // Check for active requests using copy_offload_list
+    ret = copy_offload_list(offload, &list_output);
+    if (ret != 0) {
+        // copy_offload_list sets err_message
+        return 1;
+    }
+    if (list_output && strlen(list_output) > 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Cannot shutdown: active copy-offload requests are still running.");
+        free(list_output);
+        return 1;
+    }
+    if (list_output) free(list_output);
+
+    // Send shutdown request
+    int n = snprintf(urlbuf, sizeof(urlbuf), "%s://%s:%s/shutdown", offload->proto, offload->server_host, offload->server_port);
+    if (n >= (int)sizeof(urlbuf) || n < 0) {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Error formatting shutdown request");
+        return 1;
+    }
+    curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+    curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "POST");
+
+    chunk.response = NULL;
+    chunk.size = 0;
+    http_code = copy_offload_perform(offload, &chunk);
+    if (http_code == 200) {
+        ret = 0;
+    } else {
+        snprintf(offload->err_message, COPY_OFFLOAD_MSG_SIZE, "Failed to shutdown server (HTTP %ld)", http_code);
+    }
+    if (chunk.response) free(chunk.response);
+
+    return ret;
+}

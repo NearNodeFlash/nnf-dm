@@ -661,6 +661,7 @@ func TestF_Lifecycle(t *testing.T) {
 			}
 		}
 	})
+
 }
 
 func TestG_BadAPIVersion(t *testing.T) {
@@ -916,6 +917,65 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 		}
 		if !strings.Contains(got, "unexpected signing method") {
 			t.Errorf("got %s, wanted a message about an unexpected signing method", got)
+		}
+	})
+}
+
+func TestJ_ShutdownRequest(t *testing.T) {
+	crLog := setupLog()
+
+	t.Run("shutdown with no active jobs", func(t *testing.T) {
+		drvr, err := driver.NewDriver(crLog, true)
+		if err != nil {
+			t.Errorf("NewDriver failed: %s", err.Error())
+			t.FailNow()
+		}
+		httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+		request, _ := http.NewRequest(http.MethodPost, "/shutdown", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		response := httptest.NewRecorder()
+
+		httpHandler.ShutdownRequest(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		want := "server shutting down\n"
+
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("got %q, want substring %q", got, want)
+		}
+	})
+
+	t.Run("shutdown with active jobs", func(t *testing.T) {
+		drvr, err := driver.NewDriver(crLog, true)
+		if err != nil {
+			t.Errorf("NewDriver failed: %s", err.Error())
+			t.FailNow()
+		}
+		httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+		// Schedule a job so there is an active request
+		makeOneRequest(t, httpHandler)
+
+		request, _ := http.NewRequest(http.MethodPost, "/shutdown", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		response := httptest.NewRecorder()
+
+		httpHandler.ShutdownRequest(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		want := "unable to shutdown server: requests in progress"
+
+		if res.StatusCode != http.StatusInternalServerError {
+			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusInternalServerError)
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("got %q, want substring %q", got, want)
 		}
 	})
 }
