@@ -214,8 +214,25 @@ fi
 
 echo
 echo "PASS: Success"
-echo "Kill server $srvr_pid"
-kill "$srvr_pid"
+echo "Requesting server shutdown"
+
+# Send shutdown request
+if ! output=$(curl -X POST -H "$CURL_APIVER_HDR" -H "$CURL_BEARER_TOKEN_HDR" $CURL_TLS_ARGS "$PROTO://$SRVR/shutdown"); then
+    echo "FAIL: Could not shutdown server gracefully"
+    kill "$srvr_pid"
+    exit 1
+fi
+echo "Shutdown response: $output"
+
+# Wait for the server to exit
+wait "$srvr_pid"
+server_exit_code=$?
+
+if [[ $server_exit_code -ne 0 ]]; then
+    echo "FAIL: Server did not exit cleanly (exit code $server_exit_code)"
+    exit 1
+fi
+
 if [[ -d $CERTDIR ]]; then
     rm -rf "$CERTDIR"
 fi
