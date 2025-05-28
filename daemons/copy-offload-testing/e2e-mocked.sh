@@ -214,8 +214,25 @@ fi
 
 echo
 echo "PASS: Success"
-echo "Kill server $srvr_pid"
-kill "$srvr_pid"
+echo "Requesting server shutdown"
+
+# Send shutdown request
+# shellcheck disable=SC2086
+if ! output=$($CO $CO_TLS_ARGS -X); then
+    echo "line $LINENO output: $output"
+    cleanup
+fi
+echo "Shutdown response: $output"
+
+# Wait for the server to exit
+wait "$srvr_pid"
+server_exit_code=$?
+
+if [[ $server_exit_code -ne 0 ]]; then
+    echo "FAIL: Server did not exit cleanly (exit code $server_exit_code)"
+    exit 1
+fi
+
 if [[ -d $CERTDIR ]]; then
     rm -rf "$CERTDIR"
 fi

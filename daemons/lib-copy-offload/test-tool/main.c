@@ -56,6 +56,8 @@ void usage(const char **argv) {
     fprintf(stderr, "       -j JOB_NAME    The job name returned by the copy-offload request.\n");
     fprintf(stderr, "       -w MAX_WAIT    Maximum number of seconds to wait for the job to complete. (default 0)\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "Usage: %s [COMMON_ARGS] -X\n", argv[0]);
+    fprintf(stderr, "    -X     Shutdown the copy-offload server.\n");
     fprintf(stderr, "COMMON_ARGS\n");
     fprintf(stderr, "    -v                  Request verbose output from this tool.\n");
     fprintf(stderr, "    -V                  Request verbose output from libcurl.\n");
@@ -90,11 +92,12 @@ int main(int argc, const char **argv) {
     int max_slots = -1;
     int H_opt = 0;
     int q_opt = 0;
+    int X_opt = 0;
     int max_wait_secs = 0;
     int ret;
     copy_offload_status_response_t *status_response = NULL;
 
-    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHqj:w:")) != -1) {
+    while ((c = getopt(argc, cargv, "hvVlst:x:c:oC:P:S:D:m:M:dHqj:w:X")) != -1) {
         switch (c) {
             case 'c':
                 c_opt = 1;
@@ -153,6 +156,9 @@ int main(int argc, const char **argv) {
                 break;
             case 'w':
                 max_wait_secs = atoi(optarg);
+                break;
+            case 'X':
+                X_opt = 1;
                 break;
             default:
                 usage(argv);
@@ -224,6 +230,8 @@ int main(int argc, const char **argv) {
         ret = copy_offload_hello(offload, &output);
     } else if (q_opt) {
         ret = copy_offload_status(offload, job_name, max_wait_secs, &status_response);
+    } else if (X_opt) {
+        ret = copy_offload_shutdown(offload);
     } else {
         fprintf(stderr, "What action?\n");
         copy_offload_cleanup(offload);
