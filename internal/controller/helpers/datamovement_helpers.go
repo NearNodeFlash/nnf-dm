@@ -651,11 +651,21 @@ func CreateMpiHostfile(profile *nnfv1alpha7.NnfDataMovementProfile, hosts []stri
 // created based on the DM Name. The hostfile is created inside of this directory.
 // A value of 0 for slots or maxSlots will not use it in the hostfile.
 func WriteMpiHostfile(dmName string, hosts []string, slots, maxSlots int) (string, error) {
+	var tmpdir string
+	var err error
 
-	tmpdir := filepath.Join("/tmp", dmName)
-	if err := os.MkdirAll(tmpdir, 0755); err != nil {
-		return "", err
+	// If the dmName is empty, create a temporary directory in /tmp. This can happen for copy
+	// offload when the dm resource is not yet created
+	if dmName == "" {
+		tmpdir, err = os.MkdirTemp("/tmp", "dm-")
+	} else {
+		tmpdir = filepath.Join("/tmp", dmName)
+		err = os.MkdirAll(tmpdir, 0755)
 	}
+	if err != nil {
+		return "", fmt.Errorf("failed to create directory for MPI hostfile: %w", err)
+	}
+
 	hostfilePath := filepath.Join(tmpdir, "hostfile")
 
 	f, err := os.Create(hostfilePath)
