@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
@@ -44,6 +45,7 @@ type UserHttp struct {
 	InTest   bool
 	Mock     bool
 	KeyBytes []byte
+	Server   *http.Server
 }
 
 // The signing algorithm that we expect was used when signing the JWT.
@@ -169,6 +171,11 @@ func (user *UserHttp) GetRequest(w http.ResponseWriter, req *http.Request) {
 	// StatusOK is implied.
 }
 
+func (user *UserHttp) GetActiveRequests() ([]string, error) {
+	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
+	return drvrReq.ListRequests(context.TODO())
+}
+
 func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 	var apiVersion string
 	if req.Method != "GET" {
@@ -179,8 +186,7 @@ func (user *UserHttp) ListRequests(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
-	items, err := drvrReq.ListRequests(context.TODO())
+	items, err := user.GetActiveRequests()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to list requests: %s\n", err.Error()), http.StatusInternalServerError)
 		return
@@ -271,4 +277,39 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 
 	// This is the v1.0 apiVersion output. See COPY_OFFLOAD_API_VERSION.
 	fmt.Fprintf(w, "name=%s\n", dmKey)
+}
+
+func (user *UserHttp) ShutdownRequest(w http.ResponseWriter, req *http.Request) {
+	var apiVersion string
+	if req.Method != "POST" {
+		http.Error(w, "method not supported", http.StatusNotImplemented)
+		return
+	}
+	if apiVersion = user.validateMessage(w, req); apiVersion == "" {
+		return
+	}
+	user.Log.Info("In ShutdownRequest", "version", apiVersion, "url", req.URL)
+
+	items, err := user.GetActiveRequests()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to list requests: %s\n", err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	// If there are active requests, we cannot shutdown the server. Return StatusConflict (409)
+	if len(items) > 0 {
+		http.Error(w, "unable to shutdown server: requests in progress", http.StatusConflict)
+		return
+	}
+	user.Log.Info("  ShutdownRequest")
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		if err := user.Server.Shutdown(context.Background()); err != nil {
+			user.Log.Error(err, "server shutdown failed")
+		}
+	}()
+
+	user.Log.Info("Server shutting down")
+	fmt.Fprintf(w, "Server shutting down\n")
 }
