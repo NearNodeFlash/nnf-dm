@@ -128,6 +128,9 @@ void copy_offload_status_pretty_print(FILE *out, copy_offload_status_response_t 
  */
 int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output);
 
+/* Shutdown the server and exit cleanly. */
+int copy_offload_shutdown(COPY_OFFLOAD *offload);
+
 /* Clean up the handle's resources. */
 void copy_offload_cleanup(COPY_OFFLOAD *offload);
 
