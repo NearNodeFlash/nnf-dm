@@ -920,6 +920,65 @@ func TestI_BearerTokenNegatives(t *testing.T) {
 	})
 }
 
+func TestJ_ShutdownRequest(t *testing.T) {
+	crLog := setupLog()
+
+	t.Run("shutdown with no active jobs", func(t *testing.T) {
+		drvr, err := driver.NewDriver(crLog, true)
+		if err != nil {
+			t.Errorf("NewDriver failed: %s", err.Error())
+			t.FailNow()
+		}
+		httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+		request, _ := http.NewRequest(http.MethodPost, "/shutdown", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		response := httptest.NewRecorder()
+
+		httpHandler.ShutdownRequest(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		want := "Server shutting down\n"
+
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusOK)
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("got %q, want substring %q", got, want)
+		}
+	})
+
+	t.Run("shutdown with active jobs", func(t *testing.T) {
+		drvr, err := driver.NewDriver(crLog, true)
+		if err != nil {
+			t.Errorf("NewDriver failed: %s", err.Error())
+			t.FailNow()
+		}
+		httpHandler := &UserHttp{Log: crLog, Drvr: drvr, Mock: true}
+
+		// Schedule a job so there is an active request
+		makeOneRequest(t, httpHandler)
+
+		request, _ := http.NewRequest(http.MethodPost, "/shutdown", nil)
+		request.Header.Set("Accepts-version", "1.0")
+		response := httptest.NewRecorder()
+
+		httpHandler.ShutdownRequest(response, request)
+
+		res := response.Result()
+		got := response.Body.String()
+		want := "unable to shutdown server: requests in progress"
+
+		if res.StatusCode != http.StatusConflict {
+			t.Errorf("got status %d, want status %d", res.StatusCode, http.StatusConflict)
+		}
+		if !strings.Contains(got, want) {
+			t.Errorf("got %q, want substring %q", got, want)
+		}
+	})
+}
+
 // Just touch ginkgo, so it's here to interpret any ginkgo args from
 // "make test", so that doesn't fail on this test file.
 var _ = BeforeSuite(func() {})
