@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
 	dwsv1alpha5 "github.com/DataWorkflowServices/dws/api/v1alpha5"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
@@ -199,7 +200,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha7.AddDataMovementTeardownStateLabel(dm, dwsv1alpha5.StatePostRun)
+	nnfv1alpha7.AddDataMovementTeardownStateLabel(dm, dwsv1alpha4.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
 	setUserConfig(dmreq, dm)

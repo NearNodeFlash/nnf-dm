@@ -12,7 +12,7 @@ github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
 # github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250509164504-1a625db7d3c6
 ## explicit; go 1.22.0
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250603174844-af2e0f0cec9c
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250606135144-173cea2b0f45
 ## explicit; go 1.22.0
 github.com/NearNodeFlash/nnf-sos/api/v1alpha7
 github.com/NearNodeFlash/nnf-sos/config/crd/bases

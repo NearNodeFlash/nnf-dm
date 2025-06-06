@@ -8,7 +8,7 @@ require (
 	github.com/DataWorkflowServices/dws v0.0.1-0.20250604140623-76b332d96362
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250425152023-c5cd382612d7
 	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250509164504-1a625db7d3c6 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250603174844-af2e0f0cec9c
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250606135144-173cea2b0f45
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
