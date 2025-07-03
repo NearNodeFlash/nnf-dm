@@ -56,6 +56,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dwsv1alpha4 "github.com/DataWorkflowServices/dws/api/v1alpha4"
+	dwsv1alpha5 "github.com/DataWorkflowServices/dws/api/v1alpha5"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	nnfv1alpha7 "github.com/NearNodeFlash/nnf-sos/api/v1alpha7"
 
@@ -75,7 +76,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(dwsv1alpha4.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha5.AddToScheme(scheme))
 	utilruntime.Must(nnfv1alpha7.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -169,13 +170,13 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			return nil, fmt.Errorf("system configuration name not defined")
 		}
 
-		systemConfig := &dwsv1alpha4.SystemConfiguration{}
+		systemConfig := &dwsv1alpha5.SystemConfiguration{}
 		if err := client.Get(context.TODO(), types.NamespacedName{Name: opts.sysConfig, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
 			return nil, fmt.Errorf("failed to retrieve system configuration: %w", err)
 		}
 
 		log.Println("Looking for Storage Node with access to Node", opts.name)
-		storageNode := func() *dwsv1alpha4.SystemConfigurationStorageNode {
+		storageNode := func() *dwsv1alpha5.SystemConfigurationStorageNode {
 			for _, storageNode := range systemConfig.Spec.StorageNodes {
 				for _, computeNode := range storageNode.ComputesAccess {
 					if computeNode.Name == opts.name {
@@ -295,7 +296,7 @@ func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovement
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 
 	// Ensure workflow exists and is in PreRun:Ready
-	workflow := &dwsv1alpha4.Workflow{ObjectMeta: metav1.ObjectMeta{
+	workflow := &dwsv1alpha5.Workflow{ObjectMeta: metav1.ObjectMeta{
 		Name:      req.Workflow.Name,
 		Namespace: req.Workflow.Namespace,
 	}}
@@ -306,10 +307,10 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-	if workflow.Status.State != dwsv1alpha4.StatePreRun || workflow.Status.Status != "Completed" {
+	if workflow.Status.State != dwsv1alpha5.StatePreRun || workflow.Status.Status != "Completed" {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: fmt.Sprintf("Workflow must be in '%s' state and 'Completed' status", dwsv1alpha4.StatePreRun),
+			Message: fmt.Sprintf("Workflow must be in '%s' state and 'Completed' status", dwsv1alpha5.StatePreRun),
 		}, nil
 	}
 
@@ -374,8 +375,8 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	dm.Spec.GroupId = groupId
 
 	// Add appropriate workflow labels so this is cleaned up
-	dwsv1alpha4.AddWorkflowLabels(dm, workflow)
-	dwsv1alpha4.AddOwnerLabels(dm, workflow)
+	dwsv1alpha5.AddWorkflowLabels(dm, workflow)
+	dwsv1alpha5.AddOwnerLabels(dm, workflow)
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
@@ -455,7 +456,7 @@ func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nn
 	return profile, nil
 }
 
-func getDirectiveIndexFromClientMount(object *dwsv1alpha4.ClientMount) (string, error) {
+func getDirectiveIndexFromClientMount(object *dwsv1alpha5.ClientMount) (string, error) {
 	// Find the DW index for our work.
 	labels := object.GetLabels()
 	if labels == nil {
@@ -470,7 +471,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha4.ClientMount) (string, 
 	return dwIndex, nil
 }
 
-func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha4.ClientMountInfo, computeClientMount *dwsv1alpha4.ClientMount) (*nnfv1alpha7.NnfDataMovement, error) {
+func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha5.ClientMountInfo, computeClientMount *dwsv1alpha5.ClientMount) (*nnfv1alpha7.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
@@ -522,7 +523,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 	return dm, nil
 }
 
-func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha4.ClientMountInfo) (*nnfv1alpha7.NnfDataMovement, error) {
+func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha5.ClientMountInfo) (*nnfv1alpha7.NnfDataMovement, error) {
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
 	if err != nil {
@@ -556,8 +557,8 @@ func (s *defaultServer) List(ctx context.Context, req *pb.DataMovementListReques
 	// Only get the DMs that match the workflow and workflow namespace
 	opts := []client.ListOption{
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha4.OwnerNameLabel:      req.Workflow.Name,
-			dwsv1alpha4.OwnerNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha5.OwnerNameLabel:      req.Workflow.Name,
+			dwsv1alpha5.OwnerNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
@@ -847,7 +848,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 	return nil, fmt.Errorf("unable to find a LustreFileSystem resource matching %s", origDest)
 }
 
-func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha4.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
+func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha5.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
 
 	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
 	// to this value resulting in the full path on the Rabbit.
@@ -855,12 +856,12 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 	listOptions := []client.ListOption{
 		client.InNamespace(s.namespace),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha4.WorkflowNameLabel:      req.Workflow.Name,
-			dwsv1alpha4.WorkflowNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha5.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha5.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha4.ClientMountList{}
+	clientMounts := &dwsv1alpha5.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
 		return "", err
 	}
@@ -883,17 +884,17 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha4.ClientMount, *dwsv1alpha4.ClientMountInfo, error) {
+func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha5.ClientMount, *dwsv1alpha5.ClientMountInfo, error) {
 
 	listOptions := []client.ListOption{
 		client.InNamespace(s.name),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha4.WorkflowNameLabel:      req.Workflow.Name,
-			dwsv1alpha4.WorkflowNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha5.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha5.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha4.ClientMountList{}
+	clientMounts := &dwsv1alpha5.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
 		return nil, nil, err
 	}
