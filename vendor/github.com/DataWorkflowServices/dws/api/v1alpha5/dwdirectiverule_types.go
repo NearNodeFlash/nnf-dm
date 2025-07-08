@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha4
+package v1alpha5
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/dwdparse"
@@ -27,6 +27,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 
 // DWDirectiveRule is the Schema for the DWDirective API
 type DWDirectiveRule struct {
