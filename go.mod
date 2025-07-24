@@ -1,14 +1,12 @@
 module github.com/NearNodeFlash/nnf-dm
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.23.9
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20250610194327-bc91fef8e840
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250708135942-4a4d148d7772
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250702200322-db4e4089d5e0 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250716194043-7f8e1465752c
+	github.com/DataWorkflowServices/dws v0.0.1-0.20250723211939-273b728aedb8
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250724135550-b3af7cc19bd6
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250723210100-233d628095b4 // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250724142043-329c585c47bd
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
