@@ -45,7 +45,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dwsv1alpha5 "github.com/DataWorkflowServices/dws/api/v1alpha5"
+	dwsv1alpha6 "github.com/DataWorkflowServices/dws/api/v1alpha6"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
 	nnfv1alpha8 "github.com/NearNodeFlash/nnf-sos/api/v1alpha8"
@@ -131,15 +131,15 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 
 	drvr := r.Drvr
 	crLog := drvr.Log.WithValues("workflow", drvr.WorkflowName)
-	workflow := &dwsv1alpha5.Workflow{}
+	workflow := &dwsv1alpha6.Workflow{}
 
 	wf := types.NamespacedName{Name: drvr.WorkflowName, Namespace: drvr.WorkflowNamespace}
 	if err := drvr.Client.Get(ctx, wf, workflow); err != nil {
 		crLog.Info("Unable to get workflow: %v", err)
 		return "", nil, err
 	}
-	if workflow.Status.State != dwsv1alpha5.StatePreRun || workflow.Status.Status != "Completed" {
-		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha5.StatePreRun)
+	if workflow.Status.State != dwsv1alpha6.StatePreRun || workflow.Status.Status != "Completed" {
+		err := fmt.Errorf("workflow must be in '%s' state and 'Completed' status", dwsv1alpha6.StatePreRun)
 		crLog.Error(err, "Workflow is in an invalid state")
 		return "", nil, err
 	}
@@ -194,12 +194,12 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 	dm.Spec.GroupId = workflow.Spec.GroupID
 
 	// Add appropriate workflow labels so this is cleaned up
-	dwsv1alpha5.AddWorkflowLabels(dm, workflow)
-	dwsv1alpha5.AddOwnerLabels(dm, workflow)
+	dwsv1alpha6.AddWorkflowLabels(dm, workflow)
+	dwsv1alpha6.AddOwnerLabels(dm, workflow)
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha8.AddDataMovementTeardownStateLabel(dm, dwsv1alpha5.StatePostRun)
+	nnfv1alpha8.AddDataMovementTeardownStateLabel(dm, dwsv1alpha6.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
 	setUserConfig(dmreq, dm)
@@ -436,7 +436,7 @@ func (r *DriverRequest) GetRequest(ctx context.Context, statreq StatusRequest) (
 		crLog.Error(err, "failed to get NnfDataMovement resource")
 		return nil, http.StatusInternalServerError, err
 	}
-	if dm.Labels[dwsv1alpha5.WorkflowNameLabel] != drvr.WorkflowName || dm.Labels[dwsv1alpha5.WorkflowNamespaceLabel] != drvr.WorkflowNamespace {
+	if dm.Labels[dwsv1alpha6.WorkflowNameLabel] != drvr.WorkflowName || dm.Labels[dwsv1alpha6.WorkflowNamespaceLabel] != drvr.WorkflowNamespace {
 		return nil, http.StatusBadRequest, errors.New("request does not belong to workflow")
 	}
 
@@ -729,7 +729,7 @@ func (r *DriverRequest) runit(ctx context.Context, ctxCancel context.Context, co
 			log.Error(err, "Data movement operation failed", "output", output)
 			dm.Status.Status = nnfv1alpha8.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
-			resourceErr := dwsv1alpha5.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
+			resourceErr := dwsv1alpha6.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
@@ -852,7 +852,7 @@ func setUserConfig(dmreq DMRequest, dm *nnfv1alpha8.NnfDataMovement) {
 }
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with Lustre.
-func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha5.ClientMountInfo, computeClientMount *dwsv1alpha5.ClientMount) (*nnfv1alpha8.NnfDataMovement, error) {
+func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha6.ClientMountInfo, computeClientMount *dwsv1alpha6.ClientMount) (*nnfv1alpha8.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -904,7 +904,7 @@ func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMReque
 	return dm, nil
 }
 
-func getDirectiveIndexFromClientMount(object *dwsv1alpha5.ClientMount) (string, error) {
+func getDirectiveIndexFromClientMount(object *dwsv1alpha6.ClientMount) (string, error) {
 	// Find the DW index for our work.
 	labels := object.GetLabels()
 	if labels == nil {
@@ -920,7 +920,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha5.ClientMount) (string, 
 }
 
 // createNnfNodeDataMovement creates an NnfDataMovement to be used with GFS2.
-func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha5.ClientMountInfo) (*nnfv1alpha8.NnfDataMovement, error) {
+func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha6.ClientMountInfo) (*nnfv1alpha8.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := r.findRabbitRelativeSource(ctx, dmreq, computeMountInfo)
@@ -950,7 +950,7 @@ func (r *DriverRequest) createNnfNodeDataMovement(ctx context.Context, dmreq DMR
 	return dm, nil
 }
 
-func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha5.ClientMountInfo) (string, error) {
+func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRequest, computeMountInfo *dwsv1alpha6.ClientMountInfo) (string, error) {
 
 	drvr := r.Drvr
 	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
@@ -959,12 +959,12 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 	listOptions := []client.ListOption{
 		client.InNamespace(r.RabbitName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha5.WorkflowNameLabel:      drvr.WorkflowName,
-			dwsv1alpha5.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
+			dwsv1alpha6.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha6.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha5.ClientMountList{}
+	clientMounts := &dwsv1alpha6.ClientMountList{}
 	if err := drvr.Client.List(ctx, clientMounts, listOptions...); err != nil {
 		return "", err
 	}
@@ -987,18 +987,18 @@ func (r *DriverRequest) findRabbitRelativeSource(ctx context.Context, dmreq DMRe
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMRequest) (*dwsv1alpha5.ClientMount, *dwsv1alpha5.ClientMountInfo, error) {
+func (r *DriverRequest) findComputeMountInfo(ctx context.Context, dmreq DMRequest) (*dwsv1alpha6.ClientMount, *dwsv1alpha6.ClientMountInfo, error) {
 
 	drvr := r.Drvr
 	listOptions := []client.ListOption{
 		client.InNamespace(dmreq.ComputeName),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha5.WorkflowNameLabel:      drvr.WorkflowName,
-			dwsv1alpha5.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
+			dwsv1alpha6.WorkflowNameLabel:      drvr.WorkflowName,
+			dwsv1alpha6.WorkflowNamespaceLabel: drvr.WorkflowNamespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha5.ClientMountList{}
+	clientMounts := &dwsv1alpha6.ClientMountList{}
 	if err := drvr.Client.List(ctx, clientMounts, listOptions...); err != nil {
 		return nil, nil, err
 	}
@@ -1102,7 +1102,7 @@ func (r *DriverRequest) findRabbitNameFromCompute(compute string) (string, error
 	drvr := r.Drvr
 	systemConfigName := "default"
 
-	systemConfig := &dwsv1alpha5.SystemConfiguration{}
+	systemConfig := &dwsv1alpha6.SystemConfiguration{}
 	if err := drvr.Client.Get(context.TODO(), types.NamespacedName{Name: systemConfigName, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
 		return "", fmt.Errorf("failed to retrieve system configuration: %w", err)
 	}
