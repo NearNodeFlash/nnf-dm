@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha5
+package v1alpha6
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
@@ -190,6 +190,7 @@ type ClientMountStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="DESIREDSTATE",type="string",JSONPath=".spec.desiredState",description="The desired state"
 //+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.allReady",description="True if desired state is achieved"

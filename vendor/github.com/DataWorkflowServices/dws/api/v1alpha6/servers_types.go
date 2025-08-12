@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha5
+package v1alpha6
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
@@ -90,6 +90,7 @@ type ServersStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="READY",type="boolean",JSONPath=".status.ready",description="True if allocation sets have been generated"
 //+kubebuilder:printcolumn:name="ERROR",type="string",JSONPath=".status.error.severity"

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha5
+package v1alpha6
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
@@ -137,6 +137,7 @@ type StorageStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".spec.state",description="State of the storage resource"
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="Status of the storage resource"
