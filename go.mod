@@ -5,8 +5,8 @@ go 1.23.9
 require (
 	github.com/DataWorkflowServices/dws v0.0.1-0.20250808183301-4b805a6dc386
 	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20250724135550-b3af7cc19bd6
-	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250723210100-233d628095b4 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250724142043-329c585c47bd
+	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20250729162827-ca422941f181 // indirect
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20250811175719-0e1580608e97
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
