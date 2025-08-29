@@ -21,7 +21,7 @@ ARG NNFMFU_TAG_BASE=ghcr.io/nearnodeflash/nnf-mfu
 ARG NNFMFU_VERSION=0.1.6
 
 # Build the manager binary
-FROM golang:1.22-alpine AS builder_setup
+FROM golang:1.23-alpine AS builder_setup
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
