@@ -17,21 +17,23 @@
  * limitations under the License.
  */
 
-package v1alpha6
+// Package v1alpha7 contains API Schema definitions for the dataworkflowservices v1alpha7 API group
+// +kubebuilder:object:generate=true
+// +groupName=dataworkflowservices.github.io
+package v1alpha7
 
 import (
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-// log is for logging in this package.
-var systemstatuslog = logf.Log.WithName("systemstatus-resource")
+var (
+	// GroupVersion is group version used to register these objects
+	GroupVersion = schema.GroupVersion{Group: "dataworkflowservices.github.io", Version: "v1alpha7"}
 
-// SetupWebhookWithManager will setup the manager to manage the webhooks
-func (r *SystemStatus) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)

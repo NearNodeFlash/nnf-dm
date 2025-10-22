@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha6
+package v1alpha7
 
 import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
@@ -93,6 +93,7 @@ type PersistentStorageInstanceStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="ERROR",type="string",JSONPath=".status.error.severity"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

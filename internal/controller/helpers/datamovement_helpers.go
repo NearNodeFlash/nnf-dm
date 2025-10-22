@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dwsv1alpha6 "github.com/DataWorkflowServices/dws/api/v1alpha6"
+	dwsv1alpha7 "github.com/DataWorkflowServices/dws/api/v1alpha7"
 	nnfv1alpha8 "github.com/NearNodeFlash/nnf-sos/api/v1alpha8"
 )
 
@@ -334,14 +334,14 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 	log.Info("Determining destination directory based on source/dest file types")
 	destDir, err := GetDestinationDir(profile, dm, mpiHostfile, log)
 	if err != nil {
-		return dwsv1alpha6.NewResourceError("could not determine source type").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not determine source type").WithError(err).WithFatal()
 	}
 
 	// See if an index mount directory on the destination is required
 	log.Info("Determining if index mount directory is required")
 	indexMount, err := checkIndexMountDir(clnt, ctx, dm)
 	if err != nil {
-		return dwsv1alpha6.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
 	}
 
 	// Account for index mount directory on the destDir and the dm dest path
@@ -350,7 +350,7 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 		log.Info("Index mount directory is required", "indexMountdir", indexMount)
 		d, err := HandleIndexMountDir(profile, dm, destDir, indexMount, mpiHostfile, log)
 		if err != nil {
-			return dwsv1alpha6.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			return dwsv1alpha7.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
 		}
 		destDir = d
 		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
@@ -359,7 +359,7 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 	// Create the destination directory
 	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
 	if err := createDestinationDir(profile, dm, destDir, mpiHostfile, log); err != nil {
-		return dwsv1alpha6.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 	}
 
 	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
