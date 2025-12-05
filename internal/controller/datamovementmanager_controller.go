@@ -468,6 +468,9 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		podSpec.Tolerations = []corev1.Toleration{
 			{Key: "cray.nnf.node", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule},
 		}
+
+		// Enable shareProcessNamespace so the manager container can signal processes in the worker
+		// container (required for MPI process coordination and cancelling data movement operations)
 		podSpec.ShareProcessNamespace = pointy.Bool(true)
 
 		if managerContainer, err := findContainer(podSpec, "manager"); err == nil {
@@ -477,15 +480,17 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		if workerContainer, err := findContainer(podSpec, "worker"); err == nil {
 			workerContainer.Env = append(workerContainer.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 
-			// Limit what the worker can do - this is enough to support dcp and being able to become
-			// the the UID/GID of the workflow
+			// Configure minimal Linux capabilities for data movement operations.
+			// Data movement executes mpirun dcp/setpriv commands that require user/group changes,
+			// file ownership operations, and filesystem node creation for HPC workflows.
 			workerContainer.SecurityContext = &corev1.SecurityContext{
-				Privileged: pointy.Bool(true),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{
-						"SETUID",
-						"SETGID",
-						"MKNOD",
+						"SETUID", // "setpriv --euid" and "dcp --uid" operations
+						"SETGID", // "setpriv --euid" and "dcp --uid" operations
+						"MKNOD",  // "mkdir -p" and directory creation in dcp
+						"CHOWN",  // dcp to change file ownership during copy
+						"FOWNER", // dcp to bypass ownership restrictions
 					},
 				},
 			}
