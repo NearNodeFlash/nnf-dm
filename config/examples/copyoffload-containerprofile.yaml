@@ -1,5 +1,5 @@
 ---
-apiVersion: nnf.cray.hpe.com/v1alpha8
+apiVersion: nnf.cray.hpe.com/v1alpha9
 kind: NnfContainerProfile
 metadata:
   name: copy-offload-template

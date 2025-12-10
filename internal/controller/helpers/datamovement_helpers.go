@@ -39,8 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dwsv1alpha6 "github.com/DataWorkflowServices/dws/api/v1alpha6"
-	nnfv1alpha8 "github.com/NearNodeFlash/nnf-sos/api/v1alpha8"
+	dwsv1alpha7 "github.com/DataWorkflowServices/dws/api/v1alpha7"
+	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
 )
 
 // Regex to scrape the progress output of the `dcp` command. Example output:
@@ -104,7 +104,7 @@ func newInvalidError(format string, a ...any) *invalidError {
 func (i *invalidError) Error() string { return i.err.Error() }
 func (i *invalidError) Unwrap() error { return i.err }
 
-func ParseDcpProgress(line string, cmdStatus *nnfv1alpha8.NnfDataMovementCommandStatus) error {
+func ParseDcpProgress(line string, cmdStatus *nnfv1alpha9.NnfDataMovementCommandStatus) error {
 	match := progressRe.FindStringSubmatch(line)
 	if len(match) > 0 {
 		progress, err := strconv.Atoi(match[1])
@@ -168,7 +168,7 @@ func TrimDcpProgressFromOutput(output string) string {
 }
 
 // Go through the list of dcp stat regexes, parse them, and put them in their appropriate place in cmdStatus
-func ParseDcpStats(line string, cmdStatus *nnfv1alpha8.NnfDataMovementCommandStatus) error {
+func ParseDcpStats(line string, cmdStatus *nnfv1alpha9.NnfDataMovementCommandStatus) error {
 	for _, s := range dcpStatsRegexes {
 		match := s.regex.FindStringSubmatch(line)
 		if len(match) > 0 {
@@ -225,15 +225,15 @@ func ParseDcpStats(line string, cmdStatus *nnfv1alpha8.NnfDataMovementCommandSta
 	return nil
 }
 
-func GetDMProfile(clnt client.Client, ctx context.Context, dm *nnfv1alpha8.NnfDataMovement) (*nnfv1alpha8.NnfDataMovementProfile, error) {
+func GetDMProfile(clnt client.Client, ctx context.Context, dm *nnfv1alpha9.NnfDataMovement) (*nnfv1alpha9.NnfDataMovementProfile, error) {
 
-	var profile *nnfv1alpha8.NnfDataMovementProfile
+	var profile *nnfv1alpha9.NnfDataMovementProfile
 
-	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha8.NnfDataMovementProfile{}).Name() {
+	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha9.NnfDataMovementProfile{}).Name() {
 		return profile, fmt.Errorf("invalid NnfDataMovementProfile kind %s", dm.Spec.ProfileReference.Kind)
 	}
 
-	profile = &nnfv1alpha8.NnfDataMovementProfile{
+	profile = &nnfv1alpha9.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dm.Spec.ProfileReference.Name,
 			Namespace: dm.Spec.ProfileReference.Namespace,
@@ -246,7 +246,7 @@ func GetDMProfile(clnt client.Client, ctx context.Context, dm *nnfv1alpha8.NnfDa
 	return profile, nil
 }
 
-func BuildDMCommand(profile *nnfv1alpha8.NnfDataMovementProfile, hostfile string, usePermissions bool, dm *nnfv1alpha8.NnfDataMovement, log logr.Logger) ([]string, error) {
+func BuildDMCommand(profile *nnfv1alpha9.NnfDataMovementProfile, hostfile string, usePermissions bool, dm *nnfv1alpha9.NnfDataMovement, log logr.Logger) ([]string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// If Dryrun is enabled, just use the "true" command
@@ -323,7 +323,7 @@ func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path st
 	return cmd
 }
 
-func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
+func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, mpiHostfile string, log logr.Logger) error {
 	// These functions interact with the filesystem, so they can't run in the test env.  Also, if
 	// the profile disables destination creation, skip it
 	if isTestEnv() || !profile.Data.CreateDestDir {
@@ -334,14 +334,14 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 	log.Info("Determining destination directory based on source/dest file types")
 	destDir, err := GetDestinationDir(profile, dm, mpiHostfile, log)
 	if err != nil {
-		return dwsv1alpha6.NewResourceError("could not determine source type").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not determine source type").WithError(err).WithFatal()
 	}
 
 	// See if an index mount directory on the destination is required
 	log.Info("Determining if index mount directory is required")
 	indexMount, err := checkIndexMountDir(clnt, ctx, dm)
 	if err != nil {
-		return dwsv1alpha6.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not determine index mount directory").WithError(err).WithFatal()
 	}
 
 	// Account for index mount directory on the destDir and the dm dest path
@@ -350,7 +350,7 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 		log.Info("Index mount directory is required", "indexMountdir", indexMount)
 		d, err := HandleIndexMountDir(profile, dm, destDir, indexMount, mpiHostfile, log)
 		if err != nil {
-			return dwsv1alpha6.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
+			return dwsv1alpha7.NewResourceError("could not handle index mount directory").WithError(err).WithFatal()
 		}
 		destDir = d
 		log.Info("Updated destination for index mount directory", "destDir", destDir, "dm.Spec.Destination.Path", dm.Spec.Destination.Path)
@@ -359,7 +359,7 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 	// Create the destination directory
 	log.Info("Creating destination directory", "destinationDir", destDir, "indexMountDir", indexMount)
 	if err := createDestinationDir(profile, dm, destDir, mpiHostfile, log); err != nil {
-		return dwsv1alpha6.NewResourceError("could not create destination directory").WithError(err).WithFatal()
+		return dwsv1alpha7.NewResourceError("could not create destination directory").WithError(err).WithFatal()
 	}
 
 	log.Info("Destination prepared", "dm.Spec.Destination", dm.Spec.Destination)
@@ -370,26 +370,26 @@ func PrepareDestination(clnt client.Client, ctx context.Context, profile *nnfv1a
 // Check for a copy_out situation by looking at the source filesystem's type. If it's gfs2 or xfs,
 // then we need to account for a Fan-In situation and create index mount directories on the
 // destination. Returns the index mount directory from the source path.
-func checkIndexMountDir(clnt client.Client, ctx context.Context, dm *nnfv1alpha8.NnfDataMovement) (string, error) {
-	var storage *nnfv1alpha8.NnfStorage
-	var nodeStorage *nnfv1alpha8.NnfNodeStorage
+func checkIndexMountDir(clnt client.Client, ctx context.Context, dm *nnfv1alpha9.NnfDataMovement) (string, error) {
+	var storage *nnfv1alpha9.NnfStorage
+	var nodeStorage *nnfv1alpha9.NnfNodeStorage
 
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha8.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha9.NnfStorage{}).Name() {
 		// The source storage reference is NnfStorage - this came from copy_in/copy_out directives
 		storageRef := dm.Spec.Source.StorageReference
 
-		storage = &nnfv1alpha8.NnfStorage{}
+		storage = &nnfv1alpha9.NnfStorage{}
 		if err := clnt.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 			if apierrors.IsNotFound(err) {
 				return "", newInvalidError("could not retrieve NnfStorage for checking index mounts: %s", err.Error())
 			}
 			return "", err
 		}
-	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha8.NnfNodeStorage{}).Name() {
+	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha9.NnfNodeStorage{}).Name() {
 		// The source storage reference is NnfNodeStorage - this came from copy_offload
 		storageRef := dm.Spec.Source.StorageReference
 
-		nodeStorage = &nnfv1alpha8.NnfNodeStorage{}
+		nodeStorage = &nnfv1alpha9.NnfNodeStorage{}
 		if err := clnt.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, nodeStorage); err != nil {
 			if apierrors.IsNotFound(err) {
 				return "", newInvalidError("could not retrieve NnfNodeStorage for checking index mounts: %s", err.Error())
@@ -438,7 +438,7 @@ func ExtractIndexMountDir(path, namespace string) (string, error) {
 
 // Given a destination directory and index mount directory, apply the necessary changes to the
 // destination directory and the DM's destination path to account for index mount directories
-func HandleIndexMountDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, destDir, indexMount, mpiHostfile string, log logr.Logger) (string, error) {
+func HandleIndexMountDir(profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, destDir, indexMount, mpiHostfile string, log logr.Logger) (string, error) {
 
 	// For cases where the root directory (e.g. $DW_JOB_my_workflow) is supplied, the path will end
 	// in the index mount directory without a trailing slash. If that's the case, there's nothing
@@ -480,7 +480,7 @@ func HandleIndexMountDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1a
 
 // Determine the directory path to create based on the source and destination.
 // Returns the mkdir directory and error.
-func GetDestinationDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
+func GetDestinationDir(profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, mpiHostfile string, log logr.Logger) (string, error) {
 	// Default to using the full path of dest
 	destDir := dm.Spec.Destination.Path
 
@@ -500,7 +500,7 @@ func GetDestinationDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alp
 }
 
 // Use mpirun to run stat on a file as a given UID/GID by using `setpriv`
-func mpiStat(profile *nnfv1alpha8.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
+func mpiStat(profile *nnfv1alpha9.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (string, error) {
 	cmd := buildStatOrMkdirCommand(uid, gid, profile.Data.StatCommand, profile.Data.SetprivCommand, mpiHostfile, path, log)
 
 	output, err := command.Run(cmd, log)
@@ -513,7 +513,7 @@ func mpiStat(profile *nnfv1alpha8.NnfDataMovementProfile, path string, uid, gid 
 }
 
 // Use mpirun to determine if a given path is a directory
-func mpiIsDir(profile *nnfv1alpha8.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
+func mpiIsDir(profile *nnfv1alpha9.NnfDataMovementProfile, path string, uid, gid uint32, mpiHostfile string, log logr.Logger) (bool, error) {
 	output, err := mpiStat(profile, path, uid, gid, mpiHostfile, log)
 	if err != nil {
 		return false, err
@@ -536,7 +536,7 @@ func mpiIsDir(profile *nnfv1alpha8.NnfDataMovementProfile, path string, uid, gid
 
 // Check to see if the source path is a file. The source must exist and will result in error if it
 // does not. Do not use mpi in the test environment.
-func isSourceAFile(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, mpiHostFile string, log logr.Logger) (bool, error) {
+func isSourceAFile(profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, mpiHostFile string, log logr.Logger) (bool, error) {
 	var isDir bool
 	var err error
 
@@ -559,7 +559,7 @@ func isSourceAFile(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.
 // Check to see if the destination path is a file. If it exists, use stat to determine if it is a
 // file or a directory. If it doesn't exist, check for a trailing slash and make an assumption based
 // on that.
-func isDestAFile(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, mpiHostFile string, log logr.Logger) bool {
+func isDestAFile(profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, mpiHostFile string, log logr.Logger) bool {
 	isFile := false
 	exists := true
 	dest := dm.Spec.Destination.Path
@@ -591,7 +591,7 @@ func isDestAFile(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.Nn
 	return isFile
 }
 
-func createDestinationDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1alpha8.NnfDataMovement, dest, mpiHostfile string, log logr.Logger) error {
+func createDestinationDir(profile *nnfv1alpha9.NnfDataMovementProfile, dm *nnfv1alpha9.NnfDataMovement, dest, mpiHostfile string, log logr.Logger) error {
 
 	// Use mpirun to check if a file exists
 	mpiExists := func() (bool, error) {
@@ -623,7 +623,7 @@ func createDestinationDir(profile *nnfv1alpha8.NnfDataMovementProfile, dm *nnfv1
 }
 
 // Create an MPI hostfile given settings from a profile and user config from the dm
-func CreateMpiHostfile(profile *nnfv1alpha8.NnfDataMovementProfile, hosts []string, dm *nnfv1alpha8.NnfDataMovement) (string, error) {
+func CreateMpiHostfile(profile *nnfv1alpha9.NnfDataMovementProfile, hosts []string, dm *nnfv1alpha9.NnfDataMovement) (string, error) {
 	userConfig := dm.Spec.UserConfig != nil
 
 	// Create MPI hostfile only if included in the provided command
@@ -740,24 +740,24 @@ func isTestEnv() bool {
 }
 
 // Retrieve the NNF Nodes that are the target of the data movement operation
-func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha8.NnfDataMovement) ([]string, error) {
+func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha9.NnfDataMovement) ([]string, error) {
 
 	// If this is a node data movement request simply reference the localhost
-	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha8.NnfNodeStorage{}).Name() {
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha9.NnfNodeStorage{}).Name() {
 		return []string{"localhost"}, nil
 	}
 
 	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
 	var storageRef corev1.ObjectReference
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha8.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha9.NnfStorage{}).Name() {
 		storageRef = dm.Spec.Source.StorageReference
-	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha8.NnfStorage{}).Name() {
+	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha9.NnfStorage{}).Name() {
 		storageRef = dm.Spec.Destination.StorageReference
 	} else {
 		return nil, newInvalidError("Neither source or destination is of NNF Storage type")
 	}
 
-	storage := &nnfv1alpha8.NnfStorage{}
+	storage := &nnfv1alpha9.NnfStorage{}
 	if err := clnt.Get(ctx, types.NamespacedName{Name: storageRef.Name, Namespace: storageRef.Namespace}, storage); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, newInvalidError("NNF Storage not found: %s", err.Error())
@@ -793,13 +793,13 @@ func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha
 // node. We can get the rabbit node from the namespace of the storage reference.
 // For lustre, we want all the rabbits for the workflow. mpi-operator builds a hostfile and we can
 // take that list of FQDNs and use them.
-func GetCopyOffloadWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string, workflow, namespace string, dm *nnfv1alpha8.NnfDataMovement) ([]string, error) {
+func GetCopyOffloadWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string, workflow, namespace string, dm *nnfv1alpha9.NnfDataMovement) ([]string, error) {
 
 	// Node-local data movement with GFS2
 	if nodes[0] == "localhost" {
 
 		// The source's storage reference should point to the namespace of the nnf node
-		if dm.Spec.Source.StorageReference.Kind != reflect.TypeOf(nnfv1alpha8.NnfNodeStorage{}).Name() {
+		if dm.Spec.Source.StorageReference.Kind != reflect.TypeOf(nnfv1alpha9.NnfNodeStorage{}).Name() {
 			return nil, newInvalidError("copy offload source storage reference is not of type NnfNodeStorage")
 		}
 		nnfNodeName := dm.Spec.Source.StorageReference.Namespace
@@ -887,9 +887,9 @@ func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string)
 
 	// Get the Rabbit DM Worker Pods
 	listOptions := []client.ListOption{
-		client.InNamespace(nnfv1alpha8.DataMovementNamespace),
+		client.InNamespace(nnfv1alpha9.DataMovementNamespace),
 		client.MatchingLabels(map[string]string{
-			nnfv1alpha8.DataMovementWorkerLabel: "true",
+			nnfv1alpha9.DataMovementWorkerLabel: "true",
 		}),
 	}
 	pods := &corev1.PodList{}
@@ -904,7 +904,7 @@ func GetWorkerHostnames(clnt client.Client, ctx context.Context, nodes []string)
 		nodeNameToHostnameMap[pod.Spec.NodeName] = fmt.Sprintf(
 			"%s.dm.%s.svc.cluster.local",
 			strings.ReplaceAll(pod.Status.PodIP, ".", "-"),
-			nnfv1alpha8.DataMovementNamespace)
+			nnfv1alpha9.DataMovementNamespace)
 	}
 
 	// Add them to the list, making sure there are no duplicates
