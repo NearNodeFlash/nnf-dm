@@ -53,7 +53,7 @@ import (
 	"github.com/DataWorkflowServices/dws/utils/updater"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
-	nnfv1alpha8 "github.com/NearNodeFlash/nnf-sos/api/v1alpha8"
+	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
 )
 
 const (
@@ -117,12 +117,12 @@ func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ct
 
 	metrics.NnfDmDataMovementManagerReconcilesTotal.Inc()
 
-	manager := &nnfv1alpha8.NnfDataMovementManager{}
+	manager := &nnfv1alpha9.NnfDataMovementManager{}
 	if err := r.Get(ctx, req.NamespacedName, manager); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	statusUpdater := updater.NewStatusUpdater[*nnfv1alpha8.NnfDataMovementManagerStatus](manager)
+	statusUpdater := updater.NewStatusUpdater[*nnfv1alpha9.NnfDataMovementManagerStatus](manager)
 	defer func() { err = statusUpdater.CloseWithStatusUpdate(ctx, r.Client.Status(), err) }()
 
 	errorHandler := func(err error, msg string) (ctrl.Result, error) {
@@ -170,7 +170,7 @@ func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ct
 	return ctrl.Result{}, nil
 }
 
-func (r *NnfDataMovementManagerReconciler) createSecretIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) (err error) {
+func (r *NnfDataMovementManagerReconciler) createSecretIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) (err error) {
 	log := log.FromContext(ctx)
 
 	newSecret := func() (*corev1.Secret, error) {
@@ -235,7 +235,7 @@ func (r *NnfDataMovementManagerReconciler) createSecretIfNecessary(ctx context.C
 	return err
 }
 
-func (r *NnfDataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) (err error) {
+func (r *NnfDataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) (err error) {
 	log := log.FromContext(ctx)
 
 	base := &appsv1.Deployment{}
@@ -298,7 +298,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(c
 	return nil
 }
 
-func (r *NnfDataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) error {
+func (r *NnfDataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	service := &corev1.Service{
@@ -310,7 +310,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx 
 
 	mutateFn := func() error {
 		service.Spec.Selector = map[string]string{
-			nnfv1alpha8.DataMovementWorkerLabel: "true",
+			nnfv1alpha9.DataMovementWorkerLabel: "true",
 		}
 
 		service.Spec.ClusterIP = corev1.ClusterIPNone
@@ -336,7 +336,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateServiceIfNecessary(ctx 
 	return nil
 }
 
-func (r *NnfDataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) error {
+func (r *NnfDataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	filesystems := &lusv1beta1.LustreFileSystemList{}
@@ -370,7 +370,7 @@ func (r *NnfDataMovementManagerReconciler) updateLustreFileSystemsIfNecessary(ct
 	return nil
 }
 
-func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) error {
+func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	filesystems := &lusv1beta1.LustreFileSystemList{}
@@ -433,7 +433,7 @@ func (r *NnfDataMovementManagerReconciler) removeLustreFileSystemsFinalizersIfNe
 	return nil
 }
 
-func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) error {
+func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) error {
 	log := log.FromContext(ctx)
 
 	filesystems := &lusv1beta1.LustreFileSystemList{}
@@ -458,7 +458,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		if podTemplateSpec.Labels == nil {
 			podTemplateSpec.Labels = make(map[string]string)
 		}
-		podTemplateSpec.Labels[nnfv1alpha8.DataMovementWorkerLabel] = "true"
+		podTemplateSpec.Labels[nnfv1alpha9.DataMovementWorkerLabel] = "true"
 
 		// Create corev1.PodSpec from NnfPodSpec
 		podSpec := manager.Spec.PodSpec.ToCorePodSpec()
@@ -468,6 +468,9 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		podSpec.Tolerations = []corev1.Toleration{
 			{Key: "cray.nnf.node", Operator: corev1.TolerationOpEqual, Value: "true", Effect: corev1.TaintEffectNoSchedule},
 		}
+
+		// Enable shareProcessNamespace so the manager container can signal processes in the worker
+		// container (required for MPI process coordination and cancelling data movement operations)
 		podSpec.ShareProcessNamespace = pointy.Bool(true)
 
 		if managerContainer, err := findContainer(podSpec, "manager"); err == nil {
@@ -477,15 +480,17 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		if workerContainer, err := findContainer(podSpec, "worker"); err == nil {
 			workerContainer.Env = append(workerContainer.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 
-			// Limit what the worker can do - this is enough to support dcp and being able to become
-			// the the UID/GID of the workflow
+			// Configure minimal Linux capabilities for data movement operations.
+			// Data movement executes mpirun dcp/setpriv commands that require user/group changes,
+			// file ownership operations, and filesystem node creation for HPC workflows.
 			workerContainer.SecurityContext = &corev1.SecurityContext{
-				Privileged: pointy.Bool(true),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{
-						"SETUID",
-						"SETGID",
-						"MKNOD",
+						"SETUID", // "setpriv --euid" and "dcp --uid" operations
+						"SETGID", // "setpriv --euid" and "dcp --uid" operations
+						"MKNOD",  // "mkdir -p" and directory creation in dcp
+						"CHOWN",  // dcp to change file ownership during copy
+						"FOWNER", // dcp to bypass ownership restrictions
 					},
 				},
 			}
@@ -524,7 +529,7 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 	return nil
 }
 
-func (r *NnfDataMovementManagerReconciler) isDaemonSetReady(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager) (bool, error) {
+func (r *NnfDataMovementManagerReconciler) isDaemonSetReady(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager) (bool, error) {
 	ds := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      daemonsetName,
@@ -548,7 +553,7 @@ func (r *NnfDataMovementManagerReconciler) isDaemonSetReady(ctx context.Context,
 	return true, nil
 }
 
-func setupSSHAuthVolumes(manager *nnfv1alpha8.NnfDataMovementManager, podSpec *corev1.PodSpec) {
+func setupSSHAuthVolumes(manager *nnfv1alpha9.NnfDataMovementManager, podSpec *corev1.PodSpec) {
 	mode := int32(0600)
 	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
 		Name: sshAuthVolume,
@@ -571,7 +576,7 @@ func setupSSHAuthVolumes(manager *nnfv1alpha8.NnfDataMovementManager, podSpec *c
 	}
 }
 
-func setupLustreVolumes(ctx context.Context, manager *nnfv1alpha8.NnfDataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1beta1.LustreFileSystem) {
+func setupLustreVolumes(ctx context.Context, manager *nnfv1alpha9.NnfDataMovementManager, podSpec *corev1.PodSpec, fileSystems []lusv1beta1.LustreFileSystem) {
 	log := log.FromContext(ctx)
 
 	// Setup Volumes / Volume Mounts for accessing global Lustre file systems
@@ -645,7 +650,7 @@ func findContainer(podSpec *corev1.PodSpec, name string) (*corev1.Container, err
 func (r *NnfDataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha8.NnfDataMovementManager{}).
+		For(&nnfv1alpha9.NnfDataMovementManager{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.Deployment{}).
@@ -657,7 +662,7 @@ func (r *NnfDataMovementManagerReconciler) SetupWithManager(mgr ctrl.Manager) er
 					{
 						NamespacedName: types.NamespacedName{
 							Name:      "nnf-dm-manager-controller-manager",
-							Namespace: nnfv1alpha8.DataMovementNamespace,
+							Namespace: nnfv1alpha9.DataMovementNamespace,
 						},
 					},
 				}

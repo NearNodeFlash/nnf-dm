@@ -55,9 +55,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dwsv1alpha6 "github.com/DataWorkflowServices/dws/api/v1alpha6"
+	dwsv1alpha7 "github.com/DataWorkflowServices/dws/api/v1alpha7"
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
-	nnfv1alpha8 "github.com/NearNodeFlash/nnf-sos/api/v1alpha8"
+	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
 
 	pb "github.com/NearNodeFlash/nnf-dm/daemons/compute/client-go/api"
 
@@ -75,8 +75,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(dwsv1alpha6.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha8.AddToScheme(scheme))
+	utilruntime.Must(dwsv1alpha7.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha9.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -169,13 +169,13 @@ func CreateDefaultServer(opts *ServerOptions) (*defaultServer, error) {
 			return nil, fmt.Errorf("system configuration name not defined")
 		}
 
-		systemConfig := &dwsv1alpha6.SystemConfiguration{}
+		systemConfig := &dwsv1alpha7.SystemConfiguration{}
 		if err := client.Get(context.TODO(), types.NamespacedName{Name: opts.sysConfig, Namespace: corev1.NamespaceDefault}, systemConfig); err != nil {
 			return nil, fmt.Errorf("failed to retrieve system configuration: %w", err)
 		}
 
 		log.Println("Looking for Storage Node with access to Node", opts.name)
-		storageNode := func() *dwsv1alpha6.SystemConfigurationStorageNode {
+		storageNode := func() *dwsv1alpha7.SystemConfigurationStorageNode {
 			for _, storageNode := range systemConfig.Spec.StorageNodes {
 				for _, computeNode := range storageNode.ComputesAccess {
 					if computeNode.Name == opts.name {
@@ -244,7 +244,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(ce event.CreateEvent) bool { return false },
 		UpdateFunc: func(ue event.UpdateEvent) bool {
-			if initiator := ue.ObjectNew.GetLabels()[nnfv1alpha8.DataMovementInitiatorLabel]; initiator == s.name {
+			if initiator := ue.ObjectNew.GetLabels()[nnfv1alpha9.DataMovementInitiatorLabel]; initiator == s.name {
 				return true
 			}
 			return false
@@ -253,7 +253,7 @@ func (s *defaultServer) setupWithManager(mgr ctrl.Manager) error {
 	}
 
 	err := ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha8.NnfDataMovement{}, builder.WithPredicates(p)).
+		For(&nnfv1alpha9.NnfDataMovement{}, builder.WithPredicates(p)).
 		Complete(&dataMovementReconciler{s})
 	if err != nil {
 		return err
@@ -268,7 +268,7 @@ type dataMovementReconciler struct {
 
 func (r *dataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
-	dm := &nnfv1alpha8.NnfDataMovement{}
+	dm := &nnfv1alpha9.NnfDataMovement{}
 	if err := r.server.client.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -295,7 +295,7 @@ func (*defaultServer) Version(context.Context, *emptypb.Empty) (*pb.DataMovement
 func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRequest) (*pb.DataMovementCreateResponse, error) {
 
 	// Ensure workflow exists and is in PreRun:Ready
-	workflow := &dwsv1alpha6.Workflow{ObjectMeta: metav1.ObjectMeta{
+	workflow := &dwsv1alpha7.Workflow{ObjectMeta: metav1.ObjectMeta{
 		Name:      req.Workflow.Name,
 		Namespace: req.Workflow.Namespace,
 	}}
@@ -306,10 +306,10 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-	if workflow.Status.State != dwsv1alpha6.StatePreRun || workflow.Status.Status != "Completed" {
+	if workflow.Status.State != dwsv1alpha7.StatePreRun || workflow.Status.Status != "Completed" {
 		return &pb.DataMovementCreateResponse{
 			Status:  pb.DataMovementCreateResponse_FAILED,
-			Message: fmt.Sprintf("Workflow must be in '%s' state and 'Completed' status", dwsv1alpha6.StatePreRun),
+			Message: fmt.Sprintf("Workflow must be in '%s' state and 'Completed' status", dwsv1alpha7.StatePreRun),
 		}, nil
 	}
 
@@ -321,7 +321,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 
-	var dm *nnfv1alpha8.NnfDataMovement
+	var dm *nnfv1alpha9.NnfDataMovement
 	dmFunc := ""
 	switch computeMountInfo.Type {
 	case "lustre":
@@ -365,7 +365,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
-		Kind:      reflect.TypeOf(nnfv1alpha8.NnfDataMovementProfile{}).Name(),
+		Kind:      reflect.TypeOf(nnfv1alpha9.NnfDataMovementProfile{}).Name(),
 		Name:      profile.Name,
 		Namespace: profile.Namespace,
 	}
@@ -374,12 +374,12 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 	dm.Spec.GroupId = groupId
 
 	// Add appropriate workflow labels so this is cleaned up
-	dwsv1alpha6.AddWorkflowLabels(dm, workflow)
-	dwsv1alpha6.AddOwnerLabels(dm, workflow)
+	dwsv1alpha7.AddWorkflowLabels(dm, workflow)
+	dwsv1alpha7.AddOwnerLabels(dm, workflow)
 
 	// Label the NnfDataMovement with a teardown state of "post_run" so the NNF workflow
 	// controller can identify compute initiated data movements.
-	nnfv1alpha8.AddDataMovementTeardownStateLabel(dm, dwsv1alpha6.StatePostRun)
+	nnfv1alpha9.AddDataMovementTeardownStateLabel(dm, dwsv1alpha7.StatePostRun)
 
 	// Allow the user to override/supplement certain settings
 	setUserConfig(req, dm)
@@ -398,8 +398,8 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 }
 
 // Set the DM's UserConfig options based on the incoming requests's options
-func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha8.NnfDataMovement) {
-	dm.Spec.UserConfig = &nnfv1alpha8.NnfDataMovementConfig{}
+func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha9.NnfDataMovement) {
+	dm.Spec.UserConfig = &nnfv1alpha9.NnfDataMovementConfig{}
 	dm.Spec.UserConfig.Dryrun = req.Dryrun
 	dm.Spec.UserConfig.MpirunOptions = req.MpirunOptions
 	dm.Spec.UserConfig.DcpOptions = req.DcpOptions
@@ -414,13 +414,13 @@ func setUserConfig(req *pb.DataMovementCreateRequest, dm *nnfv1alpha8.NnfDataMov
 	}
 }
 
-func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nnfv1alpha8.NnfDataMovementProfile, error) {
+func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nnfv1alpha9.NnfDataMovementProfile, error) {
 	ns := "nnf-system"
 
 	// If a profile is named then verify that it exists.  Otherwise, verify that a default profile
 	// can be found.
 	if len(profileName) == 0 {
-		NnfDataMovementProfiles := &nnfv1alpha8.NnfDataMovementProfileList{}
+		NnfDataMovementProfiles := &nnfv1alpha9.NnfDataMovementProfileList{}
 		if err := s.client.List(ctx, NnfDataMovementProfiles, &client.ListOptions{Namespace: ns}); err != nil {
 			return nil, err
 		}
@@ -440,7 +440,7 @@ func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nn
 		profileName = profilesFound[0]
 	}
 
-	profile := &nnfv1alpha8.NnfDataMovementProfile{
+	profile := &nnfv1alpha9.NnfDataMovementProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      profileName,
 			Namespace: ns,
@@ -455,14 +455,14 @@ func (s *defaultServer) getProfile(ctx context.Context, profileName string) (*nn
 	return profile, nil
 }
 
-func getDirectiveIndexFromClientMount(object *dwsv1alpha6.ClientMount) (string, error) {
+func getDirectiveIndexFromClientMount(object *dwsv1alpha7.ClientMount) (string, error) {
 	// Find the DW index for our work.
 	labels := object.GetLabels()
 	if labels == nil {
 		return "", fmt.Errorf("unable to find labels on compute ClientMount, namespaces=%s, name=%s", object.Namespace, object.Name)
 	}
 
-	dwIndex, found := labels[nnfv1alpha8.DirectiveIndexLabel]
+	dwIndex, found := labels[nnfv1alpha9.DirectiveIndexLabel]
 	if !found {
 		return "", fmt.Errorf("unable to find directive index label on compute ClientMount, namespace=%s name=%s", object.Namespace, object.Name)
 	}
@@ -470,7 +470,7 @@ func getDirectiveIndexFromClientMount(object *dwsv1alpha6.ClientMount) (string, 
 	return dwIndex, nil
 }
 
-func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha6.ClientMountInfo, computeClientMount *dwsv1alpha6.ClientMount) (*nnfv1alpha8.NnfDataMovement, error) {
+func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha7.ClientMountInfo, computeClientMount *dwsv1alpha7.ClientMount) (*nnfv1alpha9.NnfDataMovement, error) {
 
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
@@ -490,25 +490,25 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 		return nil, err
 	}
 
-	dm := &nnfv1alpha8.NnfDataMovement{
+	dm := &nnfv1alpha9.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			// Be careful about how much you put into GenerateName.
 			// The MPI operator will use the resulting name as a
 			// prefix for its own names.
 			GenerateName: nameBase,
 			// Use the data movement namespace.
-			Namespace: nnfv1alpha8.DataMovementNamespace,
+			Namespace: nnfv1alpha9.DataMovementNamespace,
 			Labels: map[string]string{
-				nnfv1alpha8.DataMovementInitiatorLabel: s.name,
-				nnfv1alpha8.DirectiveIndexLabel:        dwIndex,
+				nnfv1alpha9.DataMovementInitiatorLabel: s.name,
+				nnfv1alpha9.DirectiveIndexLabel:        dwIndex,
 			},
 		},
-		Spec: nnfv1alpha8.NnfDataMovementSpec{
-			Source: &nnfv1alpha8.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha9.NnfDataMovementSpec{
+			Source: &nnfv1alpha9.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha8.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha9.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 				StorageReference: corev1.ObjectReference{
 					Kind:      reflect.TypeOf(*lustrefs).Name(),
@@ -522,27 +522,27 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 	return dm, nil
 }
 
-func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha6.ClientMountInfo) (*nnfv1alpha8.NnfDataMovement, error) {
+func (s *defaultServer) createNnfNodeDataMovement(ctx context.Context, req *pb.DataMovementCreateRequest, computeMountInfo *dwsv1alpha7.ClientMountInfo) (*nnfv1alpha9.NnfDataMovement, error) {
 	// Find the ClientMount for the rabbit.
 	source, err := s.findRabbitRelativeSource(ctx, computeMountInfo, req)
 	if err != nil {
 		return nil, err
 	}
 
-	dm := &nnfv1alpha8.NnfDataMovement{
+	dm := &nnfv1alpha9.NnfDataMovement{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nodeNameBase,
 			Namespace:    s.namespace, // Use the rabbit
 			Labels: map[string]string{
-				nnfv1alpha8.DataMovementInitiatorLabel: s.name,
+				nnfv1alpha9.DataMovementInitiatorLabel: s.name,
 			},
 		},
-		Spec: nnfv1alpha8.NnfDataMovementSpec{
-			Source: &nnfv1alpha8.NnfDataMovementSpecSourceDestination{
+		Spec: nnfv1alpha9.NnfDataMovementSpec{
+			Source: &nnfv1alpha9.NnfDataMovementSpecSourceDestination{
 				Path:             source,
 				StorageReference: computeMountInfo.Device.DeviceReference.ObjectReference,
 			},
-			Destination: &nnfv1alpha8.NnfDataMovementSpecSourceDestination{
+			Destination: &nnfv1alpha9.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 			},
 		},
@@ -556,12 +556,12 @@ func (s *defaultServer) List(ctx context.Context, req *pb.DataMovementListReques
 	// Only get the DMs that match the workflow and workflow namespace
 	opts := []client.ListOption{
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha6.OwnerNameLabel:      req.Workflow.Name,
-			dwsv1alpha6.OwnerNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha7.OwnerNameLabel:      req.Workflow.Name,
+			dwsv1alpha7.OwnerNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
-	list := nnfv1alpha8.NnfDataMovementList{}
+	list := nnfv1alpha9.NnfDataMovementList{}
 	if err := s.client.List(ctx, &list, opts...); err != nil {
 		return nil, err
 	}
@@ -580,7 +580,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	ns := s.getNamespace(req.Uid)
 
-	dm := &nnfv1alpha8.NnfDataMovement{}
+	dm := &nnfv1alpha9.NnfDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 		if errors.IsNotFound(err) {
 			return &pb.DataMovementStatusResponse{
@@ -608,7 +608,7 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 		}
 	}
 
-	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha8.DataMovementConditionReasonInvalid {
+	if dm.Status.StartTime.IsZero() && dm.Status.Status != nnfv1alpha9.DataMovementConditionReasonInvalid {
 		return &pb.DataMovementStatusResponse{
 			State:  pb.DataMovementStatusResponse_PENDING,
 			Status: pb.DataMovementStatusResponse_UNKNOWN_STATUS,
@@ -617,9 +617,9 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	stateMap := map[string]pb.DataMovementStatusResponse_State{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATE,
-		nnfv1alpha8.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
-		nnfv1alpha8.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
-		nnfv1alpha8.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
+		nnfv1alpha9.DataMovementConditionTypeStarting: pb.DataMovementStatusResponse_STARTING,
+		nnfv1alpha9.DataMovementConditionTypeRunning:  pb.DataMovementStatusResponse_RUNNING,
+		nnfv1alpha9.DataMovementConditionTypeFinished: pb.DataMovementStatusResponse_COMPLETED,
 	}
 
 	state, ok := stateMap[dm.Status.State]
@@ -637,10 +637,10 @@ func (s *defaultServer) Status(ctx context.Context, req *pb.DataMovementStatusRe
 
 	statusMap := map[string]pb.DataMovementStatusResponse_Status{
 		"": pb.DataMovementStatusResponse_UNKNOWN_STATUS,
-		nnfv1alpha8.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,
-		nnfv1alpha8.DataMovementConditionReasonSuccess:   pb.DataMovementStatusResponse_SUCCESS,
-		nnfv1alpha8.DataMovementConditionReasonInvalid:   pb.DataMovementStatusResponse_INVALID,
-		nnfv1alpha8.DataMovementConditionReasonCancelled: pb.DataMovementStatusResponse_CANCELLED,
+		nnfv1alpha9.DataMovementConditionReasonFailed:    pb.DataMovementStatusResponse_FAILED,
+		nnfv1alpha9.DataMovementConditionReasonSuccess:   pb.DataMovementStatusResponse_SUCCESS,
+		nnfv1alpha9.DataMovementConditionReasonInvalid:   pb.DataMovementStatusResponse_INVALID,
+		nnfv1alpha9.DataMovementConditionReasonCancelled: pb.DataMovementStatusResponse_CANCELLED,
 	}
 
 	status, ok := statusMap[dm.Status.Status]
@@ -744,7 +744,7 @@ func (s *defaultServer) Cancel(ctx context.Context, req *pb.DataMovementCancelRe
 	ns := s.getNamespace(req.Uid)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		dm := &nnfv1alpha8.NnfDataMovement{}
+		dm := &nnfv1alpha9.NnfDataMovement{}
 		if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 			return err
 		}
@@ -784,7 +784,7 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 
 	ns := s.getNamespace(req.Uid)
 
-	dm := &nnfv1alpha8.NnfDataMovement{}
+	dm := &nnfv1alpha9.NnfDataMovement{}
 	if err := s.client.Get(ctx, types.NamespacedName{Name: req.Uid, Namespace: ns}, dm); err != nil {
 		if errors.IsNotFound(err) {
 			return &pb.DataMovementDeleteResponse{
@@ -795,7 +795,7 @@ func (s *defaultServer) Delete(ctx context.Context, req *pb.DataMovementDeleteRe
 		return nil, err
 	}
 
-	if dm.Status.State != nnfv1alpha8.DataMovementConditionTypeFinished {
+	if dm.Status.State != nnfv1alpha9.DataMovementConditionTypeFinished {
 		return &pb.DataMovementDeleteResponse{
 			Status: pb.DataMovementDeleteResponse_ACTIVE,
 		}, nil
@@ -847,7 +847,7 @@ func (s *defaultServer) findDestinationLustreFilesystem(ctx context.Context, des
 	return nil, fmt.Errorf("unable to find a LustreFileSystem resource matching %s", origDest)
 }
 
-func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha6.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
+func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMountInfo *dwsv1alpha7.ClientMountInfo, req *pb.DataMovementCreateRequest) (string, error) {
 
 	// Now look up the client mount on this Rabbit node and find the compute initiator. We append the relative path
 	// to this value resulting in the full path on the Rabbit.
@@ -855,12 +855,12 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 	listOptions := []client.ListOption{
 		client.InNamespace(s.namespace),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha6.WorkflowNameLabel:      req.Workflow.Name,
-			dwsv1alpha6.WorkflowNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha7.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha7.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha6.ClientMountList{}
+	clientMounts := &dwsv1alpha7.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
 		return "", err
 	}
@@ -883,17 +883,17 @@ func (s *defaultServer) findRabbitRelativeSource(ctx context.Context, computeMou
 // Look up the client mounts on this node to find the compute relative mount path. The "spec.Source" must be
 // prefixed with a mount path in the list of mounts. Once we find this mount, we can strip out the prefix and
 // are left with the relative path.
-func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha6.ClientMount, *dwsv1alpha6.ClientMountInfo, error) {
+func (s *defaultServer) findComputeMountInfo(ctx context.Context, req *pb.DataMovementCreateRequest) (*dwsv1alpha7.ClientMount, *dwsv1alpha7.ClientMountInfo, error) {
 
 	listOptions := []client.ListOption{
 		client.InNamespace(s.name),
 		client.MatchingLabels(map[string]string{
-			dwsv1alpha6.WorkflowNameLabel:      req.Workflow.Name,
-			dwsv1alpha6.WorkflowNamespaceLabel: req.Workflow.Namespace,
+			dwsv1alpha7.WorkflowNameLabel:      req.Workflow.Name,
+			dwsv1alpha7.WorkflowNamespaceLabel: req.Workflow.Namespace,
 		}),
 	}
 
-	clientMounts := &dwsv1alpha6.ClientMountList{}
+	clientMounts := &dwsv1alpha7.ClientMountList{}
 	if err := s.client.List(ctx, clientMounts, listOptions...); err != nil {
 		return nil, nil, err
 	}
@@ -922,5 +922,5 @@ func (s *defaultServer) getNamespace(uid string) string {
 		return s.namespace
 	}
 
-	return nnfv1alpha8.DataMovementNamespace
+	return nnfv1alpha9.DataMovementNamespace
 }
