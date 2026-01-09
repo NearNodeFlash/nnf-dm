@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2025 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -17,21 +17,17 @@
  * limitations under the License.
  */
 
-package v1alpha9
+package v1alpha10
 
-import (
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-)
+// NnfResourceStatus provides common fields that are included in all NNF Resources
+type NnfResourceStatus struct {
+	// ID reflects the NNF Node unique identifier for this NNF Server resource.
+	ID string `json:"id,omitempty"`
 
-// log is for logging in this package.
-var nnfportmanagerlog = logf.Log.WithName("nnfportmanager-resource")
+	// Name reflects the common name of this NNF Server resource.
+	Name string `json:"name,omitempty"`
 
-// SetupWebhookWithManager will setup the manager to manage the webhooks
-func (r *NnfPortManager) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+	Status NnfResourceStatusType `json:"status,omitempty"`
+
+	Health NnfResourceHealthType `json:"health,omitempty"`
 }
-
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
