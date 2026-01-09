@@ -1,11 +1,11 @@
-github.com/DataWorkflowServices/dws v0.0.1-0.20251201192617-99a03aa3170f h1:ezj0+9HY6VvPnJbDoIXr/IzwBFe1X2pLLEZpHodOulU=
-github.com/DataWorkflowServices/dws v0.0.1-0.20251201192617-99a03aa3170f/go.mod h1:NbNOIG2ybY2XHVSJn0KF7edPlX3I1ji7je6MGzuPeaA=
-github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20251210162744-b3f481b47161 h1:7NCIXYOp8jW/OS3KQg27+xw5DikxoHJRYRLWiT6fQ8I=
-github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20251210162744-b3f481b47161/go.mod h1:4QNBl5vMm4dFW49oqXa/1NzIjgt8EJKuAixmeoIVLCU=
+github.com/DataWorkflowServices/dws v0.0.1-0.20260109150927-a938893e9bc1 h1:LAXjsJpz8ohEVwXxMtzPLbx0DJRhjVgEZfvfGRWNGnA=
+github.com/DataWorkflowServices/dws v0.0.1-0.20260109150927-a938893e9bc1/go.mod h1:NbNOIG2ybY2XHVSJn0KF7edPlX3I1ji7je6MGzuPeaA=
+github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260109155851-6751754d51d4 h1:1dR9TE6TpKipsLEfQGYL4SIMfKxz/XjAYA20F8rJqJM=
+github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260109155851-6751754d51d4/go.mod h1:4QNBl5vMm4dFW49oqXa/1NzIjgt8EJKuAixmeoIVLCU=
 github.com/NearNodeFlash/nnf-ec v0.0.1-0.20251021182141-d22098d70c26 h1:CHEvLPUEZDj0Z1hn0kXB//mHKh2eQ2EP/mMjy4zB9+g=
 github.com/NearNodeFlash/nnf-ec v0.0.1-0.20251021182141-d22098d70c26/go.mod h1:slDsqUJtN2uZ5Z7z4J6wWrtKksQAaH4JqRzUonDXNKo=
-github.com/NearNodeFlash/nnf-sos v0.0.1-0.20251210164542-0745ce4c3473 h1:VgFA+7Tklv0TNjkdcNtCRJspheNaP3wxMxjCMgKtOX4=
-github.com/NearNodeFlash/nnf-sos v0.0.1-0.20251210164542-0745ce4c3473/go.mod h1:6EQR4F5Wscxpy4ekZOdu9+xfkfuvrD1ZeM6Z+zi/gdA=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260109165538-1a10e72da207 h1:gkumBfwyOw6X/0SUdzao7uruqff/tGqb6A01j7dJFZc=
+github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260109165538-1a10e72da207/go.mod h1:kRfXiYqvaxqoNsFbrY+6WMWlcZqWb3IWickAopA8SEg=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=

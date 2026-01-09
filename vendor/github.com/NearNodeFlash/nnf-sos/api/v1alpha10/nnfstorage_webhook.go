@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package v1alpha9
+package v1alpha10
 
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,10 +25,10 @@ import (
 )
 
 // log is for logging in this package.
-var nnflustremgtlog = logf.Log.WithName("nnflustremgt-resource")
+var nnfstoragelog = logf.Log.WithName("nnfstorage-resource")
 
 // SetupWebhookWithManager will setup the manager to manage the webhooks
-func (r *NnfLustreMGT) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *NnfStorage) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
