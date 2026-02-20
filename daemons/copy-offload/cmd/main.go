@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2026 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -45,7 +45,7 @@ import (
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
 	userHttp "github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/server"
-	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
+	nnfv1alpha10 "github.com/NearNodeFlash/nnf-sos/api/v1alpha10"
 )
 
 var (
@@ -55,7 +55,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(nnfv1alpha9.AddToScheme(scheme))
+	utilruntime.Must(nnfv1alpha10.AddToScheme(scheme))
 	utilruntime.Must(dwsv1alpha7.AddToScheme(scheme))
 	utilruntime.Must(lusv1beta1.AddToScheme(scheme))
 }
@@ -103,7 +103,7 @@ func setupClient(crLog logr.Logger) client.Client {
 
 func clientSanity(crLog logr.Logger, clnt client.Client, rabbitName string) {
 	// Sanity check the client connection.
-	nnfNode := &nnfv1alpha9.NnfNode{}
+	nnfNode := &nnfv1alpha10.NnfNode{}
 	if err := clnt.Get(context.TODO(), types.NamespacedName{Name: "nnf-nlc", Namespace: rabbitName}, nnfNode); err != nil {
 		crLog.Error(err, "Failed to retrieve my own NnfNode")
 		os.Exit(1)
