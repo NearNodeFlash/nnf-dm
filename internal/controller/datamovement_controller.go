@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2025 Hewlett Packard Enterprise Development LP
+ * Copyright 2021-2026 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -47,7 +47,7 @@ import (
 	dwsv1alpha7 "github.com/DataWorkflowServices/dws/api/v1alpha7"
 	. "github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
 	"github.com/NearNodeFlash/nnf-dm/internal/controller/metrics"
-	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
+	nnfv1alpha10 "github.com/NearNodeFlash/nnf-sos/api/v1alpha10"
 )
 
 const (
@@ -86,7 +86,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	metrics.NnfDmDataMovementReconcilesTotal.Inc()
 
-	dm := &nnfv1alpha9.NnfDataMovement{}
+	dm := &nnfv1alpha10.NnfDataMovement{}
 	if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -96,8 +96,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			resourceError, ok := err.(*dwsv1alpha7.ResourceErrorInfo)
 			if ok {
 				if resourceError.Severity != dwsv1alpha7.SeverityMinor {
-					dm.Status.State = nnfv1alpha9.DataMovementConditionTypeFinished
-					dm.Status.Status = nnfv1alpha9.DataMovementConditionReasonInvalid
+					dm.Status.State = nnfv1alpha10.DataMovementConditionTypeFinished
+					dm.Status.Status = nnfv1alpha10.DataMovementConditionReasonInvalid
 				}
 			}
 			dm.Status.SetResourceErrorAndLog(err, log)
@@ -138,7 +138,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Prevent gratuitous wakeups for a resource that is already finished.
-	if dm.Status.State == nnfv1alpha9.DataMovementConditionTypeFinished {
+	if dm.Status.State == nnfv1alpha10.DataMovementConditionTypeFinished {
 		return ctrl.Result{}, nil
 	}
 
@@ -152,7 +152,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Make sure if the DM is already running that we don't start up another command
-	if dm.Status.State == nnfv1alpha9.DataMovementConditionTypeRunning {
+	if dm.Status.State == nnfv1alpha10.DataMovementConditionTypeRunning {
 
 		// If we're currently tracking the resource, then we know for certain the
 		// resource is running and there's nothing further we need to do.
@@ -215,8 +215,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
 	dm.Status.StartTime = &now
-	dm.Status.State = nnfv1alpha9.DataMovementConditionTypeRunning
-	cmdStatus := nnfv1alpha9.NnfDataMovementCommandStatus{}
+	dm.Status.State = nnfv1alpha10.DataMovementConditionTypeRunning
+	cmdStatus := nnfv1alpha10.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
@@ -285,13 +285,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 					// Update the CommandStatus in the DM resource after we parsed all the lines
 					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						dm := &nnfv1alpha9.NnfDataMovement{}
+						dm := &nnfv1alpha10.NnfDataMovement{}
 						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 							return client.IgnoreNotFound(err)
 						}
 
 						if dm.Status.CommandStatus == nil {
-							dm.Status.CommandStatus = &nnfv1alpha9.NnfDataMovementCommandStatus{}
+							dm.Status.CommandStatus = &nnfv1alpha10.NnfDataMovementCommandStatus{}
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 
@@ -332,8 +332,8 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Command is finished, update status
 		now := metav1.NowMicro()
 		dm.Status.EndTime = &now
-		dm.Status.State = nnfv1alpha9.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha9.DataMovementConditionReasonSuccess
+		dm.Status.State = nnfv1alpha10.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha10.DataMovementConditionReasonSuccess
 
 		// Grab the output and trim it to remove the progress bloat
 		output := TrimDcpProgressFromOutput(combinedOutBuf.String())
@@ -343,10 +343,10 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
-			dm.Status.Status = nnfv1alpha9.DataMovementConditionReasonCancelled
+			dm.Status.Status = nnfv1alpha10.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", output)
-			dm.Status.Status = nnfv1alpha9.DataMovementConditionReasonFailed
+			dm.Status.Status = nnfv1alpha10.DataMovementConditionReasonFailed
 			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
 			resourceErr := dwsv1alpha7.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
 			dm.Status.SetResourceErrorAndLog(resourceErr, log)
@@ -369,7 +369,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		status := dm.Status.DeepCopy()
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			dm := &nnfv1alpha9.NnfDataMovement{}
+			dm := &nnfv1alpha10.NnfDataMovement{}
 			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -392,15 +392,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha9.NnfDataMovement) error {
+func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha10.NnfDataMovement) error {
 	log := log.FromContext(ctx)
 
 	// Check for the scenario where a request is canceled but not deleted before the DM has started.
 	// If so, record it as cancelled and do nothing more with the data movement operation
 	if dm.Status.StartTime.IsZero() && !dm.DeletionTimestamp.IsZero() {
 		now := metav1.NowMicro()
-		dm.Status.State = nnfv1alpha9.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha9.DataMovementConditionReasonCancelled
+		dm.Status.State = nnfv1alpha10.DataMovementConditionTypeFinished
+		dm.Status.Status = nnfv1alpha10.DataMovementConditionReasonCancelled
 		dm.Status.StartTime = &now
 		dm.Status.EndTime = &now
 
@@ -439,7 +439,7 @@ func filterByNamespace(namespace string) predicate.Predicate {
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	maxReconciles := runtime.GOMAXPROCS(0)
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nnfv1alpha9.NnfDataMovement{}).
+		For(&nnfv1alpha10.NnfDataMovement{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxReconciles}).
 		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)

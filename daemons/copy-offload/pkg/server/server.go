@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-2025 Hewlett Packard Enterprise Development LP
+ * Copyright 2024-2026 Hewlett Packard Enterprise Development LP
  * Other additional copyright holders may be indicated within.
  *
  * The entirety of this work is licensed under the Apache License,
@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
-	nnfv1alpha9 "github.com/NearNodeFlash/nnf-sos/api/v1alpha9"
+	nnfv1alpha10 "github.com/NearNodeFlash/nnf-sos/api/v1alpha10"
 	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -245,7 +245,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	}
 	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 
-	var dm *nnfv1alpha9.NnfDataMovement
+	var dm *nnfv1alpha10.NnfDataMovement
 	var dmKey string
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
