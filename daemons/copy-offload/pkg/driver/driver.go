@@ -184,7 +184,7 @@ func (r *DriverRequest) Create(ctx context.Context, dmreq DMRequest) (string, *n
 		return "", nil, err
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
-		Kind:      reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name(),
+		Kind:      reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name(),
 		Name:      r.dmProfile.Name,
 		Namespace: r.dmProfile.Namespace,
 	}
@@ -541,7 +541,7 @@ func (r *DriverRequest) ListRequests(ctx context.Context) ([]string, error) {
 
 	drvr.Log.Info("Listing requests:")
 	items := make([]string, 0)
-	drvr.contexts.Range(func(key, val interface{}) bool {
+	drvr.contexts.Range(func(key, val any) bool {
 		skey := fmt.Sprintf("%s", key)
 		drvr.Log.Info(fmt.Sprintf("   %s", skey))
 		items = append(items, skey)
@@ -893,7 +893,7 @@ func (r *DriverRequest) createNnfDataMovement(ctx context.Context, dmreq DMReque
 			Destination: &nnfv1alpha11.NnfDataMovementSpecSourceDestination{
 				Path: dmreq.DestinationPath,
 				StorageReference: corev1.ObjectReference{
-					Kind:      reflect.TypeOf(*lustrefs).Name(),
+					Kind:      reflect.TypeFor[lusv1beta1.LustreFileSystem]().Name(),
 					Namespace: lustrefs.Namespace,
 					Name:      lustrefs.Name,
 				},

@@ -68,7 +68,7 @@ func createTokenFromKey(key []byte, method jwt.SigningMethod) (string, error) {
 }
 
 func verifyToken(tokenString string, key []byte, method jwt.SigningMethod) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if token.Method.Alg() != method.Alg() {
 			return nil, errors.New("token verification failed: unexpected signing method for token")
 		}

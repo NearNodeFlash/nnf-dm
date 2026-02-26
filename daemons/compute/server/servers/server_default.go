@@ -365,7 +365,7 @@ func (s *defaultServer) Create(ctx context.Context, req *pb.DataMovementCreateRe
 		}, nil
 	}
 	dm.Spec.ProfileReference = corev1.ObjectReference{
-		Kind:      reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name(),
+		Kind:      reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name(),
 		Name:      profile.Name,
 		Namespace: profile.Namespace,
 	}
@@ -511,7 +511,7 @@ func (s *defaultServer) createNnfDataMovement(ctx context.Context, req *pb.DataM
 			Destination: &nnfv1alpha11.NnfDataMovementSpecSourceDestination{
 				Path: req.Destination,
 				StorageReference: corev1.ObjectReference{
-					Kind:      reflect.TypeOf(*lustrefs).Name(),
+					Kind:      reflect.TypeFor[lusv1beta1.LustreFileSystem]().Name(),
 					Namespace: lustrefs.Namespace,
 					Name:      lustrefs.Name,
 				},
