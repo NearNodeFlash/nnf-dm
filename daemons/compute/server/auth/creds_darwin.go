@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 /*
  * Copyright 2021, 2022 Hewlett Packard Enterprise Development LP

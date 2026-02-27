@@ -140,7 +140,7 @@ var _ = Describe("Data Movement Test", func() {
 					GroupId: 0,
 					Cancel:  false,
 					ProfileReference: corev1.ObjectReference{
-						Kind:      reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name(),
+						Kind:      reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name(),
 						Name:      dmProfile.Name,
 						Namespace: dmProfile.Namespace,
 					},
@@ -397,7 +397,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				p.Data.Command = cmd
 				dm.Spec.ProfileReference = corev1.ObjectReference{
-					Kind:      reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name(),
+					Kind:      reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name(),
 					Name:      p.Name,
 					Namespace: p.Namespace,
 				}
@@ -422,7 +422,7 @@ var _ = Describe("Data Movement Test", func() {
 				By("verify that profile is used")
 				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
 					Fields{
-						"Kind":      Equal(reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name()),
+						"Kind":      Equal(reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name()),
 						"Name":      Equal(p.Name),
 						"Namespace": Equal(p.Namespace),
 					},
@@ -443,7 +443,7 @@ var _ = Describe("Data Movement Test", func() {
 			BeforeEach(func() {
 				m.Data.Command = cmd
 				dm.Spec.ProfileReference = corev1.ObjectReference{
-					Kind:      reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name(),
+					Kind:      reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name(),
 					Name:      m.Name,
 					Namespace: m.Namespace,
 				}
@@ -462,7 +462,7 @@ var _ = Describe("Data Movement Test", func() {
 				By("verify that profile is used")
 				Expect(dm.Spec.ProfileReference).To(MatchFields(IgnoreExtras,
 					Fields{
-						"Kind":      Equal(reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name()),
+						"Kind":      Equal(reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name()),
 						"Name":      Equal(m.Name),
 						"Namespace": Equal(m.Namespace),
 					},

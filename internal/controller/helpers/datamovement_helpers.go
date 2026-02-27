@@ -229,7 +229,7 @@ func GetDMProfile(clnt client.Client, ctx context.Context, dm *nnfv1alpha11.NnfD
 
 	var profile *nnfv1alpha11.NnfDataMovementProfile
 
-	if dm.Spec.ProfileReference.Kind != reflect.TypeOf(nnfv1alpha11.NnfDataMovementProfile{}).Name() {
+	if dm.Spec.ProfileReference.Kind != reflect.TypeFor[nnfv1alpha11.NnfDataMovementProfile]().Name() {
 		return profile, fmt.Errorf("invalid NnfDataMovementProfile kind %s", dm.Spec.ProfileReference.Kind)
 	}
 
@@ -374,7 +374,7 @@ func checkIndexMountDir(clnt client.Client, ctx context.Context, dm *nnfv1alpha1
 	var storage *nnfv1alpha11.NnfStorage
 	var nodeStorage *nnfv1alpha11.NnfNodeStorage
 
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha11.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeFor[nnfv1alpha11.NnfStorage]().Name() {
 		// The source storage reference is NnfStorage - this came from copy_in/copy_out directives
 		storageRef := dm.Spec.Source.StorageReference
 
@@ -385,7 +385,7 @@ func checkIndexMountDir(clnt client.Client, ctx context.Context, dm *nnfv1alpha1
 			}
 			return "", err
 		}
-	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha11.NnfNodeStorage{}).Name() {
+	} else if dm.Spec.Source.StorageReference.Kind == reflect.TypeFor[nnfv1alpha11.NnfNodeStorage]().Name() {
 		// The source storage reference is NnfNodeStorage - this came from copy_offload
 		storageRef := dm.Spec.Source.StorageReference
 
@@ -743,15 +743,15 @@ func isTestEnv() bool {
 func GetStorageNodeNames(clnt client.Client, ctx context.Context, dm *nnfv1alpha11.NnfDataMovement) ([]string, error) {
 
 	// If this is a node data movement request simply reference the localhost
-	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha11.NnfNodeStorage{}).Name() {
+	if dm.Namespace == os.Getenv("NNF_NODE_NAME") || isTestEnv() || dm.Spec.Source.StorageReference.Kind == reflect.TypeFor[nnfv1alpha11.NnfNodeStorage]().Name() {
 		return []string{"localhost"}, nil
 	}
 
 	// Otherwise, this is a system wide data movement request we target the NNF Nodes that are defined in the storage specification
 	var storageRef corev1.ObjectReference
-	if dm.Spec.Source.StorageReference.Kind == reflect.TypeOf(nnfv1alpha11.NnfStorage{}).Name() {
+	if dm.Spec.Source.StorageReference.Kind == reflect.TypeFor[nnfv1alpha11.NnfStorage]().Name() {
 		storageRef = dm.Spec.Source.StorageReference
-	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeOf(nnfv1alpha11.NnfStorage{}).Name() {
+	} else if dm.Spec.Destination.StorageReference.Kind == reflect.TypeFor[nnfv1alpha11.NnfStorage]().Name() {
 		storageRef = dm.Spec.Destination.StorageReference
 	} else {
 		return nil, newInvalidError("Neither source or destination is of NNF Storage type")
@@ -799,7 +799,7 @@ func GetCopyOffloadWorkerHostnames(clnt client.Client, ctx context.Context, node
 	if nodes[0] == "localhost" {
 
 		// The source's storage reference should point to the namespace of the nnf node
-		if dm.Spec.Source.StorageReference.Kind != reflect.TypeOf(nnfv1alpha11.NnfNodeStorage{}).Name() {
+		if dm.Spec.Source.StorageReference.Kind != reflect.TypeFor[nnfv1alpha11.NnfNodeStorage]().Name() {
 			return nil, newInvalidError("copy offload source storage reference is not of type NnfNodeStorage")
 		}
 		nnfNodeName := dm.Spec.Source.StorageReference.Namespace

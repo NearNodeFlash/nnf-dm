@@ -52,7 +52,7 @@ type UserHttp struct {
 var jwtSigningAlgorithm = jwt.SigningMethodHS256
 
 func (user *UserHttp) verifyToken(tokenString string) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if token.Method.Alg() != jwtSigningAlgorithm.Name {
 			return nil, errors.New("unexpected signing method")
 		}
