@@ -303,7 +303,28 @@ func BuildDMCommand(profile *nnfv1alpha11.NnfDataMovementProfile, hostfile strin
 		}
 	}
 
+	// Isolate the ORTE session directory to prevent race conditions when multiple
+	// mpirun processes run concurrently on the same pod. Each DM operation uses its
+	// own hostfile directory, so we reuse that as the ORTE tmpdir base.
+	cmd = InjectOrteTmpdirBase(cmd, hostfile)
+
 	return strings.Split(cmd, " "), nil
+}
+
+// InjectOrteTmpdirBase adds --mca orte_tmpdir_base <dir> to the mpirun command to isolate
+// each mpirun invocation's ORTE session directory. This prevents a race condition where
+// concurrent mpirun processes on the same pod share and race on /tmp/ompi.<hostname>.<uid>/,
+// causing "No such file or directory" errors when one process cleans up the parent directory
+// while another is initializing.
+func InjectOrteTmpdirBase(cmd, hostfile string) string {
+	idx := strings.Index(cmd, "mpirun")
+	if idx == -1 {
+		return cmd
+	}
+	tmpdirBase := filepath.Dir(hostfile)
+	idx += len("mpirun")
+	cmd = cmd[:idx] + " --mca orte_tmpdir_base " + tmpdirBase + cmd[idx:]
+	return cmd
 }
 
 func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path string, log logr.Logger) string {
@@ -319,6 +340,10 @@ func buildStatOrMkdirCommand(uid, gid uint32, cmd, setprivCmd, hostfile, path st
 	cmd = strings.ReplaceAll(cmd, "$UID", fmt.Sprintf("%d", uid))
 	cmd = strings.ReplaceAll(cmd, "$GID", fmt.Sprintf("%d", gid))
 	cmd = strings.ReplaceAll(cmd, "$PATH", path)
+
+	// Isolate the ORTE session directory to prevent race conditions when multiple
+	// mpirun processes run concurrently on the same pod.
+	cmd = InjectOrteTmpdirBase(cmd, hostfile)
 
 	return cmd
 }

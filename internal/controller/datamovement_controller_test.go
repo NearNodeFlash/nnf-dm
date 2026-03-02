@@ -700,7 +700,7 @@ var _ = Describe("Data Movement Test", func() {
 					}
 					return cmd
 				}).Should(MatchRegexp(fmt.Sprintf(
-					"mpirun --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid %d --gid %d %s %s",
+					"mpirun --mca orte_tmpdir_base .+ --allow-run-as-root --hostfile (.+)/([^/]+) dcp --progress 1 --uid %d --gid %d %s %s",
 					expectedUid, expectedGid, srcPath, destPath)))
 			})
 		})
@@ -802,7 +802,7 @@ var _ = Describe("Data Movement Test", func() {
 						MpirunOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
-						"mpirun --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
+						"mpirun --mca orte_tmpdir_base /tmp --extra opts --allow-run-as-root --hostfile /tmp/hostfile dcp --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
 					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", true, &dm, log.FromContext(context.TODO()))
@@ -820,7 +820,7 @@ var _ = Describe("Data Movement Test", func() {
 						DcpOptions: "--extra opts",
 					}
 					expectedCmdRegex := fmt.Sprintf(
-						"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp --extra opts --progress 1 --uid %d --gid %d %s %s",
+						"mpirun --mca orte_tmpdir_base /tmp --allow-run-as-root --hostfile /tmp/hostfile dcp --extra opts --progress 1 --uid %d --gid %d %s %s",
 						expectedUid, expectedGid, srcPath, destPath)
 
 					cmd, err := BuildDMCommand(&profile, "/tmp/hostfile", true, &dm, log.FromContext(context.TODO()))
@@ -875,6 +875,27 @@ var _ = Describe("Data Movement Test", func() {
 					Entry("when nil it should use the profile", nil),
 				)
 			})
+		})
+
+		Context("injectOrteTmpdirBase", func() {
+			DescribeTable("injecting --mca orte_tmpdir_base into mpirun commands",
+				func(cmd, hostfile, expected string) {
+					result := InjectOrteTmpdirBase(cmd, hostfile)
+					Expect(result).To(Equal(expected))
+				},
+				Entry("with mpirun and hostfile in /tmp/dm-name",
+					"mpirun --allow-run-as-root --hostfile /tmp/my-dm/hostfile dcp src dest",
+					"/tmp/my-dm/hostfile",
+					"mpirun --mca orte_tmpdir_base /tmp/my-dm --allow-run-as-root --hostfile /tmp/my-dm/hostfile dcp src dest"),
+				Entry("with mpirun and hostfile in /tmp",
+					"mpirun --allow-run-as-root --hostfile /tmp/hostfile dcp src dest",
+					"/tmp/hostfile",
+					"mpirun --mca orte_tmpdir_base /tmp --allow-run-as-root --hostfile /tmp/hostfile dcp src dest"),
+				Entry("without mpirun",
+					"dcp src dest",
+					"/tmp/my-dm/hostfile",
+					"dcp src dest"),
+			)
 		})
 
 		Context("getDestinationDir", func() {
