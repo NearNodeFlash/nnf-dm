@@ -393,7 +393,14 @@ func (r *DriverRequest) CancelRequest(ctx context.Context, name string) error {
 
 	contextRecord, err := r.loadRequestByName(name)
 	if err != nil {
-		// Maybe the Go routine already finished and removed the record.
+		// The goroutine may have already finished and removed the record. If it's in the
+		// completions map, the job is done and cancelling it is a no-op success.
+		drvr.cond.L.Lock()
+		_, completed := drvr.completions[name]
+		drvr.cond.L.Unlock()
+		if completed {
+			return nil
+		}
 		return err
 	}
 	cancelContext := contextRecord.cancelContext
