@@ -1,17 +1,17 @@
-# github.com/DataWorkflowServices/dws v0.0.1-0.20260217162004-9c3e31c5c6c6
-## explicit; go 1.23.9
+# github.com/DataWorkflowServices/dws v0.0.1-0.20260309165511-cf9255cfc6a7
+## explicit; go 1.25.7
 github.com/DataWorkflowServices/dws/api/v1alpha7
 github.com/DataWorkflowServices/dws/utils/dwdparse
 github.com/DataWorkflowServices/dws/utils/updater
-# github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260217204444-10b3c2fa90bf
-## explicit; go 1.23.9
+# github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260309172025-4b4ec57b9127
+## explicit; go 1.25.7
 github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1
 github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases
-# github.com/NearNodeFlash/nnf-ec v0.0.1-0.20251021182141-d22098d70c26
-## explicit; go 1.23.9
+# github.com/NearNodeFlash/nnf-ec v0.0.1-0.20260310162051-7797cd568379
+## explicit; go 1.25.7
 github.com/NearNodeFlash/nnf-ec/pkg/rfsf/pkg/models
-# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260226154734-3f9c52dffe92
-## explicit; go 1.23.9
+# github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260312170612-fb412e3dde6f
+## explicit; go 1.25.7
 github.com/NearNodeFlash/nnf-sos/api/v1alpha11
 github.com/NearNodeFlash/nnf-sos/config/crd/bases
 github.com/NearNodeFlash/nnf-sos/pkg/command
@@ -58,7 +58,7 @@ github.com/go-task/slim-sprig/v3
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
-# github.com/golang-jwt/jwt/v5 v5.2.1
+# github.com/golang-jwt/jwt/v5 v5.2.2
 ## explicit; go 1.18
 github.com/golang-jwt/jwt/v5
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
@@ -203,8 +203,8 @@ go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.31.0
-## explicit; go 1.20
+# golang.org/x/crypto v0.48.0
+## explicit; go 1.24.0
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
@@ -215,9 +215,8 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 # golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 ## explicit; go 1.18
 golang.org/x/exp/maps
-# golang.org/x/net v0.33.0
-## explicit; go 1.18
-golang.org/x/net/context
+# golang.org/x/net v0.51.0
+## explicit; go 1.25.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
@@ -225,17 +224,19 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/internal/httpcommon
+golang.org/x/net/internal/httpsfv
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.8.0
-## explicit; go 1.17
+# golang.org/x/oauth2 v0.35.0
+## explicit; go 1.24.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.10.0
-## explicit; go 1.18
+# golang.org/x/sync v0.19.0
+## explicit; go 1.24.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.28.0
-## explicit; go 1.18
+# golang.org/x/sys v0.41.0
+## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
@@ -243,11 +244,11 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.27.0
-## explicit; go 1.18
+# golang.org/x/term v0.40.0
+## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.21.0
-## explicit; go 1.18
+# golang.org/x/text v0.34.0
+## explicit; go 1.24.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -271,22 +272,16 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.28.0
-## explicit; go 1.22.0
+# golang.org/x/tools v0.41.0
+## explicit; go 1.24.0
 golang.org/x/tools/cover
+golang.org/x/tools/go/ast/edge
 golang.org/x/tools/go/ast/inspector
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
 # google.golang.org/appengine v1.6.8-0.20221117013220-504804fb50de
 ## explicit; go 1.11
-google.golang.org/appengine/internal
-google.golang.org/appengine/internal/base
-google.golang.org/appengine/internal/datastore
-google.golang.org/appengine/internal/log
-google.golang.org/appengine/internal/remote_api
-google.golang.org/appengine/internal/urlfetch
-google.golang.org/appengine/urlfetch
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20230803162519-f966b187b2e5
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/status
