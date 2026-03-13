@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/NearNodeFlash/nnf-dm/daemons/copy-offload/pkg/driver"
-	nnfv1alpha10 "github.com/NearNodeFlash/nnf-sos/api/v1alpha10"
+	nnfv1alpha11 "github.com/NearNodeFlash/nnf-sos/api/v1alpha11"
 	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -52,7 +52,7 @@ type UserHttp struct {
 var jwtSigningAlgorithm = jwt.SigningMethodHS256
 
 func (user *UserHttp) verifyToken(tokenString string) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if token.Method.Alg() != jwtSigningAlgorithm.Name {
 			return nil, errors.New("unexpected signing method")
 		}
@@ -245,7 +245,7 @@ func (user *UserHttp) TrialRequest(w http.ResponseWriter, req *http.Request) {
 	}
 	user.Log.Info("  TrialRequest", "dmreq", dmreq)
 
-	var dm *nnfv1alpha10.NnfDataMovement
+	var dm *nnfv1alpha11.NnfDataMovement
 	var dmKey string
 	var err error
 	drvrReq := driver.DriverRequest{Drvr: user.Drvr}
