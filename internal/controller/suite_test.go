@@ -41,7 +41,7 @@ import (
 	lusv1beta1 "github.com/NearNodeFlash/lustre-fs-operator/api/v1beta1"
 	_ "github.com/NearNodeFlash/lustre-fs-operator/config/crd/bases"
 
-	nnfv1alpha10 "github.com/NearNodeFlash/nnf-sos/api/v1alpha10"
+	nnfv1alpha11 "github.com/NearNodeFlash/nnf-sos/api/v1alpha11"
 	_ "github.com/NearNodeFlash/nnf-sos/config/crd/bases"
 	//+kubebuilder:scaffold:imports
 )
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	err = lusv1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = nnfv1alpha10.AddToScheme(scheme.Scheme)
+	err = nnfv1alpha11.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
