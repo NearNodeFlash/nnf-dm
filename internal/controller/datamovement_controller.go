@@ -33,9 +33,9 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,7 +52,31 @@ import (
 
 const (
 	finalizer = "dm.cray.hpe.com"
+
+	// SSA field managers for status subresource updates. Separate field managers
+	// allow concurrent SSA applies to non-overlapping fields without conflicts.
+	fieldManagerDMController = "nnf-dm-controller" // reconciler-level status (start, error, cancel)
+	fieldManagerDMProgress   = "nnf-dm-progress"   // progress goroutine (CommandStatus only)
+	fieldManagerDMCompletion = "nnf-dm-completion" // completion goroutine (final status)
 )
+
+// newDMStatusApply creates a minimal NnfDataMovement for Server-Side Apply on the
+// status subresource. Only status fields explicitly set on the returned object
+// will be applied; omitempty fields left at zero value are excluded from the patch.
+func newDMStatusApply(name, namespace string) *nnfv1alpha11.NnfDataMovement {
+	dm := &nnfv1alpha11.NnfDataMovement{}
+	dm.Name = name
+	dm.Namespace = namespace
+	dm.SetGroupVersionKind(nnfv1alpha11.GroupVersion.WithKind("NnfDataMovement"))
+	return dm
+}
+
+// applyStatus performs a Server-Side Apply patch on the status subresource.
+// ForceOwnership is used so the field manager takes ownership even if another
+// manager previously owned the field.
+func (r *DataMovementReconciler) applyStatus(ctx context.Context, dm *nnfv1alpha11.NnfDataMovement, fieldManager string) error {
+	return r.Status().Patch(ctx, dm, client.Apply, client.FieldOwner(fieldManager), client.ForceOwnership)
+}
 
 // DataMovementReconciler reconciles a DataMovement object
 type DataMovementReconciler struct {
@@ -93,17 +117,26 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	defer func() {
 		if err != nil {
+			// Skip the error status apply for conflict errors — these are transient
+			// and self-resolve on the next reconcile. Applying status here would
+			// bump the resourceVersion and trigger a watch event, creating a
+			// feedback loop with other non-SSA writes (e.g. finalizer updates).
+			if apierrors.IsConflict(err) {
+				return
+			}
+
+			applyDM := newDMStatusApply(dm.Name, dm.Namespace)
 			resourceError, ok := err.(*dwsv1alpha7.ResourceErrorInfo)
 			if ok {
 				if resourceError.Severity != dwsv1alpha7.SeverityMinor {
-					dm.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
-					dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonInvalid
+					applyDM.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
+					applyDM.Status.Status = nnfv1alpha11.DataMovementConditionReasonInvalid
 				}
 			}
-			dm.Status.SetResourceErrorAndLog(err, log)
-			dm.Status.Message = err.Error()
+			applyDM.Status.SetResourceErrorAndLog(err, log)
+			applyDM.Status.Message = err.Error()
 
-			if updateErr := r.Status().Update(ctx, dm); updateErr != nil {
+			if updateErr := r.applyStatus(ctx, applyDM, fieldManagerDMController); updateErr != nil {
 				err = updateErr
 			}
 		}
@@ -218,10 +251,19 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	dm.Status.State = nnfv1alpha11.DataMovementConditionTypeRunning
 	cmdStatus := nnfv1alpha11.NnfDataMovementCommandStatus{}
 	cmdStatus.Command = cmd.String()
+	// Initialize LastMessageTime to avoid zero-valued metav1.MicroTime serializing as
+	// JSON null in SSA patches, which the CRD validator rejects.
+	cmdStatus.LastMessageTime = now
 	dm.Status.CommandStatus = &cmdStatus
 	log.Info("Running Command", "cmd", cmdStatus.Command)
 
-	if err := r.Status().Update(ctx, dm); err != nil {
+	applyDM := newDMStatusApply(dm.Name, dm.Namespace)
+	applyDM.Status.StartTime = dm.Status.StartTime
+	applyDM.Status.State = dm.Status.State
+	applyDM.Status.Restarts = dm.Status.Restarts
+	applyDM.Status.CommandStatus = &nnfv1alpha11.NnfDataMovementCommandStatus{}
+	cmdStatus.DeepCopyInto(applyDM.Status.CommandStatus)
+	if err := r.applyStatus(ctx, applyDM, fieldManagerDMController); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -283,22 +325,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						cmdStatus.ElapsedTime = elapsed
 					}
 
-					// Update the CommandStatus in the DM resource after we parsed all the lines
-					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						dm := &nnfv1alpha11.NnfDataMovement{}
-						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-							return client.IgnoreNotFound(err)
-						}
+					// Update the CommandStatus in the DM resource via SSA
+					applyDM := newDMStatusApply(dm.Name, dm.Namespace)
+					applyDM.Status.CommandStatus = &nnfv1alpha11.NnfDataMovementCommandStatus{}
+					cmdStatus.DeepCopyInto(applyDM.Status.CommandStatus)
 
-						if dm.Status.CommandStatus == nil {
-							dm.Status.CommandStatus = &nnfv1alpha11.NnfDataMovementCommandStatus{}
-						}
-						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
-
-						return r.Status().Update(ctx, dm)
-					})
-
-					if err != nil {
+					if err := r.applyStatus(ctx, applyDM, fieldManagerDMProgress); err != nil {
 						log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
 					}
 				}
@@ -329,11 +361,12 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			<-chProgressDone      // wait for process goroutine to stop parsing final output
 		}
 
-		// Command is finished, update status
+		// Command is finished, build SSA apply for final status
 		now := metav1.NowMicro()
-		dm.Status.EndTime = &now
-		dm.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonSuccess
+		applyDM := newDMStatusApply(dm.Name, dm.Namespace)
+		applyDM.Status.EndTime = &now
+		applyDM.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
+		applyDM.Status.Status = nnfv1alpha11.DataMovementConditionReasonSuccess
 
 		// Grab the output and trim it to remove the progress bloat
 		output := TrimDcpProgressFromOutput(combinedOutBuf.String())
@@ -343,13 +376,13 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// and/or store the output.
 		if errors.Is(ctxCancel.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
-			dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonCancelled
+			applyDM.Status.Status = nnfv1alpha11.DataMovementConditionReasonCancelled
 		} else if err != nil {
 			log.Error(err, "Data movement operation failed", "output", output)
-			dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonFailed
-			dm.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
+			applyDM.Status.Status = nnfv1alpha11.DataMovementConditionReasonFailed
+			applyDM.Status.Message = fmt.Sprintf("%s: %s", err.Error(), output)
 			resourceErr := dwsv1alpha7.NewResourceError("").WithError(err).WithUserMessage("data movement operation failed: %s", output).WithFatal()
-			dm.Status.SetResourceErrorAndLog(resourceErr, log)
+			applyDM.Status.SetResourceErrorAndLog(resourceErr, log)
 		} else {
 			log.Info("Data movement operation completed", "cmdStatus", cmdStatus)
 
@@ -360,30 +393,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 			// Profile or DM request has enabled storing stdout
 			if profile.Data.StoreStdout || (dm.Spec.UserConfig != nil && dm.Spec.UserConfig.StoreStdout) {
-				dm.Status.Message = output
+				applyDM.Status.Message = output
 			}
 		}
 
 		os.RemoveAll(filepath.Dir(mpiHostfile))
 
-		status := dm.Status.DeepCopy()
+		// Include the final CommandStatus in the completion apply
+		applyDM.Status.CommandStatus = &nnfv1alpha11.NnfDataMovementCommandStatus{}
+		cmdStatus.DeepCopyInto(applyDM.Status.CommandStatus)
 
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			dm := &nnfv1alpha11.NnfDataMovement{}
-			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-
-			// Ensure we have the latest CommandStatus from the progress goroutine
-			cmdStatus.DeepCopyInto(status.CommandStatus)
-			status.DeepCopyInto(&dm.Status)
-
-			return r.Status().Update(ctx, dm)
-		})
-
-		if err != nil {
+		if err := r.applyStatus(ctx, applyDM, fieldManagerDMCompletion); err != nil {
 			log.Error(err, "failed to update dm status with completion")
-			// TODO Add prometheus counter to track occurrences
 		}
 
 		r.contexts.Delete(dm.Name)
@@ -399,12 +420,13 @@ func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha11.Nn
 	// If so, record it as cancelled and do nothing more with the data movement operation
 	if dm.Status.StartTime.IsZero() && !dm.DeletionTimestamp.IsZero() {
 		now := metav1.NowMicro()
-		dm.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
-		dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonCancelled
-		dm.Status.StartTime = &now
-		dm.Status.EndTime = &now
+		applyDM := newDMStatusApply(dm.Name, dm.Namespace)
+		applyDM.Status.State = nnfv1alpha11.DataMovementConditionTypeFinished
+		applyDM.Status.Status = nnfv1alpha11.DataMovementConditionReasonCancelled
+		applyDM.Status.StartTime = &now
+		applyDM.Status.EndTime = &now
 
-		if err := r.Status().Update(ctx, dm); err != nil {
+		if err := r.applyStatus(ctx, applyDM, fieldManagerDMController); err != nil {
 			return err
 		}
 
