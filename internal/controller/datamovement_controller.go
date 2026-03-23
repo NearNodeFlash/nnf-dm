@@ -41,8 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	dwsv1alpha7 "github.com/DataWorkflowServices/dws/api/v1alpha7"
 	. "github.com/NearNodeFlash/nnf-dm/internal/controller/helpers"
@@ -62,6 +65,11 @@ type DataMovementReconciler struct {
 	// We maintain a map of active operations which allows us to process cancel requests
 	// This is a thread safe map since multiple data movement reconcilers and go routines will be executing at the same time.
 	contexts sync.Map
+
+	// completions receives a GenericEvent from a goroutine when a data movement
+	// command finishes, causing the reconciler to re-run and write the final
+	// status with standard controller-runtime retry semantics.
+	completions chan event.GenericEvent
 
 	WatchNamespace string
 }
@@ -115,6 +123,18 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 
+		// Wait for any running goroutine to finish before removing the finalizer.
+		// cancel() has already signalled it to stop; the goroutine will fire a
+		// completions event and set Result when it actually exits.
+		if stored, found := r.contexts.Load(dm.Name); found {
+			ctxEntry := stored.(DataMovementContext)
+			if ctxEntry.Result == nil {
+				// Goroutine still running; it will re-trigger us when done.
+				return ctrl.Result{}, nil
+			}
+			r.contexts.Delete(dm.Name)
+		}
+
 		if controllerutil.ContainsFinalizer(dm, finalizer) {
 			controllerutil.RemoveFinalizer(dm, finalizer)
 
@@ -135,6 +155,21 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// An update here will cause the reconciler to run again once kubernetes
 		// has recorded the resource it its database.
 		return ctrl.Result{}, nil
+	}
+
+	// If a goroutine has completed and stored a result, write the final status
+	// here using standard reconciler error/retry semantics instead of doing it
+	// inside the goroutine where retries after exhaustion would be silently lost.
+	if stored, found := r.contexts.Load(dm.Name); found {
+		ctxEntry := stored.(DataMovementContext)
+		if ctxEntry.Result != nil {
+			ctxEntry.Result.DeepCopyInto(&dm.Status)
+			if err := r.Status().Update(ctx, dm); err != nil {
+				return ctrl.Result{}, err
+			}
+			r.contexts.Delete(dm.Name)
+			return ctrl.Result{}, nil
+		}
 	}
 
 	// Prevent gratuitous wakeups for a resource that is already finished.
@@ -186,9 +221,9 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Expand the context with cancel and store it in the map so the cancel function can be used in
 	// another reconciler loop. Also add NamespacedName so we can retrieve the resource.
-	ctxCancel, cancel := context.WithCancel(ctx)
-	r.contexts.Store(dm.Name, DataMovementCancelContext{
-		Ctx:    ctxCancel,
+	dmCtx, cancel := context.WithCancel(ctx)
+	r.contexts.Store(dm.Name, DataMovementContext{
+		Ctx:    dmCtx,
 		Cancel: cancel,
 	})
 
@@ -210,7 +245,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha7.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
-	cmd := exec.CommandContext(ctxCancel, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
+	cmd := exec.CommandContext(dmCtx, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
 	// Record the start of the data movement operation
 	now := metav1.NowMicro()
@@ -341,7 +376,7 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// On cancellation or failure, log the output. On failure, also store the output in the
 		// Status.Message. When successful, check the profile/UserConfig config options to log
 		// and/or store the output.
-		if errors.Is(ctxCancel.Err(), context.Canceled) {
+		if errors.Is(dmCtx.Err(), context.Canceled) {
 			log.Info("Data movement operation cancelled", "output", output)
 			dm.Status.Status = nnfv1alpha11.DataMovementConditionReasonCancelled
 		} else if err != nil {
@@ -366,27 +401,22 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		os.RemoveAll(filepath.Dir(mpiHostfile))
 
+		// Ensure latest CommandStatus is captured in the final status.
+		cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
 		status := dm.Status.DeepCopy()
 
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			dm := &nnfv1alpha11.NnfDataMovement{}
-			if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-
-			// Ensure we have the latest CommandStatus from the progress goroutine
-			cmdStatus.DeepCopyInto(status.CommandStatus)
-			status.DeepCopyInto(&dm.Status)
-
-			return r.Status().Update(ctx, dm)
-		})
-
-		if err != nil {
-			log.Error(err, "failed to update dm status with completion")
-			// TODO Add prometheus counter to track occurrences
+		// Store the result in the context map entry and notify the reconciler via
+		// a GenericEvent. The reconciler will write the status update using standard
+		// controller-runtime error/retry semantics.
+		if stored, ok := r.contexts.Load(dm.Name); ok {
+			ctxEntry := stored.(DataMovementContext)
+			ctxEntry.Result = status
+			r.contexts.Store(dm.Name, ctxEntry)
 		}
-
-		r.contexts.Delete(dm.Name)
+		// Block until the reconciler has room. Each goroutine sends exactly one
+		// event here and the reconciler drains the channel continuously, so in
+		// steady state this never blocks.
+		r.completions <- event.GenericEvent{Object: dm}
 	}()
 
 	return ctrl.Result{}, nil
@@ -412,16 +442,22 @@ func (r *DataMovementReconciler) cancel(ctx context.Context, dm *nnfv1alpha11.Nn
 		return nil
 	}
 
-	storedCancelContext, found := r.contexts.LoadAndDelete(dm.Name)
+	stored, found := r.contexts.Load(dm.Name)
 	if !found {
 		return nil // Already completed or cancelled?
 	}
 
-	cancelContext := storedCancelContext.(DataMovementCancelContext)
+	dmCtx := stored.(DataMovementContext)
+
+	// If the goroutine already finished and stored a result, nothing to cancel.
+	if dmCtx.Result != nil {
+		return nil
+	}
 
 	log.Info("Cancelling operation")
-	cancelContext.Cancel()
-	<-cancelContext.Ctx.Done()
+	dmCtx.Cancel()
+	// Don't block here; the goroutine will fire a completions event when the
+	// process exits and the reconciler will write the final status then.
 
 	// Nothing more to do - the go routine that is executing the data movement will exit
 	// and the status is recorded then.
@@ -437,9 +473,11 @@ func filterByNamespace(namespace string) predicate.Predicate {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DataMovementReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.completions = make(chan event.GenericEvent, 64)
 	maxReconciles := runtime.GOMAXPROCS(0)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nnfv1alpha11.NnfDataMovement{}).
+		WatchesRawSource(&source.Channel{Source: r.completions}, &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: maxReconciles}).
 		WithEventFilter(filterByNamespace(r.WatchNamespace)).
 		Complete(r)
