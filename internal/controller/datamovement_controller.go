@@ -35,7 +35,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -219,14 +218,6 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, dwsv1alpha7.NewResourceError("could not get worker nodes for data movement").WithError(err).WithMajor()
 	}
 
-	// Expand the context with cancel and store it in the map so the cancel function can be used in
-	// another reconciler loop. Also add NamespacedName so we can retrieve the resource.
-	dmCtx, cancel := context.WithCancel(ctx)
-	r.contexts.Store(dm.Name, DataMovementContext{
-		Ctx:    dmCtx,
-		Cancel: cancel,
-	})
-
 	// Create the hostfile. This is needed for preparing the destination and the data movement
 	// command itself.
 	mpiHostfile, err := CreateMpiHostfile(profile, hosts, dm)
@@ -245,6 +236,11 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		return ctrl.Result{}, dwsv1alpha7.NewResourceError("could not create data movement command").WithError(err).WithMajor()
 	}
+
+	// Expand the context with cancel and store it in the map so the cancel function can be used in
+	// another reconciler loop. Also add NamespacedName so we can retrieve the resource.
+	dmCtx, cancel := context.WithCancel(ctx)
+
 	cmd := exec.CommandContext(dmCtx, "/bin/bash", "-c", strings.Join(cmdArgs, " "))
 
 	// Record the start of the data movement operation
@@ -257,8 +253,14 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("Running Command", "cmd", cmdStatus.Command)
 
 	if err := r.Status().Update(ctx, dm); err != nil {
+		cancel()
 		return ctrl.Result{}, err
 	}
+
+	r.contexts.Store(dm.Name, DataMovementContext{
+		Ctx:    dmCtx,
+		Cancel: cancel,
+	})
 
 	// Execute the go routine to perform the data movement
 	go func() {
@@ -319,22 +321,15 @@ func (r *DataMovementReconciler) Reconcile(ctx context.Context, req ctrl.Request
 					}
 
 					// Update the CommandStatus in the DM resource after we parsed all the lines
-					err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						dm := &nnfv1alpha11.NnfDataMovement{}
-						if err := r.Get(ctx, req.NamespacedName, dm); err != nil {
-							return client.IgnoreNotFound(err)
-						}
-
+					dm := &nnfv1alpha11.NnfDataMovement{}
+					if err := r.Get(ctx, req.NamespacedName, dm); err == nil {
 						if dm.Status.CommandStatus == nil {
 							dm.Status.CommandStatus = &nnfv1alpha11.NnfDataMovementCommandStatus{}
 						}
 						cmdStatus.DeepCopyInto(dm.Status.CommandStatus)
-
-						return r.Status().Update(ctx, dm)
-					})
-
-					if err != nil {
-						log.Error(err, "failed to update CommandStatus with Progress", "cmdStatus", cmdStatus)
+						if err := r.Status().Update(ctx, dm); err != nil {
+							log.Info("Progress update skipped", "error", err)
+						}
 					}
 				}
 
