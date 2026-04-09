@@ -84,7 +84,7 @@ type Driver struct {
 // and cancel data movement operations in progress.
 // These objects are stored in the Driver.contexts map.
 type SrvrDataMovementRecord struct {
-	cancelContext helpers.DataMovementCancelContext
+	cancelContext helpers.DataMovementContext
 
 	// Save a reference to the NnfDataMovement when in mock mode.
 	mockDM *nnfv1alpha11.NnfDataMovement
@@ -361,7 +361,7 @@ func (r *DriverRequest) recordRequest(ctx context.Context, dm *nnfv1alpha11.NnfD
 	// found by another server thread if necessary.
 	ctxCancel, cancel := context.WithCancel(ctx)
 	record := SrvrDataMovementRecord{
-		cancelContext: helpers.DataMovementCancelContext{
+		cancelContext: helpers.DataMovementContext{
 			Ctx:    ctxCancel,
 			Cancel: cancel,
 		},
