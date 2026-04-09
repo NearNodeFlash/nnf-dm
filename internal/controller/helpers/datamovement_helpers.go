@@ -83,11 +83,14 @@ var dcpStatsRegexes = []statsRegex{
 	{"rate", regexp.MustCompile(`Rate: (.*)`)},
 }
 
-// Keep track of the context and its cancel function so that we can track
-// and cancel data movement operations in progress
-type DataMovementCancelContext struct {
+// DataMovementContext tracks an in-progress data movement operation. It holds
+// the context/cancel for cancellation, and Result is set by the goroutine
+// when the command finishes so the reconciler can write the final status
+// using standard controller-runtime retry semantics.
+type DataMovementContext struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
+	Result *nnfv1alpha11.NnfDataMovementStatus
 }
 
 // Invalid error is a non-recoverable error type that implies the Data Movement resource is invalid

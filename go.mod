@@ -3,10 +3,10 @@ module github.com/NearNodeFlash/nnf-dm
 go 1.25.7
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20260309165511-cf9255cfc6a7
-	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260309172025-4b4ec57b9127
+	github.com/DataWorkflowServices/dws v0.0.1-0.20260316202252-4e24ce7ae372
+	github.com/NearNodeFlash/lustre-fs-operator v0.0.1-0.20260409140943-c59379bba6df
 	github.com/NearNodeFlash/nnf-ec v0.0.1-0.20260310162051-7797cd568379 // indirect
-	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260313175029-02a4b3a23e5d
+	github.com/NearNodeFlash/nnf-sos v0.0.1-0.20260409160114-bcb00b928378
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.16.0
@@ -14,8 +14,8 @@ require (
 	go.uber.org/zap v1.25.0
 	golang.org/x/crypto v0.48.0
 	golang.org/x/sys v0.41.0
-	google.golang.org/grpc v1.69.4
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/grpc v1.79.3
+	google.golang.org/protobuf v1.36.10
 	k8s.io/api v0.28.1
 	k8s.io/apimachinery v0.28.1
 	k8s.io/client-go v0.28.1
@@ -30,7 +30,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -41,7 +41,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/google/uuid v1.6.0
@@ -69,7 +69,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

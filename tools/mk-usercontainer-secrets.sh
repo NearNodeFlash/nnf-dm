@@ -163,6 +163,17 @@ create_secrets() {
         echo "The user-container secrets already exist in the cluster."
         exit 0
     fi
+
+    # The secrets don't exist in the cluster. If stale cert files remain on
+    # disk from a previous run (e.g. after a kind cluster reset), remove them
+    # so generate_certs() produces a fresh key pair with the current SANs.
+    if [[ -e "$CERTDIR" ]]; then
+        echo "Removing stale cert directory $CERTDIR (secrets not in cluster)."
+        rm -rf "$CERTDIR"
+    fi
+
+    generate_certs
+
     if ! kubectl create secret tls $SERVER_SECRET_TLS --cert "$SERVER_CERT" --key "$CA_KEY"; then
         echo "Unable to create the $SERVER_SECRET_TLS secret."
         exit 1
@@ -176,9 +187,10 @@ create_secrets() {
     fi
 }
 
-generate_certs
 if [[ -n $CREATE_SECRETS ]]; then
     create_secrets
+else
+    generate_certs
 fi
 exit 0
 
