@@ -1,0 +1,118 @@
+.TH COPY_OFFLOAD_INIT 3 "January 2025" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_init \- create and initialize a copy-offload handle
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "COPY_OFFLOAD *copy_offload_init(void);"
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_init ()
+function creates and initializes a new COPY_OFFLOAD handle for communicating
+with a copy-offload server. This handle must be used for all subsequent
+copy-offload operations.
+.PP
+The function performs the following initialization:
+.IP \(bu 3
+Calls
+.BR curl_global_init (3)
+with CURL_GLOBAL_ALL
+.IP \(bu
+Creates a new CURL easy handle via
+.BR curl_easy_init (3)
+.IP \(bu
+Allocates and zeros a COPY_OFFLOAD structure
+.IP \(bu
+Sets initial state for error tracking
+.PP
+The returned handle is not yet configured for communication. After initialization,
+the caller must invoke
+.BR copy_offload_configure (3)
+or
+.BR copy_offload_configure_without_tls (3)
+to establish connection parameters before performing any operations that
+communicate with the server.
+.PP
+The handle maintains internal state including:
+.IP \(bu 3
+libcurl session information
+.IP \(bu
+Server connection parameters
+.IP \(bu
+TLS certificate and authentication token
+.IP \(bu
+Error messages and HTTP status codes
+.IP \(bu
+Protocol and hostname information
+.SH RETURN VALUE
+On success, returns a pointer to a newly allocated COPY_OFFLOAD handle.
+.PP
+On failure, prints an error message to stderr and returns NULL. Failure typically
+indicates that libcurl initialization failed, which may occur if the system is
+out of memory or libcurl cannot be initialized.
+.SH ERRORS
+This function does not set
+.IR errno .
+Error conditions are reported by returning NULL and printing diagnostic information
+to stderr.
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_init ()
+T}	Thread safety: MT-Unsafe
+.TE
+.PP
+This function calls
+.BR curl_global_init (3)
+which is not thread-safe. It should only be called once per process, typically
+from the main thread before any threads are created.
+.SH EXAMPLE
+.nf
+#include <stdio.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+
+    handle = copy_offload_init();
+    if (!handle) {
+        fprintf(stderr, "Failed to initialize handle\\n");
+        return 1;
+    }
+
+    /* Configure and use the handle... */
+
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+Every handle created with
+.BR copy_offload_init ()
+must be freed with
+.BR copy_offload_cleanup (3)
+to prevent memory leaks
+.IP \(bu
+The handle is not ready for use until
+.BR copy_offload_configure (3)
+or
+.BR copy_offload_configure_without_tls (3)
+has been called
+.IP \(bu
+Calling this function multiple times creates independent handles
+.SH SEE ALSO
+.BR copy_offload_configure (3),
+.BR copy_offload_configure_without_tls (3),
+.BR copy_offload_cleanup (3),
+.BR curl_easy_init (3),
+.BR curl_global_init (3),
+.BR libcopyoffload (3)

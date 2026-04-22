@@ -1,0 +1,212 @@
+.TH COPY_OFFLOAD_STATUS 3 "January 2025" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_status \- query the status of a data movement job
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "int copy_offload_status(COPY_OFFLOAD *" offload ", char *" job_name ,
+.BI "                        int " max_wait_secs ,
+.BI "                        copy_offload_status_response_t **" status_response );
+.PP
+.BI "void copy_offload_status_cleanup("
+.BI "                        copy_offload_status_response_t *" status_response );
+.PP
+.BI "void copy_offload_status_pretty_print(FILE *" out ,
+.BI "                        copy_offload_status_response_t *" status_response );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_status ()
+function queries the copy-offload server for the current status of a data movement
+job previously submitted via
+.BR copy_offload_copy (3).
+The function can either return immediately with the current status or wait for
+the job to complete.
+.PP
+The response is parsed from JSON into a structured format that includes job state,
+progress information, timing data, and error messages if any.
+.SS Parameters
+.TP
+.I offload
+Handle initialized and configured for server communication.
+.TP
+.I job_name
+Job identifier returned by
+.BR copy_offload_copy (3).
+Typically in the format "job-NNNNNNNN".
+.TP
+.I max_wait_secs
+Maximum time in seconds to wait for the job to complete:
+.RS
+.IP \(bu 3
+0 - Return immediately with current status
+.IP \(bu
+\-1 - Wait indefinitely until completion
+.IP \(bu
+>0 - Wait up to specified seconds, return earlier if completed
+.RE
+.TP
+.I status_response
+Pointer to a pointer that will receive the status response structure. The caller
+must call
+.BR copy_offload_status_cleanup (3)
+on this structure to free associated memory.
+.SS Status Response Structure
+The
+.B copy_offload_status_response_t
+structure contains:
+.TP
+.I state
+Current job state (e.g., "Starting", "Running", "Completed", "Error").
+.TP
+.I status
+More detailed status description.
+.TP
+.I message
+Additional information about the current state or any errors.
+.TP
+.I command_status
+Structure containing:
+.RS
+.IP \(bu 3
+.I command
+- The data movement command being executed
+.IP \(bu
+.I progress
+- Percentage complete (0-100)
+.IP \(bu
+.I elapsed_time
+- Duration of operation (e.g., "1m30s")
+.IP \(bu
+.I last_message
+- Most recent output line from the command
+.IP \(bu
+.I last_message_time
+- Timestamp of last_message
+.RE
+.TP
+.I start_time
+Local time when the job started.
+.TP
+.I end_time
+Local time when the job completed (NULL if still running).
+.SS Helper Functions
+.TP
+.BR copy_offload_status_cleanup ()
+Frees all memory associated with a status response structure, including the
+underlying JSON object. After calling this function, no fields of the structure
+should be accessed.
+.TP
+.BR copy_offload_status_pretty_print ()
+Writes a human-readable representation of the status response to the specified
+file stream. Useful for debugging and logging.
+.SH RETURN VALUE
+.BR copy_offload_status ()
+returns 0 on success. On success,
+.I *status_response
+points to a valid structure that must be freed with
+.BR copy_offload_status_cleanup (3).
+.PP
+Returns 1 on failure. On failure,
+.I offload->err_message
+contains an error description and
+.I *status_response
+may be NULL or point to a partial response structure.
+.PP
+.BR copy_offload_status_cleanup ()
+and
+.BR copy_offload_status_pretty_print ()
+do not return values.
+.SH ERRORS
+Error messages are stored in
+.IR offload->err_message .
+Common errors:
+.IP \(bu 3
+"Error formatting request: buffer too small" - Job name or parameters too long
+.IP \(bu
+libcurl errors - Network failures, connection timeouts
+.IP \(bu
+HTTP 404 - Job not found (invalid job_name or job expired)
+.IP \(bu
+HTTP 401 - Authentication failure
+.PP
+This function does not set
+.IR errno .
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_status ()
+T}	Thread safety: MT-Safe
+.TE
+.PP
+Thread-safe if each thread uses its own COPY_OFFLOAD handle and status_response
+structure.
+.SH EXAMPLE
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    char *job_name = NULL;
+    copy_offload_status_response_t *status = NULL;
+    int ret;
+
+    handle = copy_offload_init();
+    copy_offload_configure(handle);
+
+    /* Submit a job */
+    ret = copy_offload_copy(handle, NULL, 4, 8, 0,
+                            "/source/data", "/dest/data",
+                            &job_name);
+    if (ret != 0) {
+        /* handle error */
+        return 1;
+    }
+
+    /* Wait up to 5 minutes for completion */
+    ret = copy_offload_status(handle, job_name, 300, &status);
+    if (ret != 0) {
+        fprintf(stderr, "Status query failed: %s\\n",
+                handle->err_message);
+    } else if (status) {
+        printf("Job state: %s\\n", status->state);
+        printf("Progress: %d%%\\n", status->command_status.progress);
+
+        /* Pretty-print full status */
+        copy_offload_status_pretty_print(stdout, status);
+
+        copy_offload_status_cleanup(status);
+    }
+
+    free(job_name);
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+The status_response structure contains pointers into the internal JSON object.
+These pointers become invalid after
+.BR copy_offload_status_cleanup ()
+.IP \(bu
+When max_wait_secs is 0, the function returns immediately, making it suitable
+for polling loops
+.IP \(bu
+The server may enforce maximum wait times regardless of max_wait_secs
+.IP \(bu
+Progress information is only available when using dcp-based data movement tools
+.SH SEE ALSO
+.BR copy_offload_copy (3),
+.BR copy_offload_cancel (3),
+.BR copy_offload_list (3),
+.BR json_tokener_parse (3),
+.BR libcopyoffload (3)

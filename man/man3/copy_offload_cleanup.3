@@ -1,0 +1,166 @@
+.TH COPY_OFFLOAD_CLEANUP 3 "January 2025" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_cleanup \- free resources associated with a handle
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "void copy_offload_cleanup(COPY_OFFLOAD *" offload );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_cleanup ()
+function frees all resources associated with a COPY_OFFLOAD handle created by
+.BR copy_offload_init (3).
+This includes libcurl handles, allocated buffers, and internal state.
+.PP
+After calling this function, the handle is no longer valid and must not be used
+for any operations. Attempting to use a cleaned-up handle results in undefined
+behavior.
+.PP
+The function performs the following cleanup:
+.IP \(bu 3
+Frees the bearer token buffer if allocated
+.IP \(bu
+Frees the server hostname buffer if allocated
+.IP \(bu
+Calls
+.BR curl_easy_cleanup (3)
+on the libcurl handle
+.IP \(bu
+Calls
+.BR curl_global_cleanup (3)
+.IP \(bu
+Sets the curl pointer to NULL
+.SS Safe Usage
+It is safe to call
+.BR copy_offload_cleanup ()
+on:
+.IP \(bu 3
+A handle that was successfully initialized
+.IP \(bu
+A handle that was partially configured (cleanup is idempotent)
+.PP
+It is NOT safe to call
+.BR copy_offload_cleanup ()
+on:
+.IP \(bu 3
+NULL pointers (causes segmentation fault)
+.IP \(bu
+Already cleaned-up handles
+.IP \(bu
+Handles that are actively being used by other threads
+.SH RETURN VALUE
+This function does not return a value.
+.SH ERRORS
+This function does not report errors or set
+.IR errno .
+If the handle is invalid or NULL, the behavior is undefined.
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_cleanup ()
+T}	Thread safety: MT-Unsafe
+.TE
+.PP
+This function is not thread-safe. It must not be called concurrently with any
+other operations on the same handle, including other calls to
+.BR copy_offload_cleanup ().
+.PP
+.BR curl_global_cleanup (3)
+affects process-wide state and should only be called when no other threads are
+using libcurl.
+.SH EXAMPLE
+.nf
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+
+    handle = copy_offload_init();
+    if (!handle) {
+        return 1;
+    }
+
+    /* Use the handle for operations... */
+
+    /* Always cleanup before exit */
+    copy_offload_cleanup(handle);
+
+    /* handle is now invalid, do not use */
+
+    return 0;
+}
+.fi
+.PP
+Example with error handling:
+.PP
+.nf
+#include <stdio.h>
+#include <copy-offload.h>
+
+int perform_copy(const char *src, const char *dst) {
+    COPY_OFFLOAD *handle = NULL;
+    char *job_name = NULL;
+    int ret = 1;
+
+    handle = copy_offload_init();
+    if (!handle) {
+        fprintf(stderr, "Init failed\\n");
+        goto cleanup;
+    }
+
+    if (copy_offload_configure(handle) != 0) {
+        fprintf(stderr, "Configure failed: %s\\n",
+                handle->err_message);
+        goto cleanup;
+    }
+
+    if (copy_offload_copy(handle, NULL, 4, 8, 0,
+                          (char *)src, (char *)dst,
+                          &job_name) != 0) {
+        fprintf(stderr, "Copy failed: %s\\n",
+                handle->err_message);
+        goto cleanup;
+    }
+
+    printf("Job: %s\\n", job_name);
+    ret = 0;
+
+cleanup:
+    free(job_name);
+    if (handle) {
+        copy_offload_cleanup(handle);
+    }
+    return ret;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+Every handle created with
+.BR copy_offload_init (3)
+must be freed with
+.BR copy_offload_cleanup ()
+to prevent memory leaks
+.IP \(bu
+Always call cleanup before program exit, even on error paths
+.IP \(bu
+Do not access handle members or use the handle after cleanup
+.IP \(bu
+Free any output strings (from
+.BR copy_offload_copy (),
+.BR copy_offload_list (),
+etc.) before calling cleanup
+.IP \(bu
+Use goto-style error handling to ensure cleanup is always performed
+.SH SEE ALSO
+.BR copy_offload_init (3),
+.BR curl_easy_cleanup (3),
+.BR curl_global_cleanup (3),
+.BR libcopyoffload (3)

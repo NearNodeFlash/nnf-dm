@@ -1,0 +1,190 @@
+.TH LIBCOPYOFFLOAD 3 "January 2025" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+libcopyoffload \- library for offloading data movement operations
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.br
+Also requires: libcurl (\-lcurl), libjson-c (\-ljson-c)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.sp
+Link with \fI\-lcopyoffload \-lcurl \-ljson-c\fP
+.fi
+.SH DESCRIPTION
+The
+.B libcopyoffload
+library provides a C API for offloading data movement operations to a remote
+copy-offload server. This allows compute applications to initiate, monitor, and
+manage large-scale data transfers without blocking application execution.
+.PP
+The library establishes secure TLS connections to copy-offload servers running
+on NearNodeFlash (NNF) Rabbit nodes and supports authentication via bearer tokens.
+Data movement requests are submitted as asynchronous jobs that can be monitored,
+listed, and cancelled.
+.SS Key Features
+.IP \(bu 3
+Secure TLS 1.3 communication with copy-offload servers
+.IP \(bu
+Bearer token authentication for workflow isolation
+.IP \(bu
+Asynchronous data movement job submission
+.IP \(bu
+Job monitoring with progress tracking
+.IP \(bu
+Job cancellation capability
+.IP \(bu
+Support for dry-run operations
+.IP \(bu
+Configurable parallelism (slots)
+.SS Typical Workflow
+.IP 1. 4
+Initialize handle with
+.BR copy_offload_init (3)
+.IP 2.
+Configure connection with
+.BR copy_offload_configure (3)
+.IP 3.
+Submit copy request with
+.BR copy_offload_copy (3)
+.IP 4.
+Monitor progress with
+.BR copy_offload_status (3)
+.IP 5.
+Clean up with
+.BR copy_offload_cleanup (3)
+.SS Environment Variables
+.TP
+.B DW_WORKFLOW_TOKEN
+Bearer token for authenticating with the copy-offload server. This token is
+typically provided by the workflow management system and grants access to the
+user's workflow namespace.
+.TP
+.B NNF_CONTAINER_LAUNCHER
+The hostname of the Rabbit node running the copy-offload server when using MPI.
+If not set, the library reads from
+.IR /etc/local-rabbit.conf .
+.TP
+.B NNF_CONTAINER_PORTS
+Comma-separated list of ports the copy-offload server is listening on. The
+library uses the first port in the list.
+.SS Files
+.TP
+.I /etc/local-rabbit.conf
+Contains the hostname of the local Rabbit node. Used when
+.B NNF_CONTAINER_LAUNCHER
+is not set.
+.TP
+.I /etc/nnf-dm-usercontainer/cert.pem
+Default TLS certificate file in PEM format. Used to verify the server's identity
+during TLS handshake.
+.SS API Version
+The library uses API version 1.0. The version is communicated to the server via
+the "Accepts-version: 1.0" HTTP header. Version mismatches will result in
+connection errors.
+.SS Error Handling
+Most functions return 0 on success and 1 on failure. On failure, a detailed error
+message is available in the handle's
+.I err_message
+field. The
+.I err_message
+buffer is CURL_ERROR_SIZE * 2 bytes and contains either libcurl error codes and
+messages or HTTP response errors from the server.
+.PP
+HTTP response codes are available in the handle's
+.I http_code
+field after operations that communicate with the server. A value of \-1 indicates
+no HTTP response was received (typically due to libcurl errors).
+.SS Thread Safety
+The
+.B libcopyoffload
+library is not thread-safe. Each thread should use its own COPY_OFFLOAD handle.
+The underlying libcurl library is initialized with
+.BR curl_global_init (3)
+which must only be called once per process.
+.SS Memory Management
+.IP \(bu 3
+Handles created with
+.BR copy_offload_init (3)
+must be freed with
+.BR copy_offload_cleanup (3)
+.IP \(bu
+String outputs returned via char** parameters must be freed by the caller using
+.BR free (3)
+.IP \(bu
+Status response structures must be cleaned up with
+.BR copy_offload_status_cleanup (3)
+.SH EXAMPLE
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    char *job_name = NULL;
+    int ret;
+
+    /* Initialize and configure */
+    handle = copy_offload_init();
+    if (!handle) {
+        fprintf(stderr, "Failed to initialize\\n");
+        return 1;
+    }
+
+    ret = copy_offload_configure(handle);
+    if (ret != 0) {
+        fprintf(stderr, "Configure failed: %s\\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    /* Submit copy request */
+    ret = copy_offload_copy(handle, "default", 4, 8, 0,
+                            "/source/data", "/dest/data",
+                            &job_name);
+    if (ret != 0) {
+        fprintf(stderr, "Copy failed: %s\\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    printf("Job submitted: %s\\n", job_name);
+
+    /* Monitor status */
+    copy_offload_status_response_t *status = NULL;
+    ret = copy_offload_status(handle, job_name, 300, &status);
+    if (ret == 0 && status) {
+        copy_offload_status_pretty_print(stdout, status);
+        copy_offload_status_cleanup(status);
+    }
+
+    free(job_name);
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH SEE ALSO
+.BR copy_offload_init (3),
+.BR copy_offload_configure (3),
+.BR copy_offload_copy (3),
+.BR copy_offload_status (3),
+.BR copy_offload_list (3),
+.BR copy_offload_cancel (3),
+.BR copy_offload_cleanup (3),
+.BR curl_easy_init (3),
+.BR json_tokener_parse (3)
+.PP
+NearNodeFlash Copy-Offload Documentation:
+.br
+https://nearnodeflash.github.io/dev/guides/data-movement/copy-offload/
+.SH NOTES
+This library is designed for use within the NearNodeFlash (NNF) environment on
+HPE systems. It requires a properly configured copy-offload server and workflow
+infrastructure.
+.SH COPYRIGHT
+Copyright 2024-2025 Hewlett Packard Enterprise Development LP
+.PP
+Licensed under the Apache License, Version 2.0.

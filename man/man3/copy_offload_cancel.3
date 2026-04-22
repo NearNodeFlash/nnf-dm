@@ -1,0 +1,175 @@
+.TH COPY_OFFLOAD_CANCEL 3 "January 2025" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_cancel \- cancel a running copy-offload job
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "int copy_offload_cancel(COPY_OFFLOAD *" offload ", char *" job_name ,
+.BI "                        char **" output );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_cancel ()
+function requests cancellation of an active copy-offload job on the server. The
+function sends an HTTP DELETE request to the server's /cancel/{job_name} endpoint.
+.PP
+Cancellation is asynchronous. The function returns immediately after submitting
+the cancellation request, but the actual job termination may take some time
+depending on the data movement tool and current operation.
+.SS Parameters
+.TP
+.I offload
+Handle initialized and configured for server communication.
+.TP
+.I job_name
+Job identifier to cancel, as returned by
+.BR copy_offload_copy (3).
+.TP
+.I output
+Pointer to a char* that will receive any response message from the server. The
+caller is responsible for calling
+.BR free (3)
+on this string if it is non-NULL. The server may return confirmation text or
+error details.
+.SS Cancellation Behavior
+When a job is cancelled:
+.IP \(bu 3
+The server sends a termination signal to the data movement process
+.IP \(bu
+The job state transitions to "Cancelled" or "Error"
+.IP \(bu
+Partial data may exist at the destination
+.IP \(bu
+The job remains queryable via
+.BR copy_offload_status (3)
+until it expires
+.PP
+Jobs in different states respond to cancellation differently:
+.IP \(bu 3
+Queued jobs are removed immediately
+.IP \(bu
+Starting jobs are terminated during initialization
+.IP \(bu
+Running jobs are signaled to stop, may complete current file
+.IP \(bu
+Completed jobs cannot be cancelled (will return an error)
+.SH RETURN VALUE
+Returns 0 on success. On success,
+.I *output
+may contain a confirmation message from the server that must be freed by the caller.
+.PP
+Returns 1 on failure. On failure,
+.I offload->err_message
+contains an error description. The
+.I offload->http_code
+field indicates the HTTP status code.
+.PP
+Common HTTP response codes:
+.IP \(bu 3
+200 - Success, job cancellation initiated
+.IP \(bu
+404 - Job not found (invalid job_name or already expired)
+.IP \(bu
+400 - Bad request (job already completed)
+.IP \(bu
+401 - Unauthorized (invalid bearer token)
+.IP \(bu
+500 - Server error
+.SH ERRORS
+Error messages are stored in
+.IR offload->err_message .
+Common errors:
+.IP \(bu 3
+"Error formatting request: buffer too small" - Job name too long
+.IP \(bu
+libcurl errors - Network or connection failures
+.IP \(bu
+HTTP 404 - Job not found
+.IP \(bu
+HTTP 400 - Job cannot be cancelled (wrong state)
+.PP
+This function does not set
+.IR errno .
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_cancel ()
+T}	Thread safety: MT-Safe
+.TE
+.PP
+Thread-safe if each thread uses its own COPY_OFFLOAD handle.
+.SH EXAMPLE
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    char *job_name = NULL;
+    char *response = NULL;
+    int ret;
+
+    handle = copy_offload_init();
+    copy_offload_configure(handle);
+
+    /* Submit a job */
+    ret = copy_offload_copy(handle, NULL, 4, 8, 0,
+                            "/source/large-data",
+                            "/dest/large-data",
+                            &job_name);
+    if (ret != 0) {
+        fprintf(stderr, "Copy submission failed\\n");
+        return 1;
+    }
+
+    printf("Job submitted: %s\\n", job_name);
+    sleep(2);  /* Let it start */
+
+    /* Cancel the job */
+    ret = copy_offload_cancel(handle, job_name, &response);
+    if (ret != 0) {
+        fprintf(stderr, "Cancel failed: %s (HTTP %ld)\\n",
+                handle->err_message, handle->http_code);
+    } else {
+        printf("Cancellation requested\\n");
+        if (response) {
+            printf("Server response: %s\\n", response);
+            free(response);
+        }
+    }
+
+    free(job_name);
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+Cancellation is asynchronous; the job may not stop immediately
+.IP \(bu
+Partial data may remain at the destination after cancellation
+.IP \(bu
+Use
+.BR copy_offload_status (3)
+after cancellation to confirm termination
+.IP \(bu
+Attempting to cancel an already completed job returns an error
+.IP \(bu
+The job remains queryable until it expires from the server cache
+.IP \(bu
+Cannot cancel jobs that were submitted by a different workflow token
+.SH SEE ALSO
+.BR copy_offload_copy (3),
+.BR copy_offload_status (3),
+.BR copy_offload_list (3),
+.BR free (3),
+.BR libcopyoffload (3)
