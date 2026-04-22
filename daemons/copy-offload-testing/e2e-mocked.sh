@@ -184,6 +184,15 @@ if [[ $output != "" ]]; then
     exit 1
 fi
 
+# Sticky-method regression test: exercises multiple operations on a single
+# handle to verify that HTTP methods are not corrupted across calls.
+# shellcheck disable=SC2086
+if ! $CO $CO_TLS_ARGS -R -S /mnt/nnf/ooo -D /lus/foo; then
+    echo "FAIL: sticky-method regression test failed"
+    kill "$srvr_pid"
+    exit 1
+fi
+
 if [[ -z $SKIP_TLS ]]; then
     SAY_CURL="Verify that TLS args are required for curl. Expect curl to fail here."
     SAY_CURL_ERR="FAIL: Expected curl to get failure when not specifying the TLS cert/key"
