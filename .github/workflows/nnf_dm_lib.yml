@@ -12,3 +12,17 @@ jobs:
           cd daemons/compute/lib-cpp
           cmake -D CMAKE_INSTALL_PREFIX=/opt/grpc .
           make
+
+  libcopyoffload_build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libjson-c-dev pkg-config
+      - name: Build libcopyoffload and examples
+        run: |
+          cd daemons/lib-copy-offload
+          make all
+          make check-examples

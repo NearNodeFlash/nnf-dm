@@ -1,0 +1,217 @@
+.TH COPY_OFFLOAD_COPY 3 "April 2026" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_copy \- submit a new data movement request
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "int copy_offload_copy(COPY_OFFLOAD *" offload ", const char *" profile_name ,
+.BI "                      int " slots ", int " max_slots ", int " dry_run ,
+.BI "                      char *" source_path ", char *" dest_path ,
+.BI "                      char **" output );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_copy ()
+function submits an asynchronous data movement request to the copy-offload server.
+The request is queued as a job and returns immediately with a job identifier that
+can be used to monitor progress, check status, or cancel the operation.
+.PP
+The function constructs a JSON request body conforming to API version 1.0 and
+sends it via HTTP POST to the server's /trial endpoint.
+.SS Parameters
+.TP
+.I offload
+Handle initialized with
+.BR copy_offload_init (3)
+and configured with
+.BR copy_offload_configure (3).
+.TP
+.I profile_name
+Name of the Data Movement profile to use. This profile is defined on the server
+and controls data movement tool selection, options, and behavior. Pass NULL or
+empty string to use the default profile.
+.TP
+.I slots
+Number of parallel data movement processes to request. The server accepts
+.B \-1
+to defer to the profile default,
+.B 0
+to disable the slots field in the hostfile, or a positive integer to request a
+specific number.
+.TP
+.I max_slots
+Maximum number of parallel processes allowed. The server accepts
+.B \-1
+to defer to the profile default,
+.B 0
+to disable the max_slots field in the hostfile, or a positive integer as an
+upper bound. The server does not enforce that
+.I slots
+\<=
+.IR max_slots .
+.TP
+.I dry_run
+If non-zero, performs a dry-run operation that validates the request without
+actually moving data. Useful for testing paths and permissions. Pass 0 for actual
+data movement.
+.TP
+.I source_path
+Absolute path to the source file or directory. Must be accessible from the Rabbit
+node running the copy-offload server.
+.TP
+.I dest_path
+Absolute path to the destination location. Parent directory must exist and be
+writable.
+.TP
+.I output
+Pointer to a char* that will receive the job name string on success. The job name
+format is server-defined. The caller is responsible for calling
+.BR free (3)
+on this string if it is non-NULL.
+.SS Request Format
+The function sends a JSON request with the following structure:
+.PP
+.nf
+{
+  "computeName": "<local-hostname>",
+  "sourcePath": "<source_path>",
+  "destinationPath": "<dest_path>",
+  "dmProfile": "<profile_name>",
+  "dryrun": true|false,
+  "dcpOptions": "",
+  "logStdout": true,
+  "storeStdout": false,
+  "slots": <slots>,
+  "maxSlots": <max_slots>
+}
+.fi
+.SH RETURN VALUE
+Returns 0 on success. On success,
+.I *output
+contains the job name string that must be freed by the caller.
+.PP
+Returns 1 on failure. On failure,
+.I offload->err_message
+contains a descriptive error message. The
+.I offload->http_code
+field contains the HTTP response code if the request reached the server, or \-1
+if there was a libcurl error before receiving an HTTP response.
+.PP
+Common HTTP response codes:
+.IP \(bu 3
+200 - Success, job submitted
+.IP \(bu
+400 - Bad request (invalid parameters)
+.IP \(bu
+401 - Unauthorized (invalid or missing bearer token)
+.IP \(bu
+500 - Server error
+.SH ERRORS
+Error messages are stored in
+.IR offload->err_message .
+Common errors include:
+.IP \(bu 3
+"Error formatting request: buffer too small" - Request parameters too long for
+internal buffers
+.IP \(bu
+"Error formatting body: buffer too small" - JSON body exceeds buffer
+.IP \(bu
+libcurl errors - Connection failures, DNS errors, TLS errors
+.IP \(bu
+Server HTTP errors - Returned in response body and copied to err_message
+.PP
+This function does not set
+.IR errno .
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_copy ()
+T}	Thread safety: MT-Safe
+.TE
+.PP
+Thread-safe if each thread uses its own COPY_OFFLOAD handle.
+.SH EXAMPLE
+.\" example-file: example_copy.c
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    char *job_name = NULL;
+    int ret;
+
+    handle = copy_offload_init();
+    if (!handle) return 1;
+
+    if (getenv("COPY_OFFLOAD_SKIP_TLS"))
+        ret = copy_offload_configure_without_tls(handle);
+    else
+        ret = copy_offload_configure(handle);
+    if (ret != 0) {
+        fprintf(stderr, "Configure error: %s\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    if (getenv("COPY_OFFLOAD_CERT"))
+        copy_offload_override_cert(handle, getenv("COPY_OFFLOAD_CERT"));
+    if (getenv("COPY_OFFLOAD_TOKEN"))
+        copy_offload_override_token(handle, getenv("COPY_OFFLOAD_TOKEN"));
+
+    /* Submit copy with 4 initial slots, up to 8 max */
+    ret = copy_offload_copy(handle, "high-performance",
+                            4, 8, 0,
+                            "/lustre/data/input.dat",
+                            "/nvme/scratch/output.dat",
+                            &job_name);
+    if (ret != 0) {
+        fprintf(stderr, "Copy failed: %s (HTTP %ld)\n",
+                handle->err_message, handle->http_code);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    printf("Copy job submitted successfully: %s\n", job_name);
+
+    /* Monitor or wait for completion... */
+
+    free(job_name);
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+The job name returned in
+.I *output
+must be freed by the caller
+.IP \(bu
+Data movement proceeds asynchronously after this function returns
+.IP \(bu
+Use
+.BR copy_offload_status (3)
+to monitor job progress
+.IP \(bu
+Source and destination paths must be absolute paths
+.IP \(bu
+Profile names are server-defined and may vary by installation
+.IP \(bu
+The server may apply quota limits on slots and job count
+.SH SEE ALSO
+.BR copy_offload_status (3),
+.BR copy_offload_list (3),
+.BR copy_offload_cancel (3),
+.BR copy_offload_init (3),
+.BR copy_offload_configure (3),
+.BR free (3),
+.BR libcopyoffload (3)

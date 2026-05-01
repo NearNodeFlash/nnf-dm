@@ -1,0 +1,179 @@
+.TH COPY_OFFLOAD_LIST 3 "April 2026" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_list \- list active copy-offload jobs
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "int copy_offload_list(COPY_OFFLOAD *" offload ", char **" output );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_list ()
+function retrieves a list of all active copy-offload jobs on the server. This
+includes jobs that are queued, starting, running, or recently completed but not
+yet expired from the server's job cache.
+.PP
+The function sends an HTTP GET request to the server's /list endpoint and returns
+a comma-separated list of job names.
+.SS Parameters
+.TP
+.I offload
+Handle initialized and configured for server communication.
+.TP
+.I output
+Pointer to a char* initialized to NULL by the caller. On success, if the server
+returns a non-empty response body,
+.I *output
+is set to a newly allocated string containing the comma-separated list of job
+names. The caller is responsible for calling
+.BR free (3)
+on this string if it is non-NULL. If the server returns an empty body,
+.I *output
+remains NULL.
+.SS Output Format
+When non-NULL, the output string contains job names separated by commas with no
+spaces:
+.PP
+.in +4n
+.EX
+job-00000001,job-00000003,job-00000007
+.EE
+.in
+.PP
+Job names are in the format returned by
+.BR copy_offload_copy (3).
+.SH RETURN VALUE
+Returns 0 on success. On success,
+.I *output
+may contain the job list string (if jobs are active) or remain NULL (if no jobs
+are active). Free
+.I *output
+with
+.BR free (3)
+if it is non-NULL.
+.PP
+Returns 1 on failure. On failure,
+.I offload->err_message
+contains a descriptive error message. The
+.I offload->http_code
+field contains the HTTP response code if available.
+.PP
+Common HTTP response codes:
+.IP \(bu 3
+200 - Success
+.IP \(bu
+401 - Unauthorized (invalid or missing bearer token)
+.IP \(bu
+500 - Server error
+.SH ERRORS
+Error messages are stored in
+.IR offload->err_message .
+Common errors include:
+.IP \(bu 3
+"Error formatting request: buffer too small" - URL construction failed
+.IP \(bu
+libcurl errors - Connection failures, DNS resolution errors
+.IP \(bu
+Server HTTP errors - Authentication failures, server unavailable
+.PP
+This function does not set
+.IR errno .
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_list ()
+T}	Thread safety: MT-Safe
+.TE
+.PP
+Thread-safe if each thread uses its own COPY_OFFLOAD handle.
+.SH EXAMPLE
+.\" example-file: example_list.c
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    char *job_list = NULL;
+    char *job, *saveptr;
+    int ret;
+
+    handle = copy_offload_init();
+    if (!handle) return 1;
+
+    if (getenv("COPY_OFFLOAD_SKIP_TLS"))
+        ret = copy_offload_configure_without_tls(handle);
+    else
+        ret = copy_offload_configure(handle);
+    if (ret != 0) {
+        fprintf(stderr, "Configure failed: %s\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    if (getenv("COPY_OFFLOAD_CERT"))
+        copy_offload_override_cert(handle, getenv("COPY_OFFLOAD_CERT"));
+    if (getenv("COPY_OFFLOAD_TOKEN"))
+        copy_offload_override_token(handle, getenv("COPY_OFFLOAD_TOKEN"));
+
+    ret = copy_offload_list(handle, &job_list);
+    if (ret != 0) {
+        fprintf(stderr, "List failed: %s\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    if (job_list != NULL && strlen(job_list) > 0) {
+        printf("Active jobs:\n");
+        job = strtok_r(job_list, ",", &saveptr);
+        while (job != NULL) {
+            printf("  %s\n", job);
+            job = strtok_r(NULL, ",", &saveptr);
+        }
+    } else {
+        printf("No active jobs\n");
+    }
+
+    free(job_list);
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+Initialize
+.I *output
+to NULL before calling; the function does not set it if the server returns no
+response body
+.IP \(bu
+The output string must be freed by the caller using
+.BR free (3)
+if non-NULL
+.IP \(bu
+Job list reflects the server's current state at the time of the query
+.IP \(bu
+Completed jobs remain in the list until expired from the server cache
+.IP \(bu
+Jobs may complete or be cancelled between listing and subsequent operations
+.IP \(bu
+Parse the comma-separated list using
+.BR strtok (3)
+or similar functions
+.SH SEE ALSO
+.BR copy_offload_copy (3),
+.BR copy_offload_status (3),
+.BR copy_offload_cancel (3),
+.BR strtok (3),
+.BR free (3),
+.BR libcopyoffload (3)

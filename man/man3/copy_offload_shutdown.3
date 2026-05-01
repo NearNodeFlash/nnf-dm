@@ -1,0 +1,157 @@
+.TH COPY_OFFLOAD_SHUTDOWN 3 "April 2026" "libcopyoffload" "Library Functions Manual"
+.SH NAME
+copy_offload_shutdown \- shutdown the copy-offload server
+.SH LIBRARY
+Copy Offload Library (libcopyoffload, \-lcopyoffload)
+.SH SYNOPSIS
+.nf
+.B #include <copy-offload.h>
+.PP
+.BI "int copy_offload_shutdown(COPY_OFFLOAD *" offload );
+.fi
+.SH DESCRIPTION
+The
+.BR copy_offload_shutdown ()
+function requests a graceful shutdown of the copy-offload server. This operation
+is typically used during system maintenance or when terminating a workflow that
+launched its own copy-offload server instance.
+.PP
+The function performs a two-step process:
+.IP 1. 4
+Queries the server for active jobs using
+.BR copy_offload_list (3)
+internally
+.IP 2.
+If no active jobs exist, sends a shutdown request to the server
+.PP
+The server will exit cleanly after completing the shutdown request, terminating
+its process and freeing all resources.
+.SS Safety Checks
+The function refuses to shutdown the server if any jobs are active (queued,
+starting, or running). This prevents data loss or corruption from interrupted
+transfers. To forcefully shutdown, all active jobs must first be cancelled using
+.BR copy_offload_cancel (3)
+or allowed to complete.
+.SS Shutdown Request
+If the safety check passes, the function sends an HTTP POST request to the server's
+/shutdown endpoint. The server will:
+.IP \(bu 3
+Complete any final cleanup operations
+.IP \(bu
+Close all network connections
+.IP \(bu
+Exit with status code 0
+.SH RETURN VALUE
+Returns 0 on success, indicating the server has acknowledged the shutdown request
+and is terminating.
+.PP
+Returns 1 on failure. Failure reasons are placed in
+.IR offload->err_message .
+Common failures include:
+.IP \(bu 3
+Active jobs still running - Error message indicates that cancellation or completion
+is required before shutdown
+.IP \(bu
+Communication failure - Unable to reach the server
+.IP \(bu
+Authentication failure - Invalid bearer token
+.IP \(bu
+Permission denied - Server policy prohibits shutdown requests
+.PP
+The
+.I offload->http_code
+field contains the HTTP status code if the request reached the server.
+.SH ERRORS
+Error messages are stored in
+.IR offload->err_message :
+.IP \(bu 3
+"Cannot shutdown: active copy-offload requests are still running." - One or more
+jobs are active; cancel or wait for them to complete first
+.IP \(bu
+"Error formatting shutdown request" - Internal buffer overflow
+.IP \(bu
+"Failed to shutdown server (HTTP %ld)" - Server refused the shutdown
+.IP \(bu
+libcurl errors - Network failures, timeouts
+.PP
+This function does not set
+.IR errno .
+.SH ATTRIBUTES
+.TS
+allbox;
+lb lb
+l l.
+Interface	Attribute
+T{
+.BR copy_offload_shutdown ()
+T}	Thread safety: MT-Safe
+.TE
+.PP
+Thread-safe if each thread uses its own COPY_OFFLOAD handle. However, shutting
+down the server affects all clients globally.
+.SH EXAMPLE
+.\" example-file: example_shutdown.c
+.nf
+#include <stdio.h>
+#include <stdlib.h>
+#include <copy-offload.h>
+
+int main(void) {
+    COPY_OFFLOAD *handle;
+    int ret;
+
+    handle = copy_offload_init();
+    if (!handle) return 1;
+
+    if (getenv("COPY_OFFLOAD_SKIP_TLS"))
+        ret = copy_offload_configure_without_tls(handle);
+    else
+        ret = copy_offload_configure(handle);
+    if (ret != 0) {
+        fprintf(stderr, "Configure failed: %s\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    if (getenv("COPY_OFFLOAD_CERT"))
+        copy_offload_override_cert(handle, getenv("COPY_OFFLOAD_CERT"));
+    if (getenv("COPY_OFFLOAD_TOKEN"))
+        copy_offload_override_token(handle, getenv("COPY_OFFLOAD_TOKEN"));
+
+    /* Shutdown; the function checks for active jobs internally */
+    ret = copy_offload_shutdown(handle);
+    if (ret != 0) {
+        fprintf(stderr, "Shutdown failed: %s\n",
+                handle->err_message);
+        copy_offload_cleanup(handle);
+        return 1;
+    }
+
+    printf("Server shutdown initiated successfully\n");
+    copy_offload_cleanup(handle);
+    return 0;
+}
+.fi
+.SH NOTES
+.IP \(bu 3
+This function checks for active jobs internally before sending the shutdown
+request; there is no need to call
+.BR copy_offload_list (3)
+separately
+.IP \(bu
+This function is intended for administrative or workflow cleanup tasks
+.IP \(bu
+Shutting down the server affects all users sharing that server instance
+.IP \(bu
+The server must be restarted manually if shutdown was unintentional
+.IP \(bu
+In multi-user environments, consider policy restrictions on shutdown
+.IP \(bu
+After successful shutdown, subsequent operations on any handle will fail with
+connection errors
+.SH SEE ALSO
+.BR copy_offload_list (3),
+.BR copy_offload_cancel (3),
+.BR copy_offload_init (3),
+.BR libcopyoffload (3)

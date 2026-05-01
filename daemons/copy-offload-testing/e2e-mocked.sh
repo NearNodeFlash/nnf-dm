@@ -22,8 +22,10 @@ set -o pipefail
 if [[ -z $SKIP_BUILD ]]; then
     make build-copy-offload-local || exit 1
     make -C ./daemons/lib-copy-offload tester || exit 1
+    make -C ./daemons/lib-copy-offload examples || exit 1
 fi
 CO="./daemons/lib-copy-offload/tester ${SKIP_TLS:+-s}"
+EXAMPLES="./daemons/lib-copy-offload/examples"
 SRVR_NAME="localhost"
 SRVR_PORT="4000"
 SRVR="$SRVR_NAME:$SRVR_PORT"
@@ -221,17 +223,86 @@ if [[ -z $SKIP_TLS ]]; then
     echo "output($output)"
 fi
 
+# Run man page example programs against the mock server.
+# Set up environment for the examples' env-var-based configuration.
+if [[ -n $SKIP_TLS ]]; then
+    export COPY_OFFLOAD_SKIP_TLS=1
+else
+    export COPY_OFFLOAD_CERT="$cacert"
+fi
+# DW_WORKFLOW_TOKEN is already exported when tokens are enabled.
+# The examples pick it up via copy_offload_configure()/getenv().
+
+echo
+echo "Running man page examples"
+
+if ! $EXAMPLES/example_init; then
+    echo "FAIL: example_init"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_configure; then
+    echo "FAIL: example_configure"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_list; then
+    echo "FAIL: example_list"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_copy; then
+    echo "FAIL: example_copy"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_status; then
+    echo "FAIL: example_status"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_cancel; then
+    echo "FAIL: example_cancel"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_cleanup; then
+    echo "FAIL: example_cleanup"
+    cleanup
+fi
+
+if ! $EXAMPLES/example_overview; then
+    echo "FAIL: example_overview"
+    cleanup
+fi
+
+echo "Man page examples: PASS"
+
+# Cancel any jobs left behind by the examples before shutdown.
+# The list endpoint returns job names separated by commas.
+# shellcheck disable=SC2086
+if active=$($CO $CO_TLS_ARGS -l) && [[ -n "$active" ]]; then
+    IFS=',' read -ra jobs <<< "$active"
+    for job in "${jobs[@]}"; do
+        # shellcheck disable=SC2086
+        $CO $CO_TLS_ARGS -c "$job" || true
+    done
+fi
+
 echo
 echo "PASS: Success"
 echo "Requesting server shutdown"
 
-# Send shutdown request
+# Run example_shutdown instead of the test-tool, to exercise it too.
 # shellcheck disable=SC2086
-if ! output=$($CO $CO_TLS_ARGS -X); then
-    echo "line $LINENO output: $output"
-    cleanup
+if ! $EXAMPLES/example_shutdown; then
+    echo "FAIL: example_shutdown, falling back to test-tool"
+    # shellcheck disable=SC2086
+    if ! output=$($CO $CO_TLS_ARGS -X); then
+        echo "line $LINENO output: $output"
+        cleanup
+    fi
 fi
-echo "Shutdown response: $output"
 
 # Wait for the server to exit
 wait "$srvr_pid"
