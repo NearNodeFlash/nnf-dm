@@ -38,13 +38,37 @@ tester: test-tool/main.o libcopyoffload.a
 	$(CC) $(CFLAGS) -o $@ $< -L. -l:libcopyoffload.a $(LDFLAGS)
 
 tester-dynamic: test-tool/main.o libcopyoffload.so
-	$(CC) $(CFLAGS) -o $@ $< -L. -lcopyoffload
+	$(CC) $(CFLAGS) -o $@ $< -L. -lcopyoffload $(LDFLAGS)
 
 test-tool/main.o: test-tool/main.c copy-offload.h
 copy-offload.o: copy-offload.c copy-offload.h copy-offload-status.c
 copy-offload-status.o: copy-offload-status.c copy-offload.h
 
+MANDIR ?= /usr/local/share/man
+MAN3DIR = $(MANDIR)/man3
+MAN3PAGES = $(wildcard ../../man/man3/*.3)
+
+.PHONY: install-man
+install-man:
+	install -d $(MAN3DIR)
+	install -m 644 $(MAN3PAGES) $(MAN3DIR)/
+
+EXAMPLE_SRCS = $(wildcard examples/*.c)
+EXAMPLE_BINS = $(EXAMPLE_SRCS:.c=)
+
+.PHONY: examples
+examples: libcopyoffload.a $(EXAMPLE_BINS)
+
+examples/%: examples/%.c libcopyoffload.a copy-offload.h
+	$(CC) $(CFLAGS) -I. -o $@ $< libcopyoffload.a $(LDFLAGS)
+
+.PHONY: check-examples
+check-examples: examples
+	../../tools/check-man-examples.sh
+
 .PHONY: clean
 clean:
 	rm -f *.o core tester tester-dynamic *.a *.so
 	rm -f test-tool/*.o
+	rm -f $(EXAMPLE_BINS)
+	rm -rf examples/*.dSYM
