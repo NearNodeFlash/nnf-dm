@@ -40,6 +40,7 @@ COPY daemons/copy-offload/ daemons/copy-offload/
 COPY daemons/copy-offload-testing/ daemons/copy-offload-testing/
 COPY daemons/lib-copy-offload/ daemons/lib-copy-offload/
 COPY tools/ tools/
+COPY man/ man/
 COPY Makefile Makefile
 
 RUN apk add make bash && make clean-bin
@@ -81,7 +82,8 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o nn
 FROM builder_setup AS copy_offload_tester_builder
 
 RUN apk add curl-dev gcc libc-dev json-c json-c-dev && \
-    make -C ./daemons/lib-copy-offload tester
+    make -C ./daemons/lib-copy-offload tester && \
+    make -C ./daemons/lib-copy-offload examples
 
 ###############################################################################
 FROM builder AS testing
@@ -93,6 +95,7 @@ COPY config/ config/
 COPY hack/ hack/
 COPY --from=copy_offload_builder /workspace/nnf-copy-offload bin/
 COPY --from=copy_offload_tester_builder /workspace/daemons/lib-copy-offload/tester daemons/lib-copy-offload/tester
+COPY --from=copy_offload_tester_builder /workspace/daemons/lib-copy-offload/examples/ daemons/lib-copy-offload/examples/
 
 # Force docker build to run the shellcheck stage.
 COPY --from=shellchecker /workspace/shellcheck_okay shellcheck_okay

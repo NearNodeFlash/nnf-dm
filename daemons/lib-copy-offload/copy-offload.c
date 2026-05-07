@@ -146,7 +146,9 @@ static int _copy_offload_configure(COPY_OFFLOAD *offload, int skip_tls) {
         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
         //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYSTATUS, 1L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 1L);
+        // Use 2L for full hostname verification; 1L only checks that a
+        // name field exists without verifying it matches the hostname.
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
         curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
     }
@@ -324,6 +326,8 @@ int copy_offload_hello(COPY_OFFLOAD *offload, char **output) {
         return ret;
     }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+    // Reset to GET in case a prior call set CURLOPT_CUSTOMREQUEST.
+    curl_easy_setopt(offload->curl, CURLOPT_HTTPGET, 1L);
 
     http_code = copy_offload_perform(offload, &chunk);
     if (http_code == 200) {
@@ -368,6 +372,8 @@ int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs
         return ret;
     }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+    // Reset to GET in case a prior call set CURLOPT_CUSTOMREQUEST.
+    curl_easy_setopt(offload->curl, CURLOPT_HTTPGET, 1L);
 
     http_code = copy_offload_perform(offload, &chunk);
     if (http_code == 200)
@@ -378,6 +384,9 @@ int copy_offload_status(COPY_OFFLOAD *offload, char *job_name, int max_wait_secs
         chop(&output);
         free(chunk.response);
         *status_response = _copy_offload_status_parse(output);
+        // The parser copies what it needs into the json object tree,
+        // so the input string can be freed now.
+        free(output);
     }
     return ret;
 }
@@ -401,6 +410,8 @@ int copy_offload_list(COPY_OFFLOAD *offload, char **output) {
         return ret;
     }
     curl_easy_setopt(offload->curl, CURLOPT_URL, urlbuf);
+    // Reset to GET in case a prior call set CURLOPT_CUSTOMREQUEST.
+    curl_easy_setopt(offload->curl, CURLOPT_HTTPGET, 1L);
 
     http_code = copy_offload_perform(offload, &chunk);
     if (http_code == 200)
@@ -433,6 +444,9 @@ int copy_offload_cancel(COPY_OFFLOAD *offload, char *job_name, char **output) {
     curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
 
     http_code = copy_offload_perform(offload, &chunk);
+    // CURLOPT_CUSTOMREQUEST is sticky; reset it so subsequent calls
+    // (e.g. list, status) don't inherit the DELETE method.
+    curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, NULL);
     if (http_code == 200)
         ret = 0;
     if (chunk.response != NULL) {
@@ -557,6 +571,9 @@ int copy_offload_shutdown(COPY_OFFLOAD *offload) {
     chunk.response = NULL;
     chunk.size = 0;
     http_code = copy_offload_perform(offload, &chunk);
+    // CURLOPT_CUSTOMREQUEST is sticky; reset it so subsequent calls
+    // don't inherit the POST method.
+    curl_easy_setopt(offload->curl, CURLOPT_CUSTOMREQUEST, NULL);
     if (http_code == 200) {
         ret = 0;
     } else {

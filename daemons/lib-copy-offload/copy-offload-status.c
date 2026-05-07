@@ -121,8 +121,12 @@ void copy_offload_status_pretty_print(FILE *out, copy_offload_status_response_t 
  * the @response object.
  */
 void copy_offload_status_cleanup(copy_offload_status_response_t *response) {
-    if (response != NULL && response->_root != NULL) {
-        json_object_put(response->_root);
-        response->_root = NULL;
+    if (response != NULL) {
+        if (response->_root != NULL) {
+            json_object_put(response->_root);
+            response->_root = NULL;
+        }
+        // Free the struct itself, which was calloc'd by _copy_offload_status_parse().
+        free(response);
     }
 }
