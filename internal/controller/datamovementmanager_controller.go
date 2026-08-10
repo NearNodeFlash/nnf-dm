@@ -170,47 +170,32 @@ func (r *NnfDataMovementManagerReconciler) Reconcile(ctx context.Context, req ct
 	return ctrl.Result{}, nil
 }
 
+func generateSSHKeypair() (privatePEM []byte, authorizedKey []byte, err error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generating private key failed: %w", err)
+	}
+
+	privateDER, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("converting private key to DER format failed: %w", err)
+	}
+
+	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generating public key failed: %w", err)
+	}
+
+	privatePEM = pem.EncodeToMemory(&pem.Block{
+		Type:  keyutil.ECPrivateKeyBlockType,
+		Bytes: privateDER,
+	})
+
+	return privatePEM, ssh.MarshalAuthorizedKey(publicKey), nil
+}
+
 func (r *NnfDataMovementManagerReconciler) createSecretIfNecessary(ctx context.Context, manager *nnfv1alpha11.NnfDataMovementManager) (err error) {
 	log := log.FromContext(ctx)
-
-	newSecret := func() (*corev1.Secret, error) {
-		privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
-		if err != nil {
-			return nil, fmt.Errorf("generating private key failed: %w", err)
-		}
-		privateDER, err := x509.MarshalECPrivateKey(privateKey)
-		if err != nil {
-			return nil, fmt.Errorf("converting private key to DER format failed: %w", err)
-		}
-
-		privatePEM := pem.EncodeToMemory(&pem.Block{
-			Type:  keyutil.ECPrivateKeyBlockType,
-			Bytes: privateDER,
-		})
-
-		publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("generating public key failed: %w", err)
-		}
-
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      manager.Name,
-				Namespace: manager.Namespace,
-			},
-			Type: corev1.SecretTypeSSHAuth,
-			Data: map[string][]byte{
-				corev1.SSHAuthPrivateKey: privatePEM,
-				sshPublicKey:             ssh.MarshalAuthorizedKey(publicKey),
-			},
-		}
-
-		if err := ctrl.SetControllerReference(manager, secret, r.Scheme); err != nil {
-			return nil, fmt.Errorf("setting Secret controller reference failed: %w", err)
-		}
-
-		return secret, nil
-	}
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -219,20 +204,44 @@ func (r *NnfDataMovementManagerReconciler) createSecretIfNecessary(ctx context.C
 		},
 	}
 
-	if err = r.Get(ctx, client.ObjectKeyFromObject(secret), secret); errors.IsNotFound(err) {
-		secret, err = newSecret()
-		if err != nil {
-			return err
+	mutateFn := func() error {
+		// Only generate a keypair when the Secret has none; regenerating it would
+		// invalidate the SSH trust already established with the running worker pods.
+		if len(secret.Data[corev1.SSHAuthPrivateKey]) == 0 {
+			privatePEM, authorizedKey, err := generateSSHKeypair()
+			if err != nil {
+				return err
+			}
+
+			secret.Type = corev1.SecretTypeSSHAuth
+			secret.Data = map[string][]byte{
+				corev1.SSHAuthPrivateKey: privatePEM,
+				sshPublicKey:             authorizedKey,
+			}
 		}
 
-		if err = r.Create(ctx, secret); err != nil {
-			return err
+		// Re-applied on every reconcile so the ownerReference's apiVersion follows the
+		// current CRD version. A stale version leaves it unresolvable to the garbage
+		// collector, which then cannot clean up this Secret.
+		if err := ctrl.SetControllerReference(manager, secret, r.Scheme); err != nil {
+			return fmt.Errorf("setting Secret controller reference failed: %w", err)
 		}
 
-		log.Info("Created Secret", "object", client.ObjectKeyFromObject(secret).String())
+		return nil
 	}
 
-	return err
+	result, err := ctrl.CreateOrUpdate(ctx, r.Client, secret, mutateFn)
+	if err != nil {
+		return err
+	}
+
+	if result == controllerutil.OperationResultCreated {
+		log.Info("Created Secret", "object", client.ObjectKeyFromObject(secret).String())
+	} else if result == controllerutil.OperationResultUpdated {
+		log.Info("Updated Secret", "object", client.ObjectKeyFromObject(secret).String())
+	}
+
+	return nil
 }
 
 func (r *NnfDataMovementManagerReconciler) createOrUpdateDeploymentIfNecessary(ctx context.Context, manager *nnfv1alpha11.NnfDataMovementManager) (err error) {
