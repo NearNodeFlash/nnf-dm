@@ -4,8 +4,7 @@
             "name": "Mac",
             "includePath": [
                 "${default}",
-                "/opt/homebrew/include",
-                "${workspaceFolder}/daemons/compute/client-cpp/cmake/build"
+                "/opt/homebrew/include"
             ],
             "defines": [],
             "macFrameworkPath": [
