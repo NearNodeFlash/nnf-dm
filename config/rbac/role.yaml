@@ -57,14 +57,6 @@ rules:
   - get
   - list
 - apiGroups:
-  - dataworkflowservices.github.io
-  resources:
-  - systemconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - lus.cray.hpe.com
   resources:
   - lustrefilesystems
