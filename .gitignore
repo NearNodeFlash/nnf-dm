@@ -25,14 +25,6 @@ test.out
 *.out
 
 # Daemon executables & libraries
-daemons/compute/client-c/client
-daemons/compute/client-c/client.a
-daemons/compute/client-cpp/cmake
-daemons/compute/client-go/client-go
-daemons/compute/lib-cpp/cmake
-daemons/compute/lib-cpp/example/cmake
-daemons/compute/server/nnf-dm
-daemons/compute/server/server
 daemons/lib-copy-offload/**/*.[ao]
 daemons/lib-copy-offload/**/tester
 daemons/copy-offload-testing/certs
