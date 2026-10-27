@@ -486,11 +486,12 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 			workerContainer.SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{
-						"SETUID", // "setpriv --euid" and "dcp --uid" operations
-						"SETGID", // "setpriv --euid" and "dcp --uid" operations
-						"MKNOD",  // "mkdir -p" and directory creation in dcp
-						"CHOWN",  // dcp to change file ownership during copy
-						"FOWNER", // dcp to bypass ownership restrictions
+						"SETUID",     // "setpriv --euid" and "dcp --uid" operations
+						"SETGID",     // "setpriv --euid" and "dcp --uid" operations
+						"MKNOD",      // "mkdir -p" and directory creation in dcp
+						"CHOWN",      // dcp to change file ownership during copy
+						"FOWNER",     // dcp to bypass ownership restrictions
+						"SYS_CHROOT", // sshd privilege-separation chroot; CRI-O's default set omits it
 					},
 				},
 			}
