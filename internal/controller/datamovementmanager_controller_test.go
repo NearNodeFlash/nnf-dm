@@ -169,9 +169,12 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 		Expect(worker.SecurityContext).ToNot(BeNil())
 		Expect(worker.SecurityContext.Privileged).To(BeNil())
 		Expect(worker.SecurityContext.Capabilities).ToNot(BeNil())
-		// CRI-O's default capability set omits SYS_CHROOT; sshd's privilege-separation chroot fails without it.
+		// Runtimes differ in their default capability set (CRI-O omits SYS_CHROOT; a drop-ALL policy omits
+		// everything), so every capability the default DM commands exercise must be listed explicitly.
 		Expect(worker.SecurityContext.Capabilities.Add).To(ContainElements(
 			corev1.Capability("SYS_CHROOT"),
+			corev1.Capability("NET_BIND_SERVICE"),
+			corev1.Capability("DAC_OVERRIDE"),
 			corev1.Capability("SETUID"),
 			corev1.Capability("SETGID"),
 			corev1.Capability("MKNOD"),
