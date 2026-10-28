@@ -480,17 +480,20 @@ func (r *NnfDataMovementManagerReconciler) createOrUpdateDaemonSetIfNecessary(ct
 		if workerContainer, err := findContainer(podSpec, "worker"); err == nil {
 			workerContainer.Env = append(workerContainer.Env, corev1.EnvVar{Name: "ENVIRONMENT", Value: os.Getenv("ENVIRONMENT")})
 
-			// Configure minimal Linux capabilities for data movement operations.
-			// Data movement executes mpirun dcp/setpriv commands that require user/group changes,
-			// file ownership operations, and filesystem node creation for HPC workflows.
+			// Capabilities the data movement commands need inside the worker. Container runtimes
+			// differ in what they grant by default (CRI-O omits SYS_CHROOT; a drop-ALL policy omits
+			// everything), so list every capability the commands exercise rather than rely on defaults.
 			workerContainer.SecurityContext = &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{
-						"SETUID", // "setpriv --euid" and "dcp --uid" operations
-						"SETGID", // "setpriv --euid" and "dcp --uid" operations
-						"MKNOD",  // "mkdir -p" and directory creation in dcp
-						"CHOWN",  // dcp to change file ownership during copy
-						"FOWNER", // dcp to bypass ownership restrictions
+						"SETUID",           // "setpriv --euid", "dcp --uid", sshd privilege separation
+						"SETGID",           // "setpriv --egid --clear-groups", "dcp --gid", sshd privilege separation
+						"SYS_CHROOT",       // sshd chroots its pre-auth child into /run/sshd
+						"NET_BIND_SERVICE", // the base image setcaps this onto /usr/sbin/sshd; exec fails without it in the bounding set
+						"DAC_OVERRIDE",     // dcp keeps real uid 0 under --uid and validates paths with access(2), which checks the real uid
+						"CHOWN",            // dcp -p preserving ownership when run as root
+						"FOWNER",           // dcp -p preserving mode/timestamps on files owned by another uid
+						"MKNOD",            // dcp copying device nodes
 					},
 				},
 			}

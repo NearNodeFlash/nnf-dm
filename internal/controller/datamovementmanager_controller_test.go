@@ -162,6 +162,25 @@ var _ = Describe("Data Movement Manager Test" /*Ordered, (Ginkgo v2)*/, func() {
 			g.Expect(daemonset.Spec.UpdateStrategy.RollingUpdate.MaxSurge.StrVal).Should(Equal(maxSurgeStr))
 			return nil
 		}).Should(Succeed())
+
+		By("The worker container has the capabilities sshd and dcp need, without relying on runtime defaults")
+		worker, err := findContainer(&daemonset.Spec.Template.Spec, "worker")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(worker.SecurityContext).ToNot(BeNil())
+		Expect(worker.SecurityContext.Privileged).To(BeNil())
+		Expect(worker.SecurityContext.Capabilities).ToNot(BeNil())
+		// Runtimes differ in their default capability set (CRI-O omits SYS_CHROOT; a drop-ALL policy omits
+		// everything), so every capability the default DM commands exercise must be listed explicitly.
+		Expect(worker.SecurityContext.Capabilities.Add).To(ContainElements(
+			corev1.Capability("SYS_CHROOT"),
+			corev1.Capability("NET_BIND_SERVICE"),
+			corev1.Capability("DAC_OVERRIDE"),
+			corev1.Capability("SETUID"),
+			corev1.Capability("SETGID"),
+			corev1.Capability("MKNOD"),
+			corev1.Capability("CHOWN"),
+			corev1.Capability("FOWNER"),
+		))
 	})
 
 	It("Adds and removes global lustre volumes", func() {
